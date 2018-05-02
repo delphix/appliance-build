@@ -25,6 +25,7 @@ dstat
 emacs
 gdb
 iftop
+linux-tools-4.15.0-20-generic
 strace
 tshark
 vim
