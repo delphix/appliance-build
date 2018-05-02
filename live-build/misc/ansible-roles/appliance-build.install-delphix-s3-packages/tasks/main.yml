@@ -1,0 +1,71 @@
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+- fail:
+    msg: "Required variable 'bucket' undefined or empty."
+  when: bucket is undefined or bucket == ''
+
+- fail:
+    msg: "Required variable 'prefix' undefined or empty."
+  when: prefix is undefined or prefix == ''
+
+#
+# We need to download the packages from S3 on the local system running
+# the playbook, because the awscli tools may not be available on the
+# remote system. Once the S3 directory/prefix containing the packages is
+# downloaded, we safely copy them to the remote system, and proceed with
+# the installation.
+#
+# Further, the expectation is for the S3 prefix to contain a directory
+# containing one or more .deb files, as well as a SHA256SUMS file that
+# can be used to verify the contents of the .deb files after the entire
+# S3 prefix is downloaded.
+#
+
+- tempfile:
+    state: directory
+    path: /tmp
+  register: tempdir
+  delegate_to: localhost
+
+- command: aws s3 sync --only-show-errors "s3://{{ bucket }}/{{ prefix }}" .
+  delegate_to: localhost
+  args:
+    chdir: "{{ tempdir.path }}"
+
+- copy:
+    src: "{{ tempdir.path }}/"
+    dest: "{{ tempdir.path }}/"
+    mode: 0644
+
+- command: sha256sum -c --strict SHA256SUMS
+  args:
+    chdir: "{{ tempdir.path }}"
+
+- apt:
+    deb: "{{ item }}"
+  with_fileglob:
+    - "{{ tempdir.path }}/*.deb"
+
+- file:
+    path: "{{ tempdir.path }}"
+    state: absent
+
+- file:
+    path: "{{ tempdir.path }}"
+    state: absent
+  delegate_to: localhost

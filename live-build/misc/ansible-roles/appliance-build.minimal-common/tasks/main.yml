@@ -1,0 +1,177 @@
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+#
+# When using the APPLIANCE_PASSWORD variable, we have to be careful to
+# specify "no_log" to prevent it from being leaked to stdout (e.g. if
+# ansible is run with verbosity).
+#
+- fail:
+    msg: "Required environment variable 'APPLIANCE_PASSWORD' is empty."
+  when: lookup('env', 'APPLIANCE_PASSWORD') == ''
+  no_log: true
+
+- fail:
+    msg: "Required environment variable 'APPLIANCE_USERNAME' is empty."
+  when: lookup('env', 'APPLIANCE_USERNAME') == ''
+
+#
+# If we don't disable the "OS prober" script, when we update the grub
+# configuration, it may find OS installations that we don't want. For
+# example, when updating grub from within the chroot environment, it may
+# find the OS installed on the build server's disks, since we bind mount
+# the host's /dev directory into the chroot environment. By disabling
+# the "OS prober" script, we avoid this issue.
+#
+- file:
+    path: /etc/grub.d/30_os-prober
+    mode: 0644
+#
+# We use a non-standard directory for the appliance user's home directory.
+# As a result, we have to explicitly create the "base directory" here, rather
+# than rely on cloud-init to create it; otherwise cloud init will fail
+# to create the appliance user.
+#
+- file:
+    path: /export/home
+    state: directory
+    mode: 0755
+
+#
+# The virtualization package uses the /etc/issue file to store a
+# customer-supplied banner that is displayed prior to login. By
+# default, there should be no banner, but due to the default /etc/issue
+# file supplied on Ubuntu this is not the case. Thus, we need to remove
+# this file to acheive our desired behavior.
+#
+- file:
+    path: /etc/issue
+    state: absent
+
+#
+# In order for networking to work on first boot, we must explicitly
+# enable this service; it's unclear why it's not already enabled.
+#
+# Also, we can't use the "service" module, as that fails when running
+# inside the chroot environment, so we have to use "command" here.
+#
+- command: systemctl enable systemd-networkd.service
+
+#
+# Configure GRUB2 to allow access over the serial console.
+#
+- lineinfile:
+    path: /etc/default/grub
+    regexp: "^#?{{ item.key }}="
+    line: "{{ item.key }}=\"{{ item.value }}\""
+  with_items:
+    - { key: 'GRUB_TERMINAL', value: 'console serial' }
+    - { key: 'GRUB_CMDLINE_LINUX_DEFAULT',
+        value: 'console=tty0 console=ttyS0,38400n8' }
+    - { key: 'GRUB_SERIAL_COMMAND',
+        value: 'serial --speed=38400 --unit=0 --word=8 --parity=no --stop=1' }
+
+#
+# Finally, we need to configure our appliance user, such that we actually
+# have a way to log into the system after it boots.
+#
+- user:
+    name: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+    group: staff
+    shell: /bin/bash
+    create_home: yes
+    comment: Appliance User
+    home: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+    password:
+      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
+  no_log: true
+
+#
+# We also want the delphix user to have passwordless sudo access, so we
+# must configure that here as well.
+#
+- copy:
+    dest: /etc/sudoers.d/delphix
+    mode: 0644
+    content: 'delphix ALL=(ALL) NOPASSWD:ALL'
+
+#
+# When running in AWS, the hostname provided by the DHCP server might
+# not be resovable from inside the instance. When this happens, it can
+# cause issues when executing commands with "sudo". To workaround this
+# issue, we explicitly ignore the hsotname supplied by the DHCP server.
+#
+- copy:
+    dest: /etc/systemd/network/dhcp-client.network
+    mode: 0644
+    content: |
+      [DHCP]
+      UseHostname=false
+
+#
+# Further, the DHCP option we set above, to ignore the DHCP supplied
+# hostname will only take affect if the /etc/hostname file does not
+# contain the value "localhost"; which it does by default. Thus, to
+# workaround this caveat, we have to change this file's contents.
+#
+- copy:
+    dest: /etc/hostname
+    mode: 0644
+    content: appliance.example.com
+
+- lineinfile:
+    dest: /etc/environment
+    regexp: '^{{ item.key }}='
+    line: '{{ item.key }}="{{ item.value }}"'
+  with_items:
+    - { key: 'JAVA_HOME', value: '/usr/lib/jvm/oracle-java8-jdk-amd64' }
+
+- locale_gen:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - en_US.UTF-8
+
+- copy:
+    dest: /etc/cloud/cloud.cfg.d/99-delphix-minimal.cfg
+    mode: 0644
+    content: |
+      #
+      # Without this setting, /etc/hosts will be empty. This allows cloud-init
+      # to at least populate it with localhost settings.
+      #
+      manage_etc_hosts: true
+
+      #
+      # Since we're running on a ZFS-on-root installation, the "resizefs" and
+      # "growpart" features of cloud init won't work; thus, we explicitly
+      # disable them to help ensure they don't cause any harm.
+      #
+      resize_rootfs: false
+      growpart:
+        mode: off
+
+      #
+      # While we create the user using Ansible, we need to inform cloud-init
+      # of this user so that SSH keys are properly inserted into this user's
+      # authorized_keys file (e.g. when running in EC2). Additionally, this
+      # will prevent cloud-init from creating the default user.
+      #
+      system_info:
+        default_user:
+          name: {{ lookup('env', 'APPLIANCE_USERNAME') }}
+          lock_passwd: false

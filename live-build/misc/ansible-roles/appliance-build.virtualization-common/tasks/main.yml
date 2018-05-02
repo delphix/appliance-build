@@ -1,0 +1,112 @@
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+#
+# The virtualization package should have already been installed; this is
+# simply asserting that the state of the system is as we expect.
+#
+- apt:
+    name: delphix-virtualization
+    state: present
+    update_cache: no
+
+#
+# The delphix-virtualization package doesn't yet declare its dependencies.
+# As a result, we must explicitly install them here.
+#
+- apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - dmidecode
+    - glances
+    - nfs-kernel-server
+    - ntp
+    - ntpdate
+    - pigz
+    - postgresql-9.4
+    - postgresql-contrib-9.4
+    - procinfo
+    - python-minimal
+    - rsync
+    - sg3-utils
+    - targetcli-fb
+    - zfsutils-linux
+    - zip
+  register: result
+  until: result is not failed
+  retries: 3
+  delay: 60
+
+- lineinfile:
+    dest: /etc/systemd/journald.conf
+    regexp: "^#?{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+  with_items:
+    - { key: "Storage", value: "persistent" }
+    - { key: "SystemMaxUse", value: "250M" }
+
+- file:
+    path: /public
+    state: directory
+
+- lineinfile:
+    dest: /etc/exports
+    regexp: "^#?{{ item.key }} "
+    line: "{{ item.key }} {{ item.value }}"
+  with_items:
+    - { key: "/public", value: "*(ro,anonuid=60001,anongid=60001)" }
+
+- file:
+    path: /var/opt/delphix
+    state: directory
+
+- shell: 'date +%s > /etc/engine.install'
+
+#
+# The "product", "platform", and "cr_auth" fields are intentionally left
+# out of this file, as those fields should get filled in by other roles
+# that will run after this role.
+#
+- copy:
+    dest: /var/opt/delphix/server.conf
+    mode: 0644
+    content: |
+      [config]
+      hostname=delphix
+      disk=c?t0d0
+      interface=vmxnet3s0
+      primary_aggr_nic=vmxnet3s0
+      type=ipv4
+      method=dhcp
+      ip=
+      netmask=
+      gateway=
+      domain=
+      dns1=
+      dns2=
+
+- shell: |
+    systemctl disable ntp.service
+    systemctl disable postgresql.service
+    systemctl disable postgresql@9.4-main.service
+
+    systemctl enable nfs-kernel-server.service
+    systemctl enable rpc-statd.service
+
+    systemctl enable /opt/delphix/server/systemd/unit/delphix-postgres@.service
+    systemctl enable /opt/delphix/server/systemd/unit/delphix-mgmt.service

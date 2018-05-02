@@ -1,0 +1,75 @@
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+- fail:
+    msg: "Required environment variable 'APPLIANCE_USERNAME' is empty."
+  when: lookup('env', 'APPLIANCE_USERNAME') == ''
+
+- apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - arping
+    - bison
+    - build-essential
+    - cmake
+    - flex
+    - git
+    - iperf
+    - libclang-6.0-dev
+    - libedit-dev
+    - libelf-dev
+    - libllvm6.0
+    - libluajit-5.1-dev
+    - llvm-6.0-dev
+    - luajit
+    - netperf
+    - python
+    - zlib1g-dev
+  register: result
+  until: result is not failed
+  retries: 3
+  delay: 60
+
+- name: checkout repository
+  git:
+    repo: "{{ item.repo }}"
+    dest:
+      "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item.dest }}"
+    version: "{{ item.version }}"
+    accept_hostkey: yes
+    update: no
+  with_items:
+    - { repo: 'https://github.com/iovisor/bcc.git',
+        version: master,
+        dest: bcc }
+
+- file:
+    path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item }}"
+    owner: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+    group: staff
+    state: directory
+    recurse: yes
+  with_items:
+    - bcc
+    - bcc/build
+
+- shell: "cmake .. -DMAKE_INSTALL_PREFIX=/usr && make"
+  become: true
+  become_user: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+  args:
+    chdir: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/bcc/build"

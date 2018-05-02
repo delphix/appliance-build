@@ -1,0 +1,40 @@
+#!/bin/bash -ex
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Since live-build doesn't natively support building a ZFS based chroot
+# filesystem, we rely on our binary hooks to convert the "binary"
+# directory into the various binary images that we need. Thus, we must
+# specify "--chroot-filesystem none" so that the "binary" directory
+# simply contains flat files that we'll then use to create a ZFS based
+# root filesystem. Likewise, the "--binary-images" and "--bootloader"
+# options aren't useful since the binary artifacts are generated via our
+# hooks, but we still need to specify the options so the binary hooks
+# are run.
+#
+lb config noauto \
+	--archive-areas "main restricted universe multiverse" \
+	--bootstrap-keyring ubuntu-keyring \
+	--bootstrap-flavour minimal \
+	--chroot-filesystem none \
+	--architectures amd64 \
+	--distribution bionic \
+	--binary-images none \
+	--bootloader none \
+	--system normal \
+	--mode ubuntu \
+	"${@}"

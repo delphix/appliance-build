@@ -1,0 +1,13 @@
+language: generic
+branches:
+  only:
+   - staging
+   - trying
+   - master
+
+install:
+ - sudo ./scripts/docker-install-ubuntu.sh
+ - ./scripts/docker-build.sh
+
+script:
+ - ./scripts/docker-run.sh make internal-minimal
