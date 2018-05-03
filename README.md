@@ -106,8 +106,10 @@ This will create a new container based on the image we previously
 created, and then execute "make" inside of that container.
 
 By default, all "internal" variants will be built when "make" is
-specified without any options; one can also explicitly specify which
-variant to build by passing in the variant's name:
+specified without any options. Each variant will have ansible roles
+applied according to playbooks in per variant directories under
+live-build/variants. A specific variant can be built by passing in the
+variant's name:
 
     $ ./scripts/docker-run.sh make internal-minimal
 
