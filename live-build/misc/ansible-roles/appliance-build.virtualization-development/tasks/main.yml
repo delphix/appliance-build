@@ -40,16 +40,6 @@
   retries: 3
   delay: 60
 
-#
-# We need to do a shallow clone here for a couple reasons:
-#
-# 1. To reduce the size needed to transfer over the network, which
-#    speeds up the time required to do a build.
-#
-# 2. To reduce the size of the resultant virtual machine images, which
-#    speeds up the time to transfer these images to wherever they're
-#    needed; along with reducing the cost of storing these images.
-#
 - git:
     repo: "{{ item.repo }}"
     dest:
@@ -57,7 +47,6 @@
     version: "{{ item.version }}"
     accept_hostkey: yes
     update: no
-    depth: 1
   with_items:
     - { repo: 'https://gitlab.delphix.com/app/dlpx-app-gate.git',
         version: projects/dx4linux,
