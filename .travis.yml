@@ -10,4 +10,6 @@ install:
  - ./scripts/docker-build.sh
 
 script:
+ - ./scripts/docker-run.sh make shellcheck
+ - ./scripts/docker-run.sh make shfmtcheck
  - ./scripts/docker-run.sh make internal-minimal

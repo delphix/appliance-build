@@ -40,6 +40,26 @@ shellcheck:
 		$$(find scripts -type f -executable) \
 		$$(find live-build/misc/live-build-hooks -type f -executable)
 
-shfmt:
-	shfmt -w $$(find scripts -type f -executable) \
-		$$(find live-build/misc/live-build-hooks -type f -executable)
+#
+# There doesn't appear to be a way to have "shfmt" return non-zero when
+# it detects differences, so we have to be a little clever to accomplish
+# this. Ultimately, we want "make" to fail when "shfmt" emits lines that
+# need to be changed.
+#
+# When grep matches on lines emitted by "shfmt", it will return with a
+# zero exit code. This tells us that "shfmt" did in fact detect changes
+# that need to be made. When this occurs, we want "make" to fail, thus
+# we have to invert grep's return code.
+#
+# This inversion also addresses the case where "shfmt" doesn't emit any
+# lines. In this case, "grep" will return a non-zero exit code, so we
+# invert this to cause "make" to succeed.
+#
+# Lastly, we want the lines emitted by "shfmt" to be user visible, so we
+# leverage the fact that "grep" will emit any lines it matches on to
+# stdout. This way, when lines are emitted from "shfmt", these
+# problematic lines are conveyed to the user so they can be fixed.
+#
+shfmtcheck:
+	! shfmt -d $$(find scripts -type f -executable) \
+		$$(find live-build/misc/live-build-hooks -type f -executable) | grep .
