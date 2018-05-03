@@ -33,6 +33,7 @@
     state: present
   with_items:
     - dmidecode
+    - fio
     - glances
     - nfs-kernel-server
     - ntp
