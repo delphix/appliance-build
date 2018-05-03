@@ -24,35 +24,6 @@
     state: present
     update_cache: no
 
-#
-# The delphix-virtualization package doesn't yet declare its dependencies.
-# As a result, we must explicitly install them here.
-#
-- apt:
-    name: "{{ item }}"
-    state: present
-  with_items:
-    - dmidecode
-    - fio
-    - glances
-    - nfs-kernel-server
-    - ntp
-    - ntpdate
-    - pigz
-    - postgresql-9.4
-    - postgresql-contrib-9.4
-    - procinfo
-    - python-minimal
-    - rsync
-    - sg3-utils
-    - targetcli-fb
-    - zfsutils-linux
-    - zip
-  register: result
-  until: result is not failed
-  retries: 3
-  delay: 60
-
 - lineinfile:
     dest: /etc/systemd/journald.conf
     regexp: "^#?{{ item.key }}="
