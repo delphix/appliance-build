@@ -14,6 +14,28 @@
 # limitations under the License.
 #
 
+#
+# The following packages explicitly state the version of the linux
+# kernel to be installed, as well as any packages that are kernel
+# specific (e.g. tools like perf, that are tied to the kernel version).
+# Any additional tools that are not specific to the kernel version
+# should be included in the "tools.list.chroot" file.
+#
+linux-generic
+linux-tools-generic
+
+#
+# The following packages are required in order to generate VM artifacts
+# that are leveraging ZFS as their root filesystem.
+#
+grub-pc
+zfs-initramfs
+zfsutils-linux
+
+#
+# The following packages provide the minimal set of packages that are
+# necessary to create a working system (e.g. networking, users, etc).
+#
 cloud-init
 debsums
 net-tools
