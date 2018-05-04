@@ -24,7 +24,10 @@ atop
 dstat
 emacs
 gdb
+glances
 iftop
+procinfo
+sg3-utils
 strace
 tshark
 vim
