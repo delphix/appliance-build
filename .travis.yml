@@ -5,11 +5,14 @@ branches:
    - trying
    - master
 
+env:
+  - TARGET=shellcheck
+  - TARGET=shfmtcheck
+  - TARGET=internal-minimal
+
 install:
  - sudo ./scripts/docker-install-ubuntu.sh
  - ./scripts/docker-build.sh
 
 script:
- - ./scripts/docker-run.sh make shellcheck
- - ./scripts/docker-run.sh make shfmtcheck
- - ./scripts/docker-run.sh make internal-minimal
+ - ./scripts/docker-run.sh make $TARGET
