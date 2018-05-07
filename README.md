@@ -1,5 +1,7 @@
 # Delphix Appliance Build
 
+[![Build Status](https://travis-ci.com/delphix/appliance-build.svg?branch=master)](https://travis-ci.com/delphix/appliance-build)
+
 This repository contains the code used to build the Ubuntu-based Delphix
 Appliance, leveraging open-source tools such as Debian's live-build,
 Docker, Ansible, OpenZFS, and others. It is capable of producing virtual
