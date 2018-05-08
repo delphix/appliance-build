@@ -69,7 +69,22 @@
 # Also, we can't use the "service" module, as that fails when running
 # inside the chroot environment, so we have to use "command" here.
 #
+# Additionally, we raise the log level to help diagnose problems; in the
+# event that networking fails, this additional information is valuable.
+#
 - command: systemctl enable systemd-networkd.service
+
+- file:
+    path: /etc/systemd/system/systemd-networkd.service.d
+    state: directory
+    mode: 0755
+
+- copy:
+    dest: /etc/systemd/system/systemd-networkd.service.d/50-log-level.conf
+    mode: 0644
+    content: |
+      [Service]
+      Environment=SYSTEMD_LOG_LEVEL=debug
 
 #
 # Configure GRUB2 to allow access over the serial console.
