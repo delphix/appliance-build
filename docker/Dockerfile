@@ -47,3 +47,11 @@ RUN \
 RUN wget -nv -O /usr/local/bin/shfmt \
   https://github.com/mvdan/sh/releases/download/v2.3.0/shfmt_v2.3.0_linux_amd64 && \
   chmod +x /usr/local/bin/shfmt
+
+RUN \
+  git clone https://github.com/willthames/ansible-lint /opt/ansible-lint && \
+  cd /opt/ansible-lint && \
+  git checkout v3.4.21 && \
+  git branch -D master
+ENV PYTHONPATH="${PYTHONPATH}:/opt/ansible-lint/lib"
+ENV PATH="${PATH}:/opt/ansible-lint/bin"
