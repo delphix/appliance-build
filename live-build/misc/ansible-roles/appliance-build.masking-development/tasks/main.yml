@@ -38,7 +38,7 @@
     update: no
   with_items:
     - { repo: 'https://gitlab.delphix.com/masking/dms-core-gate.git',
-        version: projects/dx4linux,
+        version: master,
         dest: dms-core-gate }
 
 - file:

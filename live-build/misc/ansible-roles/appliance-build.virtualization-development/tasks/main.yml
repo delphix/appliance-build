@@ -49,7 +49,7 @@
     update: no
   with_items:
     - { repo: 'https://gitlab.delphix.com/app/dlpx-app-gate.git',
-        version: projects/dx4linux,
+        version: master,
         dest: dlpx-app-gate }
 
 - file:
