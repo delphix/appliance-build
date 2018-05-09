@@ -63,3 +63,6 @@ shellcheck:
 shfmtcheck:
 	! shfmt -d $$(find scripts -type f -executable) \
 		$$(find live-build/misc/live-build-hooks -type f -executable) | grep .
+
+ansiblecheck:
+	ansible-lint $$(find live-build/variants -name playbook.yml)
