@@ -20,3 +20,7 @@
     mode: 0644
     content: |
       datasource_list: [ Ec2, None ]
+      datasource:
+        Ec2:
+          timeout: 10
+          max_wait: 24
