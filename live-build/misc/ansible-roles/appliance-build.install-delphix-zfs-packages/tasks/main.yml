@@ -24,7 +24,7 @@
 # compile the ZFS on Linux repositories from source, and install the
 # resultant build artifacts. Below is the logic to that work.
 #
-- shell: "sh autogen.sh && ./configure --prefix= && make"
+- shell: "sh autogen.sh && ./configure --enable-debuginfo --prefix= && make"
   args:
     chdir: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/spl"
     creates: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/spl/module/Module.symvers"
@@ -37,7 +37,7 @@
     chdir: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/spl"
   when: spl.changed
 
-- shell: "sh autogen.sh && ./configure --prefix= && make"
+- shell: "sh autogen.sh && ./configure --enable-debuginfo --prefix= && make"
   args:
     chdir: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs"
     creates: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs/module/Module.symvers"
