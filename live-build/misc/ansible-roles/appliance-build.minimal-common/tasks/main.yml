@@ -89,6 +89,12 @@
 #
 # Configure GRUB2 to allow access over the serial console.
 #
+# Note: We disable IPv6 because it is not supported by the product.
+# We do so here and not from systemd-sysctl as it seems like even
+# though net.ipv6.conf.{default,all}.disable_ipv6 work for the
+# currently installed network interfaces, new interfaces don't pick
+# up those parameters.
+#
 - lineinfile:
     path: /etc/default/grub
     regexp: "^#?{{ item.key }}="
@@ -96,7 +102,7 @@
   with_items:
     - { key: 'GRUB_TERMINAL', value: 'console serial' }
     - { key: 'GRUB_CMDLINE_LINUX_DEFAULT',
-        value: 'console=tty0 console=ttyS0,38400n8' }
+        value: 'ipv6.disable=1 console=tty0 console=ttyS0,38400n8' }
     - { key: 'GRUB_SERIAL_COMMAND',
         value: 'serial --speed=38400 --unit=0 --word=8 --parity=no --stop=1' }
 
@@ -192,18 +198,14 @@
           lock_passwd: false
 
 #
-# IPv6 addresses are not supported by the product thus we need
-# to ensure that they cannot be added manually by default. In
-# addition, we wouldn't want to have our secondary addresses
-# deleted when someone deletes the primary IP address of a
-# network interface, thus we enable the promotion of secondary
-# addresses to primary ones.
+# We don't want to have our secondary addresses deleted when someone
+# deletes the primary IP address of a network interface, thus we enable
+# the promotion of secondary addresses to primary ones.
 #
-# As for the priority prefix for our config file (see what that
-# means in /etc/sysctl.d/README) we pick 50 which is higher than
-# what other Ubuntu packages will be installing but less than
-# customization made by the end-user, which in our case would be
-# customer support.
+# As for the priority prefix for our config file (see what that means
+# in /etc/sysctl.d/README) we pick 50 which is higher than what other
+# Ubuntu packages will be installing but less than customization made
+# by the end-user, which in our case would be customer support.
 #
 - lineinfile:
     create: yes
@@ -212,4 +214,4 @@
     line: "{{ item.key }}={{ item.value }}"
   with_items:
     - { key: "net.ipv4.conf.all.promote_secondaries", value: "1" }
-    - { key: "net.ipv6.conf.all.disable_ipv6", value: "1" }
+    - { key: "net.ipv4.conf.default.promote_secondaries", value: "1" }
