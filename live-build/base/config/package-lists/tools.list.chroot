@@ -21,6 +21,7 @@
 #
 
 atop
+bpfcc-tools
 dstat
 emacs
 gdb
