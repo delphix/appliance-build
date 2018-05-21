@@ -113,6 +113,7 @@
 - user:
     name: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
     group: staff
+    groups: root
     shell: /bin/bash
     create_home: yes
     comment: Appliance User
