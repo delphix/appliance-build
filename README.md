@@ -9,6 +9,25 @@ machine images containing the Delphix Dynamic Data Platform, that are
 capable of running in cloud and non-cloud hypervisors alike (e.g. Amazon
 EC2, Microsoft Azure, VMware, OpenStack).
 
+## Quickstart (for the impatient)
+
+Run this command on "dlpxdc.co" to create the VM used to do the build:
+
+    $ dc clone-latest --size COMPUTE_LARGE bootstrap-18-04 $USER-bootstrap
+
+Log into that VM using the "ubuntu" user, and run these commands:
+
+    $ git clone https://github.com/delphix/appliance-build.git
+    $ cd appliance-build
+    $ ./scripts/docker-build.sh
+    $ sudo ./scripts/kernel-modules-load.sh
+    $ ./scripts/docker-run.sh make internal-minimal
+    $ sudo apt-get install -y qemu
+    $ sudo qemu-system-x86_64 -nographic -m 1G \
+    > -drive file=live-build/artifacts/internal-minimal.qcow2
+
+To exit "qemu", use "Ctrl-A X".
+
 ## Build Requirements
 
 The Delphix Appliance build system has the following assuptions about
@@ -80,10 +99,7 @@ that will be used to execute the build; this can be done like so:
     $ ./scripts/docker-build.sh
 
 After this, one can easily obtain an interactive shell running in a
-container based on that image, like so:
-
-    $ ./scripts/docker-run.sh
-
+container based on that image by running "./scripts/docker-run.sh".
 This will mount the appliance-build git repository inside of that
 running container, such that live-build can be executed inside the
 container, using the files from the repository (that may have been
