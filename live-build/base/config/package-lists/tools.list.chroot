@@ -27,6 +27,7 @@ emacs
 gdb
 glances
 iftop
+inotify-tools
 procinfo
 sg3-utils
 strace
