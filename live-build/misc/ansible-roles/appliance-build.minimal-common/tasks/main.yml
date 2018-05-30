@@ -87,6 +87,23 @@
       Environment=SYSTEMD_LOG_LEVEL=debug
 
 #
+# Similarly to systemd-networkd, we also raise the log level of
+# systemd-resolved.service just in case we ever have to debug DNS
+# issues.
+#
+- file:
+    path: /etc/systemd/system/systemd-resolved.service.d
+    state: directory
+    mode: 0755
+
+- copy:
+    dest: /etc/systemd/system/systemd-resolved.service.d/50-log-level.conf
+    mode: 0644
+    content: |
+      [Service]
+      Environment=SYSTEMD_LOG_LEVEL=debug
+
+#
 # Configure GRUB2 to allow access over the serial console.
 #
 # Note: We disable IPv6 because it is not supported by the product.
