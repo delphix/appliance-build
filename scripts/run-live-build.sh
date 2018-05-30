@@ -85,30 +85,29 @@ if ! [[ -n "$CI" && -n "$TRAVIS" ]]; then
 	# about these details.
 	#
 
-	BUCKET="dlpx-norfair2"
-	TOPLEVEL="snapshot"
+	BUCKET="snapshot-de-images"
 	GITBRANCH="projects/dx4linux"
 	JENKINSID="jenkins-ops"
 
 	if [[ -z "$AWS_S3_PREFIX_VIRTUALIZATION" ]]; then
-		URI="s3://$BUCKET/builds/$TOPLEVEL/$JENKINSID/dlpx-app-gate/"
+		URI="s3://$BUCKET/builds/$JENKINSID/dlpx-app-gate/"
 		URI+="$GITBRANCH/build-package/post-push/latest"
 
 		aws s3 cp "$URI" .
 		AWS_S3_PREFIX_VIRTUALIZATION=$(cat latest)
 		export AWS_S3_PREFIX_VIRTUALIZATION
-		export AWS_S3_BUCKET="dlpx-norfair2"
+		export AWS_S3_BUCKET="snapshot-de-images"
 		rm -f latest
 	fi
 
 	if [[ -z "$AWS_S3_PREFIX_MASKING" ]]; then
-		URI="s3://$BUCKET/builds/$TOPLEVEL/$JENKINSID/dms-core-gate/"
+		URI="s3://$BUCKET/builds/$JENKINSID/dms-core-gate/"
 		URI+="$GITBRANCH/build-package/post-push/latest"
 
 		aws s3 cp "$URI" .
 		AWS_S3_PREFIX_MASKING=$(cat latest)
 		export AWS_S3_PREFIX_MASKING
-		export AWS_S3_BUCKET="dlpx-norfair2"
+		export AWS_S3_BUCKET="snapshot-de-images"
 		rm -f latest
 	fi
 fi
