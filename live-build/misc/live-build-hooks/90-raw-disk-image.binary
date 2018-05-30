@@ -115,6 +115,15 @@ zfs mount rpool/ROOT/ubuntu
 rsync --info=stats3 -Wa binary/* /mnt/
 
 #
+# Set up a swap device.
+#
+zfs create -V 4G -b "$(getconf PAGESIZE)" \
+	-o logbias=throughput -o sync=always \
+	-o primarycache=metadata rpool/swap
+mkswap -f /dev/zvol/rpool/swap
+echo /dev/zvol/rpool/swap none swap defaults 0 0 >>/mnt/etc/fstab
+
+#
 # Now we need to install the bootloader. In order to do that, we'll chroot
 # into the newly populated root filesystem, so that we use the grub-install
 # and update-grub binaries installed in that filesystem.  Additionally, we
