@@ -26,19 +26,6 @@
 #
 - shell: "sh autogen.sh && ./configure --enable-debuginfo --prefix= && make"
   args:
-    chdir: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/spl"
-    creates: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/spl/module/Module.symvers"
-  become: true
-  become_user: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
-  register: spl
-
-- shell: "make install"
-  args:
-    chdir: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/spl"
-  when: spl.changed
-
-- shell: "sh autogen.sh && ./configure --enable-debuginfo --prefix= && make"
-  args:
     chdir: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs"
     creates: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs/module/Module.symvers"
   become: true

@@ -65,9 +65,6 @@
     - { repo: 'https://github.com/delphix/zfs.git',
         version: master,
         dest: zfs }
-    - { repo: 'https://github.com/delphix/spl.git',
-        version: master,
-        dest: spl }
 
 - file:
     path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item }}"
@@ -77,4 +74,3 @@
     recurse: yes
   with_items:
     - zfs
-    - spl
