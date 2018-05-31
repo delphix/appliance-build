@@ -55,26 +55,16 @@
   delay: 60
 
 - git:
-    repo: "{{ item.repo }}"
+    repo: "https://github.com/delphix/zfs.git"
     dest:
-      "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item.dest }}"
-    version: "{{ item.version }}"
+      "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs"
+    version: master
     accept_hostkey: yes
     update: no
-  with_items:
-    - { repo: 'https://github.com/delphix/zfs.git',
-        version: master,
-        dest: zfs }
-    - { repo: 'https://github.com/delphix/spl.git',
-        version: master,
-        dest: spl }
 
 - file:
-    path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item }}"
+    path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs"
     owner: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
     group: staff
     state: directory
     recurse: yes
-  with_items:
-    - zfs
-    - spl
