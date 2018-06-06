@@ -233,3 +233,36 @@
   with_items:
     - { key: "net.ipv4.conf.all.promote_secondaries", value: "1" }
     - { key: "net.ipv4.conf.default.promote_secondaries", value: "1" }
+
+#
+# Configure command audit logging
+#
+# We want to record all commands executed on the appliance. Opt out for
+# setsid since all ExecuteUtils.execute wrap each call with setsid.
+#
+# Note we can't use the "service" module, as that fails when running
+# inside the chroot environment, so we enable auditd using "command".
+#
+- command: systemctl enable auditd.service
+
+- lineinfile:
+    dest: /etc/audit/auditd.conf
+    regexp: "{{ item.regex }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regex: "^num_logs =", line: "num_logs = 6" }
+    - { regex: "^max_log_file =", line: "max_log_file = 3072" }
+    - { regex: "^max_log_file_action =", line: "max_log_file_action = rotate" }
+    - { regex: "^log_format =", line: "log_format = RAW" }
+
+- blockinfile:
+    path: /etc/audit/rules.d/audit.rules
+    insertafter: EOF
+    block: |
+      ## Record all executed commands (excluding setsid)
+      -a exit,never -S execve -F exe=/usr/bin/setsid
+      -a exit,always -S execve
+
+      ## Record command exit failures (execve result is not command result)
+      -a exit,always -F a0!=0 -S exit_group
+      -a exit,always -F a0!=0 -S exit
