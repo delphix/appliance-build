@@ -38,7 +38,7 @@ source /usr/share/livecd-rootfs/live-build/functions
 case "$APPLIANCE_VARIANT" in
 internal-*)
 	CPUS_COUNT=2
-	MEMORY_MB=$((7 * 1024))
+	MEMORY_MB=$((8 * 1024))
 	;;
 external-*)
 	CPUS_COUNT=8
