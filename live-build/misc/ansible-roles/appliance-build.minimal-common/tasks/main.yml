@@ -266,3 +266,50 @@
       ## Record command exit failures (execve result is not command result)
       -a exit,always -F a0!=0 -S exit_group
       -a exit,always -F a0!=0 -S exit
+
+#
+# By default, the ulimit for core files is set to 0, and the default
+# filename and location for a core file is 'core' in the cwd. Update
+# limits.conf to allow processes running as root or a regular user to
+# make core files.
+#
+- lineinfile:
+    create: yes
+    dest: /etc/security/limits.conf
+    line: "{{ item }} soft core unlimited"
+  with_items:
+    - 'root'
+    - '*'
+
+#
+# Create a world writeable directory for application core dumps. We
+# want it world writeable because we're sharing one directory for
+# corefiles from any user. Unlike illumos where all cores are written
+# out as root, linux cores are written with the UID of the running
+# process.
+#
+- file:
+    path: /var/crash
+    state: directory
+    mode: 0777
+
+#
+# Update sysctl.conf such that application cores are written into
+# /var/crash and tagged with the execname, process id, and seconds since
+# the epoch.
+#
+# Additionally in this file, we force the kernel to assume memory
+# allocations will succeed until we actually run out of memory. The
+# default heuristic can cause failure to generate an hprof dump on OOM
+# in the stack. Allowing overcommit lets the fork(2) succeed despite not
+# having enough memory which allows the script that generates the hprof
+# dump to run.
+#
+- lineinfile:
+    create: yes
+    dest: /etc/sysctl.conf
+    regexp: "^#?{{ item.key }} ="
+    line: "{{ item.key }} = {{ item.value }}"
+  with_items:
+    - { key: 'kernel.core_pattern', value: '/var/crash/core.%e.%p.%t' }
+    - { key: 'vm.overcommit_memory', value: '1' }
