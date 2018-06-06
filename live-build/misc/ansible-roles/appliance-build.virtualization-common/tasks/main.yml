@@ -82,3 +82,13 @@
 
     systemctl enable /opt/delphix/server/systemd/unit/delphix-postgres@.service
     systemctl enable /opt/delphix/server/systemd/unit/delphix-mgmt.service
+
+#
+# In order for the rsync systemd service to start, it needs a config file.
+# Here we configure the port with its default value.
+#
+- copy:
+    dest: /etc/rsyncd.conf
+    mode: 0644
+    content: |
+      port = 873
