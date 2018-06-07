@@ -56,10 +56,24 @@
   args:
     chdir: "{{ tempdir.path }}"
 
-- apt:
-    deb: "{{ item }}"
-  with_fileglob:
-    - "{{ tempdir.path }}/*.deb"
+#
+# We use apt-get here instead of ansible's apt module to install all the debs
+# at the same time, so that any dependencies between provided packages are
+# resolved (i.e. if one of the .deb depends on another .deb being installed).
+#
+# We add 'DEBIAN_FRONTEND=noninteractive' which is meant for executing apt-get
+# from a script. The DPkg:: options are defaults used by the ansible apt
+# module that auto-answer some questions apt could ask.
+#
+# We use 'shell' instead of 'command' to resolve the glob (*.deb).
+#
+- shell: >
+    apt-get install -y -o DPkg::Options::=--force-confold
+    -o DPkg::Options::=--force-confdef ./*.deb
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  args:
+    chdir: "{{ tempdir.path }}"
 
 - file:
     path: "{{ tempdir.path }}"

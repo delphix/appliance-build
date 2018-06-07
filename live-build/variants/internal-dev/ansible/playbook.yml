@@ -24,6 +24,7 @@
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
     - appliance-build.install-delphix-zfs-packages
+    - appliance-build.zfsonlinux-development
     - appliance-build.masking-common
     - appliance-build.masking-development
     - appliance-build.virtualization-common

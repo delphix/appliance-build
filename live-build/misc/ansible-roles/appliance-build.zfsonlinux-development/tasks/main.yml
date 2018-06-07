@@ -14,6 +14,9 @@
 # limitations under the License.
 #
 
+#
+# This role allows building ZFS on the appliance.
+#
 ---
 - fail:
     msg: "Required environment variable 'APPLIANCE_USERNAME' is empty."

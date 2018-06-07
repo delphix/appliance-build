@@ -109,6 +109,17 @@ if ! [[ -n "$CI" && -n "$TRAVIS" ]]; then
 		export AWS_S3_BUCKET="snapshot-de-images"
 		rm -f latest
 	fi
+
+	if [[ -z "$AWS_S3_PREFIX_ZFS" ]]; then
+		URI="s3://$BUCKET/builds/$JENKINSID/devops-gate/"
+		URI+="projects/dx4linux/zfs-package-build/master/post-push/latest"
+
+		aws s3 cp "$URI" .
+		AWS_S3_PREFIX_ZFS=$(cat latest)
+		export AWS_S3_PREFIX_ZFS
+		export AWS_S3_BUCKET="snapshot-de-images"
+		rm -f latest
+	fi
 fi
 
 lb config
