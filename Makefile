@@ -65,4 +65,4 @@ shfmtcheck:
 		$$(find live-build/misc/live-build-hooks -type f -executable) | grep .
 
 ansiblecheck:
-	ansible-lint $$(find live-build/variants -name playbook.yml)
+	ansible-lint $$(find bootstrap live-build/variants -name playbook.yml)

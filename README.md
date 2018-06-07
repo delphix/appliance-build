@@ -19,8 +19,7 @@ Log into that VM using the "ubuntu" user, and run these commands:
 
     $ git clone https://github.com/delphix/appliance-build.git
     $ cd appliance-build
-    $ ./scripts/docker-build.sh
-    $ sudo ./scripts/kernel-modules-load.sh
+    $ ansible-playbook bootstrap/playbook.yml
     $ ./scripts/docker-run.sh make internal-minimal
     $ sudo apt-get install -y qemu
     $ sudo qemu-system-x86_64 -nographic -m 1G \
@@ -88,48 +87,35 @@ following steps assume their being run on the cloned VM.
 
 ### Step 2: Clone "appliance-build" Repository
 
-Once the DCenter on AWS VM is created, the "appliance-build" repository
-needs to be populated on the VM. Generally this is done using "git"
-primitives, e.g. "git clone", "git checkout", etc. For this example,
-we'll do a new "git clone" of the upstream repository:
+Once the "bootstrap" DCenter on AWS VM is created, the "appliance-build"
+repository needs to be populated on it. Generally this is done using
+"git" primitives, e.g. "git clone", "git checkout", etc. For this
+example, we'll do a new "git clone" of the upstream repository:
 
     $ git clone https://github.com/delphix/appliance-build.git
     $ cd appliance-build
 
-Once the repository is cloned, we can move on, using the various scripts
-contained in the repository to help us run the following steps.
+### Step 3: Configure "bootstrap" VM
 
-### Step 3: Build Docker Image
+Next, we need to apply the "bootstrap" Ansible configuration, which will
+verify all the necessary build dependencies are fulfilled, while also
+correcting any deficencies that may exist. This is easily done like so:
 
-Before the build can be executed, one needs to build the docker image
-that will be used to execute the build; this can be done like so:
+    $ ansible-playbook bootstrap/playbook.yml
 
-    $ ./scripts/docker-build.sh
+### Step 4: Run Live Build
 
-After this, one can easily obtain an interactive shell running in a
-container based on that image by running "./scripts/docker-run.sh".
-This will mount the appliance-build git repository inside of that
-running container, such that live-build can be executed inside the
-container, using the files from the repository (that may have been
-modified).
-
-### Step 4: Load ZFS Kernel Modules
-
-As stated previously, the build relies on ZFS kernel modules provided by
-the host performing the build. Thus, before we run the build, we need to
-ensure these modules are loaded:
-
-    $ sudo ./scripts/kernel-modules-load.sh
-
-### Step 5: Run Live Build
-
-Now, with the Docker image built and the ZFS kernel modules loaded, we
-can finally run the build:
+Now, with the "bootstrap" VM properly configured, we can run the build:
 
     $ ./scripts/docker-run.sh make
 
 This will create a new container based on the image we previously
 created, and then execute "make" inside of that container.
+
+The "./scripts/docker-run" script can also be run without any arguments,
+which will provide an interactive shell running in the container
+environment, with the appliance-build git repository mounted inside of
+the container; this can be useful for debugging and/or experimenting.
 
 By default, all "internal" variants will be built when "make" is
 specified without any options. Each variant will have ansible roles
@@ -150,7 +136,7 @@ the "live-build/artifacts" directory:
     -rw-r--r-- 1 root root  2.8G Apr 30 19:44 internal-minimal.vhdx
     -rw-r--r-- 1 root root  975M Apr 30 19:47 internal-minimal.vmdk
 
-### Step 6: Use QEMU for Boot Verfication
+### Step 5: Use QEMU for Boot Verfication
 
 Once the live-build artifacts have been generated, we can then leverage
 the "qemu" tool to test the "qcow2" artifact:
