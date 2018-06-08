@@ -42,3 +42,4 @@ net-tools
 open-vm-tools
 openssh-server
 ubuntu-minimal
+auditd
