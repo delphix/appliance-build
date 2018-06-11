@@ -15,12 +15,7 @@
 #
 
 ---
-#
-# Until we have Delphix specific ZFS packages to install in the
-# appliance, we have to clone and compile the ZFS on Linux repositories
-# from source and install the resultant build artifacts. Thus, we use
-# this dependent role to initialize the system with the necessary source
-# code, and build dependencies. Later, we'll do the build and install.
-#
 dependencies:
-  - role: appliance-build.zfsonlinux-development
+  - role: appliance-build.install-delphix-s3-packages
+    bucket: "{{ lookup('env', 'AWS_S3_BUCKET') }}"
+    prefix: "{{ lookup('env', 'AWS_S3_PREFIX_ZFS') }}"
