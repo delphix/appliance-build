@@ -39,6 +39,7 @@
     - ksh
     - libattr1-dev
     - libblkid-dev
+    - libelf-dev
     - libselinux-dev
     - libssl-dev
     - libtool
