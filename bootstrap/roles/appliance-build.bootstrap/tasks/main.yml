@@ -29,6 +29,7 @@
 - docker_image:
     path: "{{ toplevel.stdout }}/docker"
     name: appliance-build
+    force: true
 
 - modprobe:
     name: zfs
