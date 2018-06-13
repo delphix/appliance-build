@@ -30,6 +30,15 @@
   when: lookup('env', 'APPLIANCE_USERNAME') == ''
 
 #
+# To adhere to the priciple of least surprise, we disable automatic
+# upgrades here; this package can always be added on a specific system
+# when it's desired.
+#
+- apt:
+    name: unattended-upgrades
+    state: absent
+
+#
 # If we don't disable the "OS prober" script, when we update the grub
 # configuration, it may find OS installations that we don't want. For
 # example, when updating grub from within the chroot environment, it may
