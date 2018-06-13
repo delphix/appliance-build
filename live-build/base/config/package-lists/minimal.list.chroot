@@ -43,3 +43,10 @@ open-vm-tools
 openssh-server
 ubuntu-minimal
 auditd
+
+#
+# The following packages are required for the ZFS test suite to run
+# properly.
+#
+attr
+bc
