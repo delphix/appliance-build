@@ -22,6 +22,11 @@
 # contents are that of the "binary" directory).
 #
 
+die() {
+	echo "$*" 1>&2
+	exit 1
+}
+
 #
 # When running in Travis CI, we cannot expect this script to be running
 # on a host that has the ZFS kernel modules installed *and* for those
@@ -45,8 +50,7 @@ external-*)
 	RAW_DISK_SIZE_GB=127
 	;;
 *)
-	echo "Invalid variant specified: '$APPLIANCE_VARIANT'" 1>&2
-	exit 1
+	die "Invalid variant specified: '$APPLIANCE_VARIANT'"
 	;;
 esac
 
@@ -120,6 +124,20 @@ rsync --info=stats3 -Wa binary/* /mnt/
 zfs create -V 4G -b "$(getconf PAGESIZE)" \
 	-o logbias=throughput -o sync=always \
 	-o primarycache=metadata rpool/swap
+
+#
+# We need to wait for the /dev/zvol device to appear before we proceed; this
+# can take a few seconds, so we retry until it succeeds.
+#
+tries=0
+while [[ ! -e /dev/zvol/rpool/swap && $tries -lt 5 ]]; do
+	sleep 5
+	tries=$((tries + 1))
+done
+if [[ ! -e /dev/zvol/rpool/swap ]]; then
+	die "/dev/zvol device failed to appear before timeout"
+fi
+
 mkswap -f /dev/zvol/rpool/swap
 echo /dev/zvol/rpool/swap none swap defaults 0 0 >>/mnt/etc/fstab
 
