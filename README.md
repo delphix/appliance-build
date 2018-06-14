@@ -21,7 +21,6 @@ Log into that VM using the "ubuntu" user, and run these commands:
     $ cd appliance-build
     $ ansible-playbook bootstrap/playbook.yml
     $ ./scripts/docker-run.sh make internal-minimal
-    $ sudo apt-get install -y qemu
     $ sudo qemu-system-x86_64 -nographic -m 1G \
     > -drive file=live-build/artifacts/internal-minimal.qcow2
 
@@ -141,7 +140,6 @@ the "live-build/artifacts" directory:
 Once the live-build artifacts have been generated, we can then leverage
 the "qemu" tool to test the "qcow2" artifact:
 
-    $ sudo apt-get install -y qemu
     $ sudo qemu-system-x86_64 -nographic -m 1G \
     > -drive file=live-build/artifacts/internal-minimal.qcow2
 
