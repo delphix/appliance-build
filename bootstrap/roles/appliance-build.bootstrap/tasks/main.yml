@@ -24,6 +24,7 @@
   with_items:
     - docker.io
     - python3-docker
+    - qemu
     - zfsutils-linux
 
 - docker_image:
