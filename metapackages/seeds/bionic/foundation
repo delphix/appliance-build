@@ -1,0 +1,60 @@
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# The following packages provide the minimal set of packages that are
+# necessary to create a working system (e.g. networking, zfs rootfs, etc).
+#
+ * auditd
+ * cloud-init
+ * debsums
+ * grub-pc
+ * net-tools
+ * open-vm-tools
+ * openssh-server
+ * ubuntu-minimal
+ * zfs-initramfs
+ * zfsutils-linux
+
+#
+# The following packages explicitly state the version of the linux kernel to
+# be installed, as well as any packages that are kernel specific (e.g. tools
+# like perf, that are tied to the kernel version). Any additional tools that
+# are not specific to the kernel version should be included in the list
+# below.
+#
+ * linux-generic
+ * linux-tools-generic
+
+#
+# The following packages are tools that are intended for human convenience.
+# These should not be relied on them programmatically. They may be updated
+# or replaced without regard for backward compatibility.
+#
+ * atop
+ * bpfcc-tools
+ * dnsutils
+ * dstat
+ * emacs
+ * gdb
+ * glances
+ * iftop
+ * inotify-tools
+ * procinfo
+ * sg3-utils
+ * strace
+ * tshark
+ * vim

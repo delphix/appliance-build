@@ -30,14 +30,19 @@ RUN \
   apt-get update && \
   apt-get install -y \
       ansible \
+      debhelper \
+      debootstrap \
+      dpkg-dev \
       livecd-rootfs \
       zfsutils-linux \
       awscli \
       coreutils \
       gdisk \
+      germinate \
       git \
       jq \
       kpartx \
+      lintian \
       make \
       man \
       shellcheck \
