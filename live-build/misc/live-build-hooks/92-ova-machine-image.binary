@@ -74,7 +74,7 @@ find "$OVA_DIRECTORY" -type f | while read -r file; do
 	NAME=$(basename "$file")
 	HASH=$(sha1sum "$file" | awk '{print $1}')
 	cat <<-EOF >>"$OVA_DIRECTORY/$APPLIANCE_VARIANT.mf"
-	SHA1($NAME)= $HASH
+		SHA1($NAME)= $HASH
 	EOF
 done
 

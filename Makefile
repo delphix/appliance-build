@@ -18,6 +18,10 @@ ALL_VARIANTS = $(shell find live-build/variants -maxdepth 1 -mindepth 1 -exec ba
 ALL_INTERNAL = $(shell find live-build/variants -maxdepth 1 -mindepth 1 -name 'internal-*' -exec basename {} \;)
 ALL_EXTERNAL = $(shell find live-build/variants -maxdepth 1 -mindepth 1 -name 'external-*' -exec basename {} \;)
 
+FINDEXEC.Darwin := -perm +111
+FINDEXEC.Linux := -executable
+FINDEXEC := $(FINDEXEC.$(shell uname -s))
+
 all-variants: $(ALL_VARIANTS)
 all-internal: $(ALL_INTERNAL)
 all-external: $(ALL_EXTERNAL)
@@ -37,8 +41,8 @@ $(ALL_VARIANTS): base
 
 shellcheck:
 	shellcheck --exclude=SC1091 \
-		$$(find scripts -type f -executable) \
-		$$(find live-build/misc/live-build-hooks -type f -executable)
+		$$(find scripts -type f $(FINDEXEC)) \
+		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC))
 
 #
 # There doesn't appear to be a way to have "shfmt" return non-zero when
@@ -61,8 +65,10 @@ shellcheck:
 # problematic lines are conveyed to the user so they can be fixed.
 #
 shfmtcheck:
-	! shfmt -d $$(find scripts -type f -executable) \
-		$$(find live-build/misc/live-build-hooks -type f -executable) | grep .
+	! shfmt -d $$(find scripts -type f $(FINDEXEC)) \
+		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC)) | grep .
 
 ansiblecheck:
 	ansible-lint $$(find bootstrap live-build/variants -name playbook.yml)
+
+check: shellcheck shfmtcheck ansiblecheck
