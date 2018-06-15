@@ -22,6 +22,17 @@ FINDEXEC.Darwin := -perm +111
 FINDEXEC.Linux := -executable
 FINDEXEC := $(FINDEXEC.$(shell uname -s))
 
+.PHONY: \
+	all-external \
+	all-internal \
+	all-variants \
+	ansiblecheck \
+	base \
+	check \
+	shellcheck \
+	shfmtcheck \
+	$(ALL_VARIANTS)
+
 all-variants: $(ALL_VARIANTS)
 all-internal: $(ALL_INTERNAL)
 all-external: $(ALL_EXTERNAL)
