@@ -156,6 +156,6 @@ fi
 #
 for ext in ova qcow2 repo vhdx vmdk; do
 	if [[ -f "$APPLIANCE_VARIANT.$ext" ]]; then
-		mv "$APPLIANCE_VARIANT.$ext" "$TOP/live-build/artifacts"
+		mv "$APPLIANCE_VARIANT.$ext" "$TOP/artifacts"
 	fi
 done

@@ -30,6 +30,7 @@ FINDEXEC := $(FINDEXEC.$(shell uname -s))
 	base \
 	check \
 	metapackages \
+	seed-repository \
 	shellcheck \
 	shfmtcheck \
 	$(ALL_VARIANTS)
@@ -55,6 +56,9 @@ metapackages:
 	cd metapackages && germinate-update-metapackage --nodch
 	cd metapackages && dpkg-buildpackage
 	cd metapackages && lintian
+
+seed-repository: metapackages
+	./scripts/build-seed-repository.sh
 
 shellcheck:
 	shellcheck --exclude=SC1091 \
