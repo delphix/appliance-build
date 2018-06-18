@@ -129,7 +129,6 @@ the "live-build/artifacts" directory:
 
     $ ls -l live-build/artifacts
     total 6.0G
-    -rw-r--r-- 1 root root  932M Apr 30 19:41 internal-minimal.lxc
     -rw-r--r-- 1 root root  975M Apr 30 19:47 internal-minimal.ova
     -rw-r--r-- 1 root root 1009M Apr 30 19:43 internal-minimal.qcow2
     -rw-r--r-- 1 root root  2.8G Apr 30 19:44 internal-minimal.vhdx
