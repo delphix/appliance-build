@@ -33,6 +33,7 @@ RUN \
       aptly \
       debhelper \
       debootstrap \
+      devscripts \
       dpkg-dev \
       livecd-rootfs \
       zfsutils-linux \

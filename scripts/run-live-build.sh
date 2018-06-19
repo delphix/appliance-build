@@ -136,6 +136,16 @@ if ! [[ -n "$CI" && -n "$TRAVIS" ]]; then
 	export AWS_S3_URI_ZFS
 fi
 
+#
+# TODO: Add some comments to explain what we're doing here. i.e. we want
+# to use this artifact as the "seed repository" for live-build, such
+# that live-build only pulls from this repository and not ubuntu's repo.
+#
+rm -rf ~/.aptly
+mkdir -p ~/.aptly
+tar -xzf "$TOP/artifacts/seed-repository.tar.gz" -C ~/.aptly
+aptly serve &
+
 lb config
 lb build
 
@@ -170,6 +180,6 @@ fi
 #
 for ext in ova qcow2 repo vhdx vmdk; do
 	if [[ -f "$APPLIANCE_VARIANT.$ext" ]]; then
-		mv "$APPLIANCE_VARIANT.$ext" "$TOP/live-build/artifacts"
+		mv "$APPLIANCE_VARIANT.$ext" "$TOP/artifacts"
 	fi
 done

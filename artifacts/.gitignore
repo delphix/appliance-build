@@ -16,5 +16,6 @@
 
 *.ova
 *.qcow2
+*.tar.gz
 *.vhdx
 *.vmdk

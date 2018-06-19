@@ -30,6 +30,12 @@
  * zfsutils-linux
 
 #
+# TODO: Describe these packages; they're needed for live-build.
+#
+ * dctrl-tools
+ * dpkg
+
+#
 # The following packages explicitly state the version of the linux kernel to
 # be installed, as well as any packages that are kernel specific (e.g. tools
 # like perf, that are tied to the kernel version). Any additional tools that
