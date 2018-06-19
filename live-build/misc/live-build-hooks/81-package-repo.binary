@@ -1,0 +1,88 @@
+#!/bin/bash -eu
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+if [[ ! -d binary/pkgrepo ]]; then
+	echo "Skipping package repo generation"
+	exit 0
+fi
+
+MISC=config/hooks/misc
+
+#
+# gather debs for all pacakges installed on the image.
+#
+cp $MISC/prepare-debs.sh binary/pkgrepo/
+chroot binary /pkgrepo/prepare-debs.sh
+
+#
+# convert all-packages.list to a format appropriate for the 'Depends'
+# section of a package definition.
+#
+# Example input:
+#  bash=4.4.18-2ubuntu1
+#  bc=1.07.1-2
+# output:
+#  bash (= 4.4.18-2ubuntu1), bc (= 1.07.1-2)
+#
+DEPENDS="$(tr '\n' ' ' <binary/pkgrepo/all-packages.list |
+	sed 's/ *$/)/' | sed 's/ /), /g' | sed 's/=/ (= /g')"
+
+#
+# build the delphix-entire meta-pacakge
+#
+cp $MISC/delphix-pkg-template delphix-pkg-control
+sed -i "s/_DEPENDS_/${DEPENDS}/" delphix-pkg-control
+sed -i "s/_DELPHIX_VERSION_/1.0.0-$(date '+%Y%m%dT%H%M%S')/" delphix-pkg-control
+equivs-build delphix-pkg-control
+
+#
+# Import the GPG key that will be used to sign the repository
+#
+gpg --import --batch --passphrase delphix $MISC/dlpx-test-priv.gpg
+
+#
+# Workaround due to aptly compatibility issues with gpg 2.1+ when trying to
+# provide passphrase non-interactively.
+# (Issue: https://github.com/aptly-dev/aptly/issues/657)
+# (Workaround: https://d.sb/2016/11/gpg-inappropriate-ioctl-for-device-errors)
+#
+cat >"$HOME/.gnupg/gpg.conf" <<EOF
+use-agent
+pinentry-mode loopback
+default-key "Delphix Test"
+EOF
+
+echo "allow-loopback-pinentry" >"$HOME/.gnupg/gpg-agent.conf"
+
+#
+# Create the private repository, put all the debs into it, and finally publish
+# it (into ~/.aptly/public by default).
+# We first clear any remnants from the previous run
+#
+rm -rf "$HOME/.aptly"
+aptly repo create -distribution=bionic -component=dlpx dlpx-repo
+aptly repo add dlpx-repo binary/pkgrepo/apt-pkgs
+aptly repo add dlpx-repo binary/pkgrepo/delphix-pkgs
+aptly repo add dlpx-repo delphix-entire*.deb
+aptly snapshot create dlpx-repo-1 from repo dlpx-repo
+aptly publish snapshot -batch -passphrase=delphix dlpx-repo-1
+
+tar cf "${APPLIANCE_VARIANT}.repo" -C "$HOME" .aptly \
+	-C "$PWD/binary/pkgrepo" all-packages.list delphix-packages.list \
+	apt-packages.list
+
+rm -rf binary/pkgrepo
