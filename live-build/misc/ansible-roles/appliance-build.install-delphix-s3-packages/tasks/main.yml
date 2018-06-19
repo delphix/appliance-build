@@ -75,6 +75,14 @@
   args:
     chdir: "{{ tempdir.path }}"
 
+#
+# We backup downloaded packages. We will use them later to create our
+# private package repository.
+#
+- name: Backup downloaded packages
+  shell: "mv {{ tempdir.path }}/*.deb {{ pkgdump }}/"
+  when: pkgdump is defined and pkgdump != ''
+
 - file:
     path: "{{ tempdir.path }}"
     state: absent

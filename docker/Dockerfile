@@ -30,6 +30,7 @@ RUN \
   apt-get update && \
   apt-get install -y \
       ansible \
+      aptly \
       debhelper \
       debootstrap \
       dpkg-dev \
@@ -37,6 +38,7 @@ RUN \
       zfsutils-linux \
       awscli \
       coreutils \
+      equivs \
       gdisk \
       germinate \
       git \

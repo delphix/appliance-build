@@ -1,3 +1,4 @@
+#!/bin/bash -eux
 #
 # Copyright 2018 Delphix
 #
@@ -14,20 +15,12 @@
 # limitations under the License.
 #
 
----
-- hosts: all
-  connection: chroot
-  gather_facts: no
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-  roles:
-    - appliance-build.minimal-common
-    - appliance-build.minimal-internal
-    - appliance-build.install-delphix-zfs-packages
-    - appliance-build.masking-common
-    - appliance-build.masking-development
-    - appliance-build.virtualization-common
-    - appliance-build.virtualization-internal
-    - appliance-build.virtualization-standard
-    - appliance-build.virtualization-development
-    - appliance-build.zfsonlinux-development
+#
+# We will create a private package repository with all our installed packages
+# for the variants listed below
+#
+case "$APPLIANCE_VARIANT" in
+internal-dev | internal-qa | external-*)
+	mkdir -p binary/pkgrepo/delphix-pkgs
+	;;
+esac

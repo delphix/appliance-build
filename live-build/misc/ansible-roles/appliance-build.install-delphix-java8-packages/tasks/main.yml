@@ -50,6 +50,10 @@
   with_items:
     - oracle-java8-jdk_8u131_amd64.deb
 
+- name: Backup java .deb to package dump
+  command: "mv /var/tmp/oracle-java8-jdk_8u131_amd64.deb {{ pkgdump }}/"
+  when: pkgdump is defined and pkgdump != ''
+
 - file:
     path: "/var/tmp/{{ item }}"
     state: absent
