@@ -27,7 +27,15 @@
 # are run.
 #
 lb config noauto \
-	--archive-areas "main restricted universe multiverse" \
+	--parent-mirror-bootstrap "http://localhost:8080" \
+	--mirror-bootstrap "http://localhost:8080" \
+	--parent-mirror-binary "http://localhost:8080" \
+	--mirror-binary "" \
+	--volatile false \
+	--security false \
+	--apt-secure false \
+	--debug \
+	--archive-areas "delphix" \
 	--bootstrap-keyring ubuntu-keyring \
 	--bootstrap-flavour minimal \
 	--chroot-filesystem none \
@@ -35,6 +43,7 @@ lb config noauto \
 	--distribution bionic \
 	--binary-images none \
 	--bootloader none \
+	--memtest none \
 	--system normal \
 	--mode ubuntu \
 	"${@}"

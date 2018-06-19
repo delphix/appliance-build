@@ -25,17 +25,32 @@ fi
 set -o errexit
 set -o xtrace
 
-rm -rf ~/.aptly
-aptly repo create -distribution=bionic -component=delphix seed-repository
-
 TMP_DIRECTORY=$(mktemp -d -p . tmp.deps.XXXXXXXXXX)
 pushd "$TMP_DIRECTORY" &>/dev/null
 
+#
+# Before we download the packages, we need to make sure our apt cache is
+# up-to-date, or else we may not find the packages we're looking for.
+#
 apt-get update
-"$TOP"/scripts/list-deb-rdependencies.sh "$TOP"/*.deb | xargs apt-get download
 
+#
+# We use "dget" to download the packages as opposed to, for example,
+# "apt-get download" so that the resultant filenames for the packages
+# are compatible to be later served with "aptly serve". If we used
+# "apt-get download" some packages would have "%3a" in their filename,
+# which causes problems when attempting to download that package from
+# the aptly served repository.
+#
+"$TOP"/scripts/list-deb-rdependencies.sh "$TOP"/*.deb | \
+	xargs -n 1 -P 16 dget -dq
+
+rm -rf ~/.aptly
+aptly repo create -distribution=bionic -component=delphix seed-repository
 aptly repo add seed-repository .
 aptly repo add seed-repository "$TOP"/*.deb
+aptly snapshot create seed-repository-snapshot from repo seed-repository
+aptly publish snapshot -skip-signing seed-repository-snapshot
 
 tar -czf "$TOP"/artifacts/seed-repository.tar.gz -C ~/.aptly .
 
