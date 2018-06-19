@@ -15,25 +15,22 @@
 #
 
 ---
-- fail:
-    msg: "Required variable 'bucket' undefined or empty."
-  when: bucket is undefined or bucket == ''
 
 - fail:
-    msg: "Required variable 'prefix' undefined or empty."
-  when: prefix is undefined or prefix == ''
+    msg: "Required variable 's3uri' undefined or empty."
+  when: s3uri is undefined or s3uri == ''
 
 #
 # We need to download the packages from S3 on the local system running
 # the playbook, because the awscli tools may not be available on the
-# remote system. Once the S3 directory/prefix containing the packages is
+# remote system. Once the S3 directory/uri containing the packages is
 # downloaded, we safely copy them to the remote system, and proceed with
 # the installation.
 #
-# Further, the expectation is for the S3 prefix to contain a directory
+# Further, the expectation is for the S3 uri to contain a directory
 # containing one or more .deb files, as well as a SHA256SUMS file that
 # can be used to verify the contents of the .deb files after the entire
-# S3 prefix is downloaded.
+# S3 uri is downloaded.
 #
 
 - tempfile:
@@ -42,7 +39,7 @@
   register: tempdir
   delegate_to: localhost
 
-- command: aws s3 sync --only-show-errors "s3://{{ bucket }}/{{ prefix }}" .
+- command: aws s3 sync --only-show-errors "{{ s3uri }}" .
   delegate_to: localhost
   args:
     chdir: "{{ tempdir.path }}"

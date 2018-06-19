@@ -18,5 +18,4 @@
 dependencies:
   - role: appliance-build.install-delphix-java8-packages
   - role: appliance-build.install-delphix-s3-packages
-    bucket: "{{ lookup('env', 'AWS_S3_BUCKET') }}"
-    prefix: "{{ lookup('env', 'AWS_S3_PREFIX_VIRTUALIZATION') }}"
+    s3uri: "{{ lookup('env', 'AWS_S3_URI_VIRTUALIZATION') }}"

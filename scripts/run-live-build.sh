@@ -61,6 +61,43 @@ else
 	cd "$TOP/live-build/variants/$1"
 fi
 
+function get_s3_uri() {
+
+	local def_bucket="snapshot-de-images"
+	local jenkinsid="jenkins-ops"
+
+	local prefix="$1"
+	local latest="s3://$def_bucket/builds/$jenkinsid/$2"
+	local uri
+
+	if [[ -z "$prefix" ]]; then
+		#
+		# prefix is empty, so get latest version
+		#
+		aws s3 cp --quiet "$latest" .
+		prefix=$(cat latest)
+		uri="s3://$def_bucket/$prefix"
+		rm -f latest
+	elif [[ "$prefix" == s3* ]]; then
+		#
+		# prefix was set to full s3 URI: "s3://<bucket>/<prefix>"
+		#
+		uri="$prefix"
+	else
+		#
+		# We assume prefix is inside default bucket
+		#
+		uri="s3://$def_bucket/$prefix"
+	fi
+
+	if aws s3 ls "$uri" >/dev/null; then
+		echo "$uri"
+	else
+		echo "$uri not found." 1>&2
+		exit 1
+	fi
+}
+
 #
 # When performing minimal testing from within Travis CI, we won't have
 # access to the Delphix internal infrastructure. Thus, we want to skip
@@ -85,41 +122,18 @@ if ! [[ -n "$CI" && -n "$TRAVIS" ]]; then
 	# about these details.
 	#
 
-	BUCKET="snapshot-de-images"
-	JENKINSID="jenkins-ops"
+	AWS_S3_URI_VIRTUALIZATION=$(get_s3_uri "$AWS_S3_PREFIX_VIRTUALIZATION" \
+		"dlpx-app-gate/projects/dx4linux/build-package/post-push/latest")
 
-	if [[ -z "$AWS_S3_PREFIX_VIRTUALIZATION" ]]; then
-		URI="s3://$BUCKET/builds/$JENKINSID/dlpx-app-gate/"
-		URI+="projects/dx4linux/build-package/post-push/latest"
+	AWS_S3_URI_MASKING=$(get_s3_uri "$AWS_S3_PREFIX_MASKING" \
+		"dms-core-gate/master/build-package/post-push/latest")
 
-		aws s3 cp "$URI" .
-		AWS_S3_PREFIX_VIRTUALIZATION=$(cat latest)
-		export AWS_S3_PREFIX_VIRTUALIZATION
-		export AWS_S3_BUCKET="snapshot-de-images"
-		rm -f latest
-	fi
+	AWS_S3_URI_ZFS=$(get_s3_uri "$AWS_S3_PREFIX_ZFS" \
+		"devops-gate/projects/dx4linux/zfs-package-build/master/post-push/latest")
 
-	if [[ -z "$AWS_S3_PREFIX_MASKING" ]]; then
-		URI="s3://$BUCKET/builds/$JENKINSID/dms-core-gate/"
-		URI+="master/build-package/post-push/latest"
-
-		aws s3 cp "$URI" .
-		AWS_S3_PREFIX_MASKING=$(cat latest)
-		export AWS_S3_PREFIX_MASKING
-		export AWS_S3_BUCKET="snapshot-de-images"
-		rm -f latest
-	fi
-
-	if [[ -z "$AWS_S3_PREFIX_ZFS" ]]; then
-		URI="s3://$BUCKET/builds/$JENKINSID/devops-gate/"
-		URI+="projects/dx4linux/zfs-package-build/master/post-push/latest"
-
-		aws s3 cp "$URI" .
-		AWS_S3_PREFIX_ZFS=$(cat latest)
-		export AWS_S3_PREFIX_ZFS
-		export AWS_S3_BUCKET="snapshot-de-images"
-		rm -f latest
-	fi
+	export AWS_S3_URI_VIRTUALIZATION
+	export AWS_S3_URI_MASKING
+	export AWS_S3_URI_ZFS
 fi
 
 lb config
