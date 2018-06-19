@@ -44,7 +44,6 @@ $DOCKER_RUN --rm \
 	--volume /dev:/dev \
 	--env CI \
 	--env TRAVIS \
-	--env AWS_S3_BUCKET \
 	--env AWS_S3_PREFIX_MASKING \
 	--env AWS_S3_PREFIX_VIRTUALIZATION \
 	--env AWS_S3_PREFIX_ZFS \
