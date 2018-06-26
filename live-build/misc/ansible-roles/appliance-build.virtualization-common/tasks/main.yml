@@ -24,30 +24,9 @@
     state: present
     update_cache: no
 
-- lineinfile:
-    dest: /etc/systemd/journald.conf
-    regexp: "^#?{{ item.key }}="
-    line: "{{ item.key }}={{ item.value }}"
-  with_items:
-    - { key: "Storage", value: "persistent" }
-    - { key: "SystemMaxUse", value: "250M" }
-
-- file:
-    path: /public
-    state: directory
-
-- lineinfile:
-    dest: /etc/exports
-    regexp: "^#?{{ item.key }} "
-    line: "{{ item.key }} {{ item.value }}"
-  with_items:
-    - { key: "/public", value: "*(ro,anonuid=60001,anongid=60001)" }
-
 - file:
     path: /var/opt/delphix
     state: directory
-
-- shell: 'date +%s > /etc/engine.install'
 
 #
 # The "product", "platform", and "cr_auth" fields are intentionally left
@@ -71,24 +50,3 @@
       domain=
       dns1=
       dns2=
-
-- shell: |
-    systemctl disable ntp.service
-    systemctl disable postgresql.service
-    systemctl disable postgresql@9.4-main.service
-
-    systemctl enable nfs-kernel-server.service
-    systemctl enable rpc-statd.service
-
-    systemctl enable /opt/delphix/server/systemd/unit/delphix-postgres@.service
-    systemctl enable /opt/delphix/server/systemd/unit/delphix-mgmt.service
-
-#
-# In order for the rsync systemd service to start, it needs a config file.
-# Here we configure the port with its default value.
-#
-- copy:
-    dest: /etc/rsyncd.conf
-    mode: 0644
-    content: |
-      port = 873
