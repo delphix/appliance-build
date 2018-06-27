@@ -31,20 +31,15 @@ RUN \
   apt-get install -y \
       ansible \
       aptly \
-      debhelper \
-      debootstrap \
-      dpkg-dev \
       livecd-rootfs \
       zfsutils-linux \
       awscli \
       coreutils \
       equivs \
       gdisk \
-      germinate \
       git \
       jq \
       kpartx \
-      lintian \
       make \
       man \
       shellcheck \
