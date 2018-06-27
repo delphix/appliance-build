@@ -29,7 +29,6 @@ FINDEXEC := $(FINDEXEC.$(shell uname -s))
 	ansiblecheck \
 	base \
 	check \
-	metapackages \
 	shellcheck \
 	shfmtcheck \
 	$(ALL_VARIANTS)
@@ -50,11 +49,6 @@ $(ALL_VARIANTS): base
 	rm -f live-build/variants/$@/.build/binary_checksums
 	rm -f live-build/variants/$@/binary/SHA256SUMS
 	./scripts/run-live-build.sh $@
-
-metapackages:
-	cd metapackages && germinate-update-metapackage --nodch
-	cd metapackages && dpkg-buildpackage
-	cd metapackages && lintian
 
 shellcheck:
 	shellcheck --exclude=SC1091 \
