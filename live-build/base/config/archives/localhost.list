@@ -14,16 +14,12 @@
 # limitations under the License.
 #
 
----
 #
-# We need to remove the ZFS and SPL modules that are bundled with the Ubuntu
-# kernel so that they do not conflict with the ZFS module that we install.
-# We use dpkg-divert instead of rm so that dpkg is aware of our changes.
+# This corresponds to the ancillary repository that must be generated
+# and served using Aptly prior to running live-build. For more details,
+# please refer to the "build-ancillary-repository.sh" script, which is
+# used to build the repository, and the "run-live-build.sh" which is
+# used to serve the repository.
 #
-- shell: |
-    VERSION=$(ls -1d /lib/modules/* | xargs basename)
-    find /lib/modules/$VERSION/kernel/zfs \
-        -type f -name '*.ko' \
-        -exec dpkg-divert --local --rename {} \;
-    depmod $VERSION
-    update-initramfs -u -t -k $VERSION
+
+deb [trusted=yes] http://localhost:8080 bionic main

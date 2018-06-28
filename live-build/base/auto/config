@@ -28,7 +28,6 @@
 #
 lb config noauto \
 	--archive-areas "main restricted universe multiverse" \
-	--bootstrap-keyring ubuntu-keyring \
 	--bootstrap-flavour minimal \
 	--chroot-filesystem none \
 	--architectures amd64 \
@@ -37,4 +36,5 @@ lb config noauto \
 	--bootloader none \
 	--system normal \
 	--mode ubuntu \
+	--memtest none \
 	"${@}"

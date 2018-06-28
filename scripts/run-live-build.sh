@@ -38,6 +38,7 @@ if [[ "$1" != "base" ]] && [[ ! -d "live-build/variants/$1" ]]; then
 fi
 
 set -o errexit
+set -o pipefail
 
 #
 # Allow the appliance username and password to be configured via these
@@ -61,83 +62,37 @@ else
 	cd "$TOP/live-build/variants/$1"
 fi
 
-function get_s3_uri() {
+#
+# The ancillary repository contains all of the first-party Delphix
+# packages that are required for live-build to operate properly.
+#
 
-	local def_bucket="snapshot-de-images"
-	local jenkinsid="jenkins-ops"
+aptly serve -config="$TOP/ancillary-repository/aptly.config" &
+APTLY_SERVE_PID=$!
 
-	local prefix="$1"
-	local latest="s3://$def_bucket/builds/$jenkinsid/$2"
-	local uri
-
-	if [[ -z "$prefix" ]]; then
-		#
-		# prefix is empty, so get latest version
-		#
-		aws s3 cp --quiet "$latest" .
-		prefix=$(cat latest)
-		uri="s3://$def_bucket/$prefix"
-		rm -f latest
-	elif [[ "$prefix" == s3* ]]; then
-		#
-		# prefix was set to full s3 URI: "s3://<bucket>/<prefix>"
-		#
-		uri="$prefix"
-	else
-		#
-		# We assume prefix is inside default bucket
-		#
-		uri="s3://$def_bucket/$prefix"
-	fi
-
-	if aws s3 ls "$uri" >/dev/null; then
-		echo "$uri"
-	else
-		echo "$uri not found." 1>&2
+#
+# We need to wait for the Aptly server to be ready before we proceed;
+# this can take a few seconds, so we retry until it succeeds.
+#
+set +o errexit
+attempts=0
+while ! curl --output /dev/null --silent --head --fail \
+	"http://localhost:8080/dists/bionic/Release"; do
+	((attempts++))
+	if [[ $attempts -gt 30 ]]; then
+		echo "Timed out waiting for ancillary repository." 1>&2
+		kill -9 $APTLY_SERVE_PID
 		exit 1
 	fi
-}
 
-#
-# When performing minimal testing from within Travis CI, we won't have
-# access to the Delphix internal infrastructure. Thus, we want to skip
-# the logic below, as it would otherwise fail when running in Travis.
-# The assumption being, we will never attempt to build a variant that
-# dependends on the Delphix S3 packages, when running in Travis.
-#
-if ! [[ -n "$CI" && -n "$TRAVIS" ]]; then
-	#
-	# If we're building any variant that depends on Delphix packages
-	# that are stored in S3, we need to provide certain environment
-	# variables that will be used to instruct the live-build logic
-	# where it can download these packages from S3. Generally these
-	# environment variables will be provided by our CI automation,
-	# but when a build is run outside of that CI environment (e.g.
-	# manually run by a developer, while making/testing changes)
-	# these environment variables will not be set.
-	#
-	# The following logic attempts to provide sane defaults for
-	# these required environment variables, such that a developer
-	# can more easily run the build manually, and not have to worry
-	# about these details.
-	#
-
-	AWS_S3_URI_VIRTUALIZATION=$(get_s3_uri "$AWS_S3_PREFIX_VIRTUALIZATION" \
-		"dlpx-app-gate/projects/dx4linux/build-package/post-push/latest")
-
-	AWS_S3_URI_MASKING=$(get_s3_uri "$AWS_S3_PREFIX_MASKING" \
-		"dms-core-gate/master/build-package/post-push/latest")
-
-	AWS_S3_URI_ZFS=$(get_s3_uri "$AWS_S3_PREFIX_ZFS" \
-		"devops-gate/projects/dx4linux/zfs-package-build/master/post-push/latest")
-
-	export AWS_S3_URI_VIRTUALIZATION
-	export AWS_S3_URI_MASKING
-	export AWS_S3_URI_ZFS
-fi
+	sleep 1
+done
+set -o errexit
 
 lb config
 lb build
+
+kill -9 $APTLY_SERVE_PID
 
 #
 # On failure, the "lb build" command above doesn't actually return a

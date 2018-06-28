@@ -37,7 +37,7 @@ all-variants: $(ALL_VARIANTS)
 all-internal: $(ALL_INTERNAL)
 all-external: $(ALL_EXTERNAL)
 
-base:
+base: ancillary-repository
 	./scripts/run-live-build.sh $@
 
 $(ALL_VARIANTS): base
@@ -49,6 +49,9 @@ $(ALL_VARIANTS): base
 	rm -f live-build/variants/$@/.build/binary_checksums
 	rm -f live-build/variants/$@/binary/SHA256SUMS
 	./scripts/run-live-build.sh $@
+
+ancillary-repository:
+	./scripts/build-ancillary-repository.sh
 
 shellcheck:
 	shellcheck --exclude=SC1091 \

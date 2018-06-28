@@ -15,11 +15,6 @@
 #
 
 ---
-#
-# The masking package should have already been installed; this is simply
-# asserting that the state of the system is as we expect.
-#
 - apt:
     name: delphix-masking
     state: present
-    update_cache: no
