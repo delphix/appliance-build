@@ -29,12 +29,7 @@ if [[ -e /etc/resolv.conf ]]; then
 	cp /etc/resolv.conf binary/etc/resolv.conf
 fi
 
-OPTS=
-if [[ -d binary/pkgrepo/delphix-pkgs ]]; then
-	OPTS="--extra-vars=pkgdump=/pkgrepo/delphix-pkgs"
-fi
-
-ansible-playbook -vvvv -i binary, $OPTS ansible/playbook.yml
+ansible-playbook -vvvv -i binary, ansible/playbook.yml
 
 if [[ -e binary/etc/resolv.conf ]]; then
 	rm binary/etc/resolv.conf

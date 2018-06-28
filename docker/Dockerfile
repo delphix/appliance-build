@@ -43,6 +43,7 @@ RUN \
       livecd-rootfs \
       make \
       man \
+      rename \
       shellcheck \
       vim \
       zfsutils-linux && \

@@ -1,8 +1,0 @@
-Section: misc
-Priority: optional
-Standards-Version: 3.9.2
-
-Package: delphix-entire
-Version: _DELPHIX_VERSION_
-Depends: _DEPENDS_
-Description: Meta-package that lists packages in a specific Delphix version.

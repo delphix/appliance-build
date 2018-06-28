@@ -37,6 +37,7 @@
 - apt:
     name: unattended-upgrades
     state: absent
+    purge: yes
 
 #
 # If we don't disable the "OS prober" script, when we update the grub
