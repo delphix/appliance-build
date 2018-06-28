@@ -21,13 +21,6 @@
 # previously created ".vmdk" disk image as the VM's boot disk.
 #
 
-#
-# Please see the comment in "90-raw-disk-image.binary"
-#
-if [[ -n "$CI" && -n "$TRAVIS" ]]; then
-	exit 0
-fi
-
 source /usr/share/livecd-rootfs/live-build/functions
 
 #

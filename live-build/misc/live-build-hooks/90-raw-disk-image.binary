@@ -28,17 +28,6 @@ die() {
 }
 
 #
-# When running in Travis CI, we cannot expect this script to be running
-# on a host that has the ZFS kernel modules installed *and* for those
-# kernel modules to be of the version that we expect. Thus, when we
-# detect we're running in Travis, we avoid creating the VM artifacts
-# that depend on ZFS.
-#
-if [[ -n "$CI" && -n "$TRAVIS" ]]; then
-	exit 0
-fi
-
-#
 # We want to use different sized rpool depending on if we're building a
 # disk image meant for internal use, or external (i.e. customer) use.
 #
