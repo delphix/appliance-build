@@ -31,19 +31,22 @@ RUN \
   apt-get install -y \
       ansible \
       aptly \
-      livecd-rootfs \
-      zfsutils-linux \
       awscli \
       coreutils \
       equivs \
       gdisk \
       git \
+      java-package \
       jq \
       kpartx \
+      libxt6 \
+      livecd-rootfs \
       make \
       man \
+      rename \
       shellcheck \
-      vim && \
+      vim \
+      zfsutils-linux && \
   rm -rf /var/lib/apt/lists/*
 
 RUN wget -nv -O /usr/local/bin/shfmt \

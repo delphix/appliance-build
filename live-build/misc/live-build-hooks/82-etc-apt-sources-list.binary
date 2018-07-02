@@ -1,0 +1,36 @@
+#!/bin/bash -eux
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# We specifically do not want the appliance to attempt to upgrade, nor
+# install, any packages by contacting servers listed in the default list
+# of APT repositories, found in /etc/apt/sources.list. Instead, the
+# appliance will handle upgrade differently, using a custom upgrade
+# mechanism that is capable of upgrading itself without network
+# connectivity to these external APT repositories. Thus to avoid any
+# source of confusion or mistakes, we actually remove the default
+# list(s) here.
+#
+chroot binary rm -f /etc/apt/sources.list
+
+#
+# We must use bash here, so the glob gets evaluated inside the chroot
+# environment, and matches the files installed in the chroot's
+# directory. Otherwise it would evaluate on the host system, and
+# matching the files found on the host system.
+#
+chroot binary bash -c 'rm -f /etc/apt/sources.list.d/*.list'

@@ -21,12 +21,5 @@
 # assumed to be a "raw" disk image, into a VHDX formated disk image.
 #
 
-#
-# Please see the comment in "90-raw-disk-image.binary"
-#
-if [[ -n "$CI" && -n "$TRAVIS" ]]; then
-	exit 0
-fi
-
 qemu-img convert "$APPLIANCE_VARIANT.img" \
 	-O vhdx -o subformat=dynamic "$APPLIANCE_VARIANT.vhdx"

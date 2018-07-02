@@ -15,14 +15,9 @@
 #
 
 ---
-#
-# The virtualization package should have already been installed; this is
-# simply asserting that the state of the system is as we expect.
-#
 - apt:
     name: delphix-virtualization
     state: present
-    update_cache: no
 
 - file:
     path: /var/opt/delphix

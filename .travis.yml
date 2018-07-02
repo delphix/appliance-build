@@ -12,7 +12,6 @@ services:
 
 env:
   - TARGET=ansiblecheck
-  - TARGET=internal-minimal
   - TARGET=shellcheck
   - TARGET=shfmtcheck
 

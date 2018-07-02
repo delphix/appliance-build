@@ -21,13 +21,6 @@
 # assumed to be a "raw" disk image, into a qcow2 formated disk image.
 #
 
-#
-# Please see the comment in "90-raw-disk-image.binary"
-#
-if [[ -n "$CI" && -n "$TRAVIS" ]]; then
-	exit 0
-fi
-
 source /usr/share/livecd-rootfs/live-build/functions
 rm -f "$APPLIANCE_VARIANT.qcow2"
 convert_to_qcow2 "$APPLIANCE_VARIANT.img" "$APPLIANCE_VARIANT.qcow2"
