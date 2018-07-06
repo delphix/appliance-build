@@ -1,0 +1,90 @@
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+
+- apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - bind9
+    - dnsutils
+    - git
+    - isc-dhcp-server
+    - libldap2-dev
+    - libsasl2-dev
+    - nfs-kernel-server
+    - python-ldap
+    - python-paramiko
+    - python-pip
+    - python-requests
+    - python2.7
+    - telnet
+  register: result
+  until: result is not failed
+  retries: 3
+  delay: 60
+
+- pip:
+    name: pysphere
+    extra_args: --index-url http://artifactory.delphix.com/artifactory/api/pypi/delphix-virtual-pypi/simple/ --trusted-host artifactory.delphix.com --no-cache-dir
+    version: 0.1.8
+    executable: pip2
+
+- git:
+    repo: 'https://gitlab.delphix.com/devops/dcenter-gate.git'
+    version: projects/dx4linux
+    dest: /opt/dcenter/lib/dcenter-gate
+    accept_hostkey: yes
+    update: no
+
+- copy:
+    dest: "/etc/dcenter.conf"
+    content: |
+      [[ -z "$DC_ROOT" ]] && export DC_ROOT="dcenter"
+
+#
+# By default, ubuntu restricts directories where dhcpd and named
+# can operate. For dcenter, we maintain the dhcp configuration
+# in /tmp so we need to add those paths into the apparmor configuration.
+#
+- copy:
+    dest: "/etc/apparmor.d/local/usr.sbin.dhcpd"
+    content: |
+      /tmp/dcenter_dhcp_config/ r,
+      /tmp/dcenter_dhcp_config/** r,
+      /tmp/dcenter_dhcp_config/dhcpd{,6}.conf r,
+      /tmp/dcenter_dhcp_config/dhcpd{,6}_ldap.conf r,
+      /tmp/dcenter_dhcp_config/dhcpd{,6}.leases* lrw,
+      /tmp/dcenter_dhcp_config/dhcpd{,6}.pid rw,
+
+- copy:
+    dest: "/etc/apparmor.d/local/usr.sbin.named"
+    content: |
+      /tmp/dcenter_dhcp_config/named.conf r,
+      /tmp/dcenter_dhcp_config/named.zone r,
+      /tmp/dcenter_dhcp_config/named.pid w,
+
+#
+# Dcenter systems use static addresses so modify cloud.cfg to preserve
+# their hostname.
+#
+- lineinfile:
+    path: /etc/cloud/cloud.cfg
+    regexp: '^preserve_hostname: false'
+    line: 'preserve_hostname: true'
+
+- command: systemctl disable bind9.service
