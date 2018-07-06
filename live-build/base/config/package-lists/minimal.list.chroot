@@ -35,10 +35,10 @@ delphix-zfs
 # The following packages provide the minimal set of packages that are
 # necessary to create a working system (e.g. networking, users, etc).
 #
+auditd
 cloud-init
 debsums
 net-tools
 open-vm-tools
 openssh-server
 ubuntu-minimal
-auditd

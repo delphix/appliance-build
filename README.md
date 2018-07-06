@@ -149,3 +149,74 @@ console and perform any post-boot verification that's required (e.g.
 verify certain packages are installed, etc).
 
 To exit "qemu", one can use "Ctrl-A X".
+
+## Creating new build variants
+
+This repository contains different build variants which are used to
+generate customized images, leveraging different Ansible roles to customize
+those variants. The following instructions can be used to create a new
+build variant and roles.
+
+### Step 1. Create the build variant
+
+The different variants are located in the "live-build/variants" directory:
+
+    $ ls -l live-build/variants
+    total 0
+    drwxr-xr-x  5 root  root  160 Jun  4 22:56 external-standard
+    drwxr-xr-x  5 root  root  160 Jun  4 22:56 internal-dev
+    drwxr-xr-x  5 root  root  160 Jun  4 22:56 internal-minimal
+    drwxr-xr-x  5 root  root  160 Jun  4 22:56 internal-qa
+
+To create a new variant, run the "create-variant.sh" script. Note that
+variant names use the "internal" and "external" prefixes:
+
+    $ ./scripts/create-variant.sh internal-dcenter
+
+### Step 2. Create and populate the ansible role directory
+
+The new variant that was just created may require some customizations applied
+to it, that are specific to this new variant. In order to apply these
+customization, a new Ansible role can be created and used. All existing Ansible
+roles that are used to customize existing build variants are located in the
+"live-build/misc/ansible-roles" directory, and follow the standard Ansible role
+directory structure (i.e. tasks, handlers, files, etc.)
+
+To create a new Ansible role, a new Ansible role directory will need to be
+created. In this example, the name of our Ansible role will be
+"appliance-build.dcenter" to match the name of our variant:
+
+    $ mkdir -p live-build/misc/ansible-roles/appliance-build.dcenter/tasks
+
+There are many roles that exist in "live-build/misc/ansible-roles" which can
+serve as good examples.
+
+### Step 3. Update the variant configuration
+
+With the role[s] created, you can populate the "playbook.yml" file in the
+new variant's "ansible" directory:
+
+    $ ls -l live-build/variants/internal-dcenter/ansible
+    total 8
+    -rw-r--r--  1 root  root  891 Jun 29 14:43 playbook.yml
+    lrwxr-xr-x  1 root  root   27 Jun 19 19:17 roles -> ../../../misc/ansible-roles
+
+For this example, we add our new role to the playboodk as shown below:
+
+    ---
+    - hosts: all
+      connection: chroot
+      gather_facts: no
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+      roles:
+        - appliance-build.minimal-common
+        - appliance-build.minimal-internal
+        - appliance-build.dcenter
+
+### Step 4. Build the variant
+
+See the instructions [above](#step-4-run-live-build) to setup your build
+environment and kick off the build:
+
+    $ ./scripts/docker-run.sh make internal-dcenter
