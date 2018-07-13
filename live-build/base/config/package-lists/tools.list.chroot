@@ -22,6 +22,7 @@
 
 atop
 bpfcc-tools
+crash
 dnsutils
 dstat
 emacs
@@ -29,6 +30,7 @@ gdb
 glances
 iftop
 inotify-tools
+kdump-tools
 procinfo
 sg3-utils
 strace

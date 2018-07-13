@@ -42,3 +42,9 @@ net-tools
 open-vm-tools
 openssh-server
 ubuntu-minimal
+
+#
+# The following package contains the GPG keys which allow us to download
+# from the repositories which contain packages containing debug symbols.
+#
+ubuntu-dbgsym-keyring
