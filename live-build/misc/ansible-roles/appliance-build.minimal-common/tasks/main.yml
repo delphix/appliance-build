@@ -323,3 +323,41 @@
   with_items:
     - { key: 'kernel.core_pattern', value: '/var/crash/core.%e.%p.%t' }
     - { key: 'vm.overcommit_memory', value: '1' }
+
+#
+# Add the apt repos that have the debug versions of packages, so that we
+# can download a debug kernel to use with crash.
+#
+- apt_repository:
+    repo: "{{ item }}"
+  with_items:
+    - deb http://ddebs.ubuntu.com bionic main restricted universe multiverse
+    - deb http://ddebs.ubuntu.com bionic-updates main restricted universe multiverse
+    - deb http://ddebs.ubuntu.com bionic-proposed main restricted universe multiverse
+  retries: 3
+  delay: 30
+  register: result
+  until: result is succeeded
+
+- shell: ls /boot/vmlinuz-* | sed 's|/boot/vmlinuz-||'
+  register: kernel_version
+
+- apt:
+    name: 'linux-image-{{ item }}-dbgsym'
+  with_items:
+    - '{{ kernel_version.stdout_lines }}'
+  retries: 3
+  delay: 30
+  register: result
+  until: result is succeeded
+
+#
+# Increase the amount of memory reserved for the crash kernel.
+# Empirically, it seems we need about 512M to get it to boot. If the
+# system has less than 1G, disable crash dumps rather than reserving
+# half of memory for the crash kernel.
+#
+- lineinfile:
+    path: /etc/default/grub.d/kdump-tools.cfg
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT crashkernel=1024M-:512M"'
