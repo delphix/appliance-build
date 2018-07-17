@@ -171,7 +171,7 @@ function build_ancillary_repository() {
 AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
 	"$AWS_S3_URI_VIRTUALIZATION" \
 	"$AWS_S3_PREFIX_VIRTUALIZATION" \
-	"dlpx-app-gate/projects/dx4linux/build-package/post-push/latest")
+	"dlpx-app-gate/master/build-package/post-push/latest")
 
 AWS_S3_URI_MASKING=$(resolve_s3_uri \
 	"$AWS_S3_URI_MASKING" \
