@@ -41,7 +41,7 @@ fi
 $DOCKER_RUN --rm \
 	--privileged \
 	--network host \
-	--ipc "private" \
+	--ipc "none" \
 	--volume /dev:/dev \
 	--env AWS_S3_PREFIX_MASKING \
 	--env AWS_S3_PREFIX_VIRTUALIZATION \
