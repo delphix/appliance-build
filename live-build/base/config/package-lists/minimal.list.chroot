@@ -41,6 +41,7 @@ debsums
 net-tools
 open-vm-tools
 openssh-server
+rng-tools
 ubuntu-minimal
 
 #
