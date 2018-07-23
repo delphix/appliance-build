@@ -30,3 +30,4 @@
     - appliance-build.virtualization-standard
     - appliance-build.virtualization-development
     - appliance-build.zfsonlinux-development
+    - appliance-build.delphix-ldap
