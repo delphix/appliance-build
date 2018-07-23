@@ -361,3 +361,12 @@
     path: /etc/default/grub.d/kdump-tools.cfg
     regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
     line: 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT crashkernel=1024M-:512M"'
+
+# Panic on ZFS assertion failures
+- lineinfile:
+    path: /etc/modprobe.d/zfs.conf
+    create: yes
+    line: 'options spl spl_panic_halt=1'
+  # Because the spl module is loaded from the initramfs when using zfs on root,
+  # we need to rebuild the initramfs to account for the modprobe.d change.
+  notify: update initramfs
