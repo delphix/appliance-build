@@ -35,6 +35,9 @@
   with_items:
     - ant
     - git
+    - libcurl4-openssl-dev
+    - libpam0g-dev
+    - libssl-dev
   register: result
   until: result is not failed
   retries: 3
