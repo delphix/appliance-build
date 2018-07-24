@@ -27,6 +27,28 @@
 set -o pipefail
 
 #
+# Sanity check to make sure we haven't installed multiple kernel versions.
+# This could happen if the version of the ZFS modules we install is not the
+# same as the kernel version installed with the package 'linux-generic'.
+#
+# If the kernel version of the ZFS packages is lower than the one for
+# 'linux-generic' then we will boot into a kernel that doesn't have Delphix ZFS
+# modules and will use the built-in Ubuntu ones (while using Delphix userland
+# packages, which are not compatible). If on the other hand the kernel version
+# is higher, then we will boot into a kernel image that contains our ZFS
+# modules (ZFS modules depend on 'linux-image-KVERS', and will install it
+# along). However, the 'linux-generic' package has more dependencies than just
+# 'linux-image-KVERS', which will not be installed along with the ZFS modules
+# for the running kernel version, and which our appliance expects to have.
+#
+# shellcheck disable=SC2012
+if [[ $(ls binary/lib/modules | wc -l) -gt 1 ]]; then
+	echo "Error: multiple kernel versions detected:" >&2
+	ls binary/lib/modules >&2
+	exit 1
+fi
+
+#
 # Here, we generate a list of all of the packages that have been
 # installed in the "binary" chroot directory, including package version,
 # and then use this list to download each of these packages.
