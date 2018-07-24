@@ -44,6 +44,8 @@ set -o pipefail
 mkdir -p /packages
 cd /packages
 
+apt-get update
+
 dpkg-query -Wf '${Package}=${Version}\n' | xargs apt-get download
 EOF
 
