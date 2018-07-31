@@ -370,3 +370,11 @@
   # Because the spl module is loaded from the initramfs when using zfs on root,
   # we need to rebuild the initramfs to account for the modprobe.d change.
   notify: update initramfs
+
+# Configure SSH to allow PAM "conversations" (interactions with the user).
+- lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+  with_items:
+    - { key: "ChallengeResponseAuthentication", value: "yes" }
