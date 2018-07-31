@@ -1,4 +1,5 @@
 #
+#
 # Copyright 2018 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +16,5 @@
 #
 
 ---
-- hosts: all
-  connection: chroot
-  gather_facts: no
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-  roles:
-    - appliance-build.minimal-common
-    - appliance-build.minimal-internal
-    - appliance-build.masking-common
-    - appliance-build.qa-internal
-    - appliance-build.virtualization-common
-    - appliance-build.virtualization-internal
-    - appliance-build.virtualization-standard
+- command: nft -f /etc/nftables.conf
+  listen: nftables

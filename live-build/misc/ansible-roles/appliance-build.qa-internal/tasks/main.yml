@@ -14,17 +14,20 @@
 # limitations under the License.
 #
 
----
-- hosts: all
-  connection: chroot
-  gather_facts: no
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-  roles:
-    - appliance-build.minimal-common
-    - appliance-build.minimal-internal
-    - appliance-build.masking-common
-    - appliance-build.qa-internal
-    - appliance-build.virtualization-common
-    - appliance-build.virtualization-internal
-    - appliance-build.virtualization-standard
+- apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - nftables
+  register: result
+  until: result is not failed
+  retries: 3
+  delay: 60
+
+- copy:
+    dest: /etc/nftables.conf
+    mode: 0644
+    content: |
+      #!/usr/sbin/nft -f
+      flush ruleset
+  notify: nftables
