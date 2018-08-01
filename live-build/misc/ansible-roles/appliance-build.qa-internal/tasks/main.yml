@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# This file is intended only for QA-specific testing items and frameworks.
+# Anything required by customers should not be added here.
+#
 
 - apt:
     name: "{{ item }}"
