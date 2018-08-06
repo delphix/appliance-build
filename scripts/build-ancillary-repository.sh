@@ -199,6 +199,12 @@ download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_ZFS"
 
 #
+# TODO: Eventually we need to download this package from S3. For now,
+# the package needs to be manually built.
+#
+cp "$TOP/delphix-foundation_6.1.0_amd64.deb" "$PKG_DIRECTORY"
+
+#
 # The Delphix Java 8 package is handled a little differently than the
 # rest. This package file must be dynamically generated on the fly, from
 # some input file stored in Artifactory. This function will do this, and
