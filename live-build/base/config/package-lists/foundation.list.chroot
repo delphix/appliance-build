@@ -14,25 +14,4 @@
 # limitations under the License.
 #
 
-#
-# These packages are tools that are intended for human convenience.  The
-# product should not rely on them programmatically.  They may be updated
-# or replaced without regard for backward compatibility.
-#
-
-atop
-bpfcc-tools
-crash
-dnsutils
-dstat
-emacs
-gdb
-glances
-iftop
-inotify-tools
-kdump-tools
-procinfo
-sg3-utils
-strace
-tshark
-vim
+delphix-foundation
