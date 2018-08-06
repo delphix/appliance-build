@@ -379,3 +379,9 @@
     line: "{{ item.key }}={{ item.value }}"
   with_items:
     - { key: "ChallengeResponseAuthentication", value: "yes" }
+
+#
+# Disable the Linux Azure Agent by default. Later this should be re-enabled on
+# Azure systems.
+#
+- command: systemctl disable walinuxagent.service

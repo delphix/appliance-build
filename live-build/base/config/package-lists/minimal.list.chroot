@@ -43,6 +43,7 @@ open-vm-tools
 openssh-server
 rng-tools
 ubuntu-minimal
+walinuxagent
 
 #
 # The following package contains the GPG keys which allow us to download
