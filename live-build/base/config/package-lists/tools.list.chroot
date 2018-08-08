@@ -33,6 +33,7 @@ inotify-tools
 kdump-tools
 procinfo
 sg3-utils
+snmp
 strace
 tshark
 vim
