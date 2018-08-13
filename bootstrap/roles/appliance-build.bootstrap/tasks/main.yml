@@ -19,6 +19,16 @@
   register: toplevel
 
 - apt:
+    name: aptitude
+    state: present
+
+- apt:
+    update_cache: yes
+
+- apt:
+    upgrade: yes
+
+- apt:
     name: "{{ item }}"
     state: present
   with_items:
