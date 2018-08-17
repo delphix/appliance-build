@@ -372,13 +372,33 @@
   # we need to rebuild the initramfs to account for the modprobe.d change.
   notify: update initramfs
 
-# Configure SSH to allow PAM "conversations" (interactions with the user).
 - lineinfile:
     path: /etc/ssh/sshd_config
     regexp: "^#?{{ item.key }}="
     line: "{{ item.key }}={{ item.value }}"
   with_items:
+    #
+    # Configure SSH to allow PAM "conversations" (interactions with the user).
+    #
     - { key: "ChallengeResponseAuthentication", value: "yes" }
+    #
+    # Harden the appliance by disabling ssh-agent(1), tcp, UNIX domain, and
+    # X11 forwarding. Note that this doesn't improve security unless users are
+    # also denied shell access.
+    #
+    - { key: "AllowAgentForwarding", value: "no" }
+    - { key: "AllowStreamLocalForwarding", value: "no" }
+    - { key: "AllowTcpForwarding", value: "no" }
+    - { key: "X11Forwarding", value: "no" }
+
+#
+# Harden the appliance by disabling SFTP.
+#
+- replace:
+    path: /etc/ssh/sshd_config
+    regexp: '^(Subsystem.*sftp.*)'
+    replace: '#\1'
+
 
 #
 # Disable the Linux Azure Agent by default. Later this should be re-enabled on
