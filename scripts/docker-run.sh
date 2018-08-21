@@ -44,9 +44,11 @@ $DOCKER_RUN --rm \
 	--ipc "none" \
 	--volume /dev:/dev \
 	--env AWS_S3_PREFIX_MASKING \
+	--env AWS_S3_PREFIX_UPGRADE \
 	--env AWS_S3_PREFIX_VIRTUALIZATION \
 	--env AWS_S3_PREFIX_ZFS \
 	--env AWS_S3_URI_MASKING \
+	--env AWS_S3_URI_UPGRADE \
 	--env AWS_S3_URI_VIRTUALIZATION \
 	--env AWS_S3_URI_ZFS \
 	--env APPLIANCE_PASSWORD \

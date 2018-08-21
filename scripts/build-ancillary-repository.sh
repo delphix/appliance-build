@@ -168,15 +168,20 @@ function build_ancillary_repository() {
 #    environment variables, and the script will work as expected.
 #
 
-AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
-	"$AWS_S3_URI_VIRTUALIZATION" \
-	"$AWS_S3_PREFIX_VIRTUALIZATION" \
-	"dlpx-app-gate/master/build-package/post-push/latest")
-
 AWS_S3_URI_MASKING=$(resolve_s3_uri \
 	"$AWS_S3_URI_MASKING" \
 	"$AWS_S3_PREFIX_MASKING" \
 	"dms-core-gate/master/build-package/post-push/latest")
+
+AWS_S3_URI_UPGRADE=$(resolve_s3_uri \
+	"$AWS_S3_URI_UPGRADE" \
+	"$AWS_S3_PREFIX_UPGRADE" \
+	"appliance-upgrade/master/build-package/post-push/latest")
+
+AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
+	"$AWS_S3_URI_VIRTUALIZATION" \
+	"$AWS_S3_PREFIX_VIRTUALIZATION" \
+	"dlpx-app-gate/master/build-package/post-push/latest")
 
 AWS_S3_URI_ZFS=$(resolve_s3_uri \
 	"$AWS_S3_URI_ZFS" \
@@ -194,8 +199,9 @@ PKG_DIRECTORY=$(mktemp -d -p "$PWD" tmp.pkgs.XXXXXXXXXX)
 # Now that we've determined the URI of all first-party packages, we can
 # proceed to download these packages.
 #
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
+download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_UPGRADE"
+download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_ZFS"
 
 #
