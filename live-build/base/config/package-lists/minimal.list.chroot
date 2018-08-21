@@ -38,6 +38,7 @@ delphix-zfs
 auditd
 cloud-init
 debsums
+delphix-upgrade
 net-tools
 open-vm-tools
 openssh-server
