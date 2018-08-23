@@ -123,7 +123,7 @@ fi
 # user (e.g. other software); this is most useful when multiple variants
 # are built via a single call to "make" (e.g. using the "all" target).
 #
-for ext in ova qcow2 repo vhdx vmdk; do
+for ext in ova qcow2 upgrade.tar.gz vhdx vmdk; do
 	if [[ -f "$APPLIANCE_VARIANT.$ext" ]]; then
 		mv "$APPLIANCE_VARIANT.$ext" "$TOP/live-build/artifacts"
 	fi

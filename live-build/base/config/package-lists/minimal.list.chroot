@@ -42,6 +42,7 @@ net-tools
 open-vm-tools
 openssh-server
 rng-tools
+systemd-container
 ubuntu-minimal
 walinuxagent
 

@@ -126,6 +126,6 @@ aptly repo add upgrade-repository ./*.deb
 
 aptly publish repo -skip-signing upgrade-repository
 
-tar -cf "$APPLIANCE_VARIANT.repo" -C ~/.aptly .
+tar -czf "$APPLIANCE_VARIANT.upgrade.tar.gz" -C upgrade-scripts . -C ~/.aptly .
 
 rm -rf binary/packages
