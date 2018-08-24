@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Copyright 2018 Delphix
 #
@@ -14,8 +15,10 @@
 # limitations under the License.
 #
 
-*
-!*/
-!ansible/**
-!config/hooks
-!upgrade-scripts
+UPDATE_DIR=${UPDATE_DIR:-"/var/dlpx-update"}
+DROPBOX_DIR=${DROPBOX_DIR:-"/var/delphix/dropbox"}
+
+function die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}

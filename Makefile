@@ -54,9 +54,10 @@ ancillary-repository:
 	./scripts/build-ancillary-repository.sh
 
 shellcheck:
-	shellcheck --exclude=SC1091 \
+	shellcheck --exclude=SC1090,SC1091 \
 		$$(find scripts -type f $(FINDEXEC)) \
-		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC))
+		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC)) \
+		$$(find live-build/misc/upgrade-scripts -type f)
 
 #
 # There doesn't appear to be a way to have "shfmt" return non-zero when
@@ -80,7 +81,8 @@ shellcheck:
 #
 shfmtcheck:
 	! shfmt -d $$(find scripts -type f $(FINDEXEC)) \
-		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC)) | grep .
+		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC)) \
+		$$(find live-build/misc/upgrade-scripts -type f) | grep .
 
 ansiblecheck:
 	ansible-lint $$(find bootstrap live-build/variants -name playbook.yml)
