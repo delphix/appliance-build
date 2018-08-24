@@ -365,14 +365,28 @@
     regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
     line: 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT crashkernel=1024M-:512M"'
 
-# Panic on ZFS assertion failures
 - lineinfile:
     path: /etc/modprobe.d/zfs.conf
     create: yes
-    line: 'options spl spl_panic_halt=1'
+    line: "{{ item }}"
   # Because the spl module is loaded from the initramfs when using zfs on root,
   # we need to rebuild the initramfs to account for the modprobe.d change.
   notify: update initramfs
+  with_items:
+    #
+    # Panic on ZFS assertion failures; otherwise it's possible for these
+    # assertion failures to only halt the thread that failed the assert,
+    # which can then put the entire system into a "hung" state, since
+    # we're running a rootfs on ZFS.
+    #
+    - "options spl spl_panic_halt=1"
+    #
+    # We increase the max memory limit for ZFS channel programs to 512MB
+    # to give us a wide buffer for development of channel programs. We
+    # were using upwards of 70MB during internal testing, which is too
+    # much with the default limit of 100MB.
+    #
+    - "options zfs zfs_lua_max_memlimit=536870912"
 
 - lineinfile:
     path: /etc/ssh/sshd_config
