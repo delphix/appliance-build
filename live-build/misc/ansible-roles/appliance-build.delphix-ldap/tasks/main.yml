@@ -44,13 +44,18 @@
 
 - lineinfile:
     dest: /etc/nsswitch.conf
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
+    regexp: "^({{ item.db }}:(?!.*\\sldap\\s).*$)"
+    line: "\\1 ldap"
+    backrefs: yes
   with_items:
-    - { regexp: "^automount:.*$", line: "automount:\tfiles ldap" }
-    - { regexp: "^group:.*$", line: "group:\tcompat ldap" }
-    - { regexp: "^passwd:.*$", line: "passwd:\tcompat ldap" }
-    - { regexp: "^shadow:.*$", line: "shadow:\tcompat ldap" }
+    - { db: "passwd" }
+    - { db: "group" }
+    - { db: "shadow" }
+
+- lineinfile:
+    dest: /etc/nsswitch.conf
+    regexp: "^automount:.*$"
+    line: "automount:\tfiles ldap"
 
 - file:
     path: /home

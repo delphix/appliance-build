@@ -30,6 +30,12 @@
   when: lookup('env', 'APPLIANCE_USERNAME') == ''
 
 #
+# Apt cache needs to be up to date.
+#
+- apt:
+    update_cache: yes
+
+#
 # To adhere to the priciple of least surprise, we disable automatic
 # upgrades here; this package can always be added on a specific system
 # when it's desired.
@@ -374,8 +380,8 @@
 
 - lineinfile:
     path: /etc/ssh/sshd_config
-    regexp: "^#?{{ item.key }}="
-    line: "{{ item.key }}={{ item.value }}"
+    regexp: "^#?{{ item.key }} "
+    line: "{{ item.key }} {{ item.value }}"
   with_items:
     #
     # Configure SSH to allow PAM "conversations" (interactions with the user).
