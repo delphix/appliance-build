@@ -35,5 +35,6 @@ procinfo
 sg3-utils
 snmp
 strace
+trace-cmd
 tshark
 vim
