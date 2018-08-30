@@ -36,6 +36,9 @@
     - ant
     - git
     - libcurl4-openssl-dev
+    - libnss3-dev
+    - libnss3-dbg
+    - libnss3-tools
     - libpam0g-dev
     - libssl-dev
   register: result
