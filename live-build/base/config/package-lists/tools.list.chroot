@@ -36,5 +36,6 @@ sg3-utils
 snmp
 snmp-mibs-downloader
 strace
+trace-cmd
 tshark
 vim
