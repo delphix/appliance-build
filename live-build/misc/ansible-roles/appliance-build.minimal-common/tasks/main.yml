@@ -232,10 +232,6 @@
           lock_passwd: false
 
 #
-# We don't want to have our secondary addresses deleted when someone
-# deletes the primary IP address of a network interface, thus we enable
-# the promotion of secondary addresses to primary ones.
-#
 # As for the priority prefix for our config file (see what that means
 # in /etc/sysctl.d/README) we pick 50 which is higher than what other
 # Ubuntu packages will be installing but less than customization made
@@ -243,12 +239,34 @@
 #
 - lineinfile:
     create: yes
-    dest: /etc/sysctl.d/50-delphix-networking.conf
+    dest: /etc/sysctl.d/50-delphix.conf
     regexp: "^#?{{ item.key }}="
     line: "{{ item.key }}={{ item.value }}"
   with_items:
+    #
+    # We don't want to have our secondary addresses deleted when someone
+    # deletes the primary IP address of a network interface, thus we
+    # enable the promotion of secondary addresses to primary ones.
+    #
     - { key: "net.ipv4.conf.all.promote_secondaries", value: "1" }
     - { key: "net.ipv4.conf.default.promote_secondaries", value: "1" }
+    #
+    # Application cores should be written into /var/crash and tagged with the
+    # execname, process id, and seconds since the epoch.
+    #
+    - { key: 'kernel.core_pattern', value: '/var/crash/core.%e.%p.%t' }
+    #
+    # Force the kernel to allow memory allocations to succeed until we
+    # actually run out of memory. The default heuristic can cause failure to
+    # generate an hprof dump on OOM in the stack. Allowing overcommit lets the
+    # fork(2) succeed despite not having enough memory which allows the script
+    # that generates the hprof dump to run.
+    #
+    - { key: 'vm.overcommit_memory', value: '1' }
+    #
+    # Enable gathering of crash dumps by sending an NMI
+    #
+    - { key: 'kernel.unknown_nmi_panic', value: '1' }
 
 #
 # Configure command audit logging
@@ -308,28 +326,6 @@
     path: /var/crash
     state: directory
     mode: 0777
-
-- lineinfile:
-    create: yes
-    dest: /etc/sysctl.conf
-    regexp: "^#?{{ item.key }} ="
-    line: "{{ item.key }} = {{ item.value }}"
-  with_items:
-    #
-    # Application cores should be written into /var/crash and tagged with the
-    # execname, process id, and seconds since the epoch.
-    #
-    - { key: 'kernel.core_pattern', value: '/var/crash/core.%e.%p.%t' }
-    #
-    # Force the kernel to allow memory allocations to succeed until we
-    # actually run out of memory. The default heuristic can cause failure to
-    # generate an hprof dump on OOM in the stack. Allowing overcommit lets the
-    # fork(2) succeed despite not having enough memory which allows the script
-    # that generates the hprof dump to run.
-    #
-    - { key: 'vm.overcommit_memory', value: '1' }
-    # Enable gathering of crash dumps by sending an NMI
-    - { key: 'kernel.unknown_nmi_panic', value: '1' }
 
 #
 # Add the apt repos that have the debug versions of packages, so that we
