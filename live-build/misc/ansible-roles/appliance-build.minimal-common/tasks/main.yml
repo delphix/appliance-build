@@ -431,7 +431,6 @@
       # tunables, that we use on our illumos-based DelphixOS.
       #
       options zfs zfs_mg_noalloc_threshold=5
-      options zfs zfs_vdev_aggregation_limit=131072
   #
   # Because the spl module is loaded from the initramfs when using zfs on root,
   # we need to rebuild the initramfs to account for the modprobe.d change.
