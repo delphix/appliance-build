@@ -365,13 +365,78 @@
     regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
     line: 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT crashkernel=1024M-:512M"'
 
-# Panic on ZFS assertion failures
-- lineinfile:
-    path: /etc/modprobe.d/zfs.conf
-    create: yes
-    line: 'options spl spl_panic_halt=1'
+- copy:
+    dest: /etc/modprobe.d/10-zfs.conf
+    mode: 0644
+    content: |
+      #
+      # This file should not be directly modified by support, as these
+      # changes would be removed on upgrade. In order to make custom
+      # tunable changes for specific customer installations, please edit
+      # the file (creating it if necessary): /etc/modprobe.d/20-zfs.conf
+      #
+
+      #
+      # Panic on ZFS assertion failures; otherwise it's possible for these
+      # assertion failures to only halt the thread that failed the assert,
+      # which can then put the entire system into a "hung" state, since
+      # we're running a rootfs on ZFS.
+      #
+      options spl spl_panic_halt=1
+
+      #
+      # We increase the max memory limit for ZFS channel programs to 512MB
+      # to give us a wide buffer for development of channel programs. We
+      # were using upwards of 70MB during internal testing, which is too
+      # much with the default limit of 100MB.
+      #
+      options zfs zfs_lua_max_memlimit=536870912
+
+      #
+      # On Linux, SEEK_FILE and SEEK_HOLE are inaccurate if the file is
+      # dirty; in which case, they say that there are no holes. To get the
+      # same behavior as illumos, we need to configure this tunable.
+      #
+      options zfs zfs_dmu_offset_next_sync=1
+
+      #
+      # We require these settings to maintain parity with our illumos
+      # based appliance w.r.t. read and write performance. We originally
+      # tuned these values on our illumos based appliance due to reports
+      # of poor performance on customers deployments, when using the
+      # default values.
+      #
+      options zfs zfs_vdev_sync_read_min_active=35
+      options zfs zfs_vdev_sync_read_max_active=35
+      options zfs zfs_vdev_sync_write_min_active=35
+      options zfs zfs_vdev_sync_write_max_active=35
+
+      #
+      # This setting is made to boost the performance ZFS replication,
+      # by allowing more async reads to be inflight at any given time.
+      #
+      options zfs zfs_vdev_async_read_max_active=10
+
+      #
+      # The default value used for this tunable is configured such that
+      # it factors in things like RAID-Z and dedup. DelphixOS does not
+      # use RAID-Z or dedup, so we can optimize this value better for
+      # our particular workload. The worst case is 3 copies in the DVAs,
+      # and one extra copy for good luck (e.g. ganging).
+      #
+      options zfs spa_asize_inflation=4
+
+      #
+      # The following changes are made to match the values for these same
+      # tunables, that we use on our illumos-based DelphixOS.
+      #
+      options zfs zfs_mg_noalloc_threshold=5
+      options zfs zfs_vdev_aggregation_limit=131072
+      options zfs zfs_vdev_async_write_min_active=1
+  #
   # Because the spl module is loaded from the initramfs when using zfs on root,
   # we need to rebuild the initramfs to account for the modprobe.d change.
+  #
   notify: update initramfs
 
 - lineinfile:
