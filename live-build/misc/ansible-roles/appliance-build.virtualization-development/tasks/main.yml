@@ -29,6 +29,21 @@
     msg: "Required environment variable 'APPLIANCE_USERNAME' is empty."
   when: lookup('env', 'APPLIANCE_USERNAME') == ''
 
+- file:
+    path: "/etc/systemd/system/delphix-mgmt.service.d"
+    owner: root
+    group: root
+    state: directory
+    recurse: yes
+
+- copy:
+    dest: "/etc/systemd/system/delphix-mgmt.service.d/override.conf"
+    owner: root
+    group: root
+    content: |
+      [Service]
+      Environment=DLPX_DEBUG=true
+
 - apt:
     name: "{{ item }}"
     state: present
