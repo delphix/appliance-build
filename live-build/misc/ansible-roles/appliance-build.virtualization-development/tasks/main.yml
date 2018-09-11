@@ -50,6 +50,7 @@
   with_items:
     - ant
     - git
+    - libcrypt-blowfish-dev
     - libcurl4-openssl-dev
     - libnss3-dev
     - libnss3-dbg
