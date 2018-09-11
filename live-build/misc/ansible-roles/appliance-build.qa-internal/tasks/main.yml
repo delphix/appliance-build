@@ -27,6 +27,36 @@
   retries: 3
   delay: 60
 
+#
+# We would ideally limit the build dependencies to the "internal-dev" variant.
+# However, we want to use the "internal-qa" variant to do pre-push testing, and
+# we currently do pre-push testing by building the code under test on the
+# Delphix Engine (and changing this workflow would require a significant amount
+# of work). As a temporary workaround, we install the build dependencies on the
+# "internal-qa" variant. In the long term, we should change the pre-push jobs to
+# do builds on a separate bootstrap VM rather than on a Delphix Engine. Then we
+# can move the build dependencies from the list below back into the
+# "internal-dev" playbook.
+#
+- apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - ant
+    - gcc
+    - git
+    - libcrypt-blowfish-dev
+    - libcurl4-openssl-dev
+    - libnss3-dbg
+    - libnss3-dev
+    - libnss3-tools
+    - libpam0g-dev
+    - libssl-dev
+  register: result
+  until: result is not failed
+  retries: 3
+  delay: 60
+
 - copy:
     dest: /etc/nftables.conf
     mode: 0644
