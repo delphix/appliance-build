@@ -32,6 +32,7 @@ RUN \
       ansible \
       aptly \
       awscli \
+      bc \
       coreutils \
       equivs \
       gdisk \

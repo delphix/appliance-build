@@ -44,24 +44,6 @@
       [Service]
       Environment=DLPX_DEBUG=true
 
-- apt:
-    name: "{{ item }}"
-    state: present
-  with_items:
-    - ant
-    - git
-    - libcrypt-blowfish-dev
-    - libcurl4-openssl-dev
-    - libnss3-dev
-    - libnss3-dbg
-    - libnss3-tools
-    - libpam0g-dev
-    - libssl-dev
-  register: result
-  until: result is not failed
-  retries: 3
-  delay: 60
-
 - git:
     repo: "{{ item.repo }}"
     dest:
