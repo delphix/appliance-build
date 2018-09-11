@@ -43,7 +43,7 @@
     state: present
   with_items:
     - ant
-    - gcc
+    - build-essential
     - git
     - libcrypt-blowfish-dev
     - libcurl4-openssl-dev
