@@ -43,6 +43,7 @@
     state: present
   with_items:
     - ant
+    - awscli
     - build-essential
     - git
     - libcrypt-blowfish-dev
