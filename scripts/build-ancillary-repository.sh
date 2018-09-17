@@ -181,7 +181,7 @@ AWS_S3_URI_MASKING=$(resolve_s3_uri \
 AWS_S3_URI_ZFS=$(resolve_s3_uri \
 	"$AWS_S3_URI_ZFS" \
 	"$AWS_S3_PREFIX_ZFS" \
-	"devops-gate/projects/dx4linux/zfs-package-build/master/post-push/latest")
+	"devops-gate/master/zfs-package-build/master/post-push/latest")
 
 #
 # All package files will be placed into this temporary directory, such
