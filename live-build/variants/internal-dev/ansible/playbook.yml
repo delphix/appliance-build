@@ -21,8 +21,26 @@
   vars:
     ansible_python_interpreter: /usr/bin/python3
   roles:
+    #
+    # In order for the local appliance user (e.g. delphix) to be created
+    # properly, we need to ensure we attempt to create this user before
+    # we configure the system to use LDAP. Once we enable LDAP, we'll
+    # fail to properly create the user. Thus, we need to ensure we apply
+    # this role (which will create the user) prior to applying the LDAP
+    # specific configuration/role (which we do below).
+    #
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
+    #
+    # In order for LDAP to work properly, we need a specific ordering of the
+    # values contained in the "passwd" line of the "/etc/nsswitch.conf" file.
+    # Essentially, we need the "delphix" value to always be last. Thus, we
+    # need to ensure the virtualization package is installed after the LDAP
+    # specific configuration has been applied; we acheive this goal by
+    # applying this LDAP role first, and then the virtualization specific
+    # roles later.
+    #
+    - appliance-build.delphix-ldap
     - appliance-build.masking-common
     - appliance-build.masking-development
     - appliance-build.qa-internal
@@ -31,4 +49,3 @@
     - appliance-build.virtualization-standard
     - appliance-build.virtualization-development
     - appliance-build.zfsonlinux-development
-    - appliance-build.delphix-ldap
