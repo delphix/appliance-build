@@ -153,7 +153,6 @@
     home: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}"
     password:
       "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
-  no_log: true
 
 #
 # We also want the delphix user to have passwordless sudo access, so we
@@ -232,6 +231,23 @@
           lock_passwd: false
 
 #
+# In order for application processes to generate core dumps, we need to
+# change the default Systemd core file setting, which would otherwise
+# default to a soft limit of 0.
+#
+- file:
+    path: /etc/systemd/system.conf.d
+    state: directory
+    mode: 0755
+
+- copy:
+    dest: /etc/systemd/system.conf.d/50-delphix.conf
+    mode: 0644
+    content: |
+      [Manager]
+      DefaultLimitCORE=infinity
+
+#
 # As for the priority prefix for our config file (see what that means
 # in /etc/sysctl.d/README) we pick 50 which is higher than what other
 # Ubuntu packages will be installing but less than customization made
@@ -271,6 +287,18 @@
     # Enable the use of /proc/sysrq-trigger
     #
     - { key: 'kernel.sysrq', value: '1' }
+
+#
+# Create a world writeable directory for application and kernel core
+# dumps. We want it world writeable because we're sharing one directory
+# for corefiles from any user. Unlike illumos where all appliacation
+# cores are written out as the root user, linux cores are written with
+# the UID of the running process.
+#
+- file:
+    path: /var/crash
+    state: directory
+    mode: 0777
 
 #
 # Configure command audit logging
@@ -318,18 +346,6 @@
   with_items:
     - 'root'
     - '*'
-
-#
-# Create a world writeable directory for application core dumps. We
-# want it world writeable because we're sharing one directory for
-# corefiles from any user. Unlike illumos where all cores are written
-# out as root, linux cores are written with the UID of the running
-# process.
-#
-- file:
-    path: /var/crash
-    state: directory
-    mode: 0777
 
 #
 # Add the apt repos that have the debug versions of packages, so that we

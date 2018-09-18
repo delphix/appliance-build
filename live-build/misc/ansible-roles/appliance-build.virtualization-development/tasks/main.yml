@@ -87,4 +87,3 @@
     name: root
     password:
       "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
-  no_log: true
