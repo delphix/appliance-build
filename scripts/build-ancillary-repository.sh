@@ -109,8 +109,17 @@ function build_delphix_java8_debs() {
 	# If we "make-jpkg" it as the real root user, it will fail; and if we
 	# run it as a non-root user, it will also fail.
 	#
+	# make-jpkg uses the debhelper tool suite to generate the deb package.
+	# In order for java debugging tools (jstack, etc.) to work properly
+	# we need to have the debug symbols in the java libraries; however
+	# debhelper strips those symbols by default and it doesn't appear like
+	# make-jpkg provides any options to override this setting. We need to
+	# resort to a hack and pass DEB_BUILD_OPTIONS=nostrip as an
+	# environment variable, which is consumed by debhelper and overrides
+	# the dh_strip step.
+	#
 	chown -R nobody:nogroup .
-	runuser -u nobody -- \
+	runuser -u nobody -- env DEB_BUILD_OPTIONS=nostrip \
 		fakeroot make-jpkg "$tarfile" <<<y
 
 	cp "$debfile" "$pkg_directory"
