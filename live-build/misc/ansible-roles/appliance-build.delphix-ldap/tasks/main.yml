@@ -67,3 +67,11 @@
 - lineinfile:
     dest: etc/auto.master
     line: "/home   auto_home    -nobrowse"
+
+- copy:
+    src: 80-internal-ldap
+    dest: /etc/sudoers.d/
+    owner: root
+    group: root
+    mode: 0444
+  when: passwordless_ldap_sudo is defined and passwordless_ldap_sudo == true

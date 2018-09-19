@@ -20,6 +20,7 @@
   gather_facts: no
   vars:
     ansible_python_interpreter: /usr/bin/python3
+    passwordless_ldap_sudo: true
   roles:
     #
     # In order for the local appliance user (e.g. delphix) to be created
