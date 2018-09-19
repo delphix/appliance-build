@@ -31,7 +31,7 @@
     - build-essential
     - cppcheck
     - curl
-    - emacs
+    - emacs-nox
     - fakeroot
     - gdebi
     - git
