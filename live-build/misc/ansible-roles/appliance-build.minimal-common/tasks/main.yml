@@ -451,6 +451,13 @@
       # tunables, that we use on our illumos-based DelphixOS.
       #
       options zfs zfs_mg_noalloc_threshold=5
+
+      #
+      # Our data blocks are of size 8k, but the filesystems usually have a
+      # recordsize of 128k. That causes incorrect size estimates in zfs
+      # send. Overriding the property here fixes that.
+      #
+      options zfs zfs_override_estimate_recordsize=8192
   #
   # Because the spl module is loaded from the initramfs when using zfs on root,
   # we need to rebuild the initramfs to account for the modprobe.d change.
