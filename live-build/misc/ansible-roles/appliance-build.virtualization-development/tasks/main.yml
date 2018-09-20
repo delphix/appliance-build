@@ -44,6 +44,21 @@
       [Service]
       Environment=DLPX_DEBUG=true
 
+- file:
+    path: "/etc/systemd/system/delphix-postgres@.service.d"
+    owner: root
+    group: root
+    state: directory
+    recurse: yes
+
+- copy:
+    dest: "/etc/systemd/system/delphix-postgres@.service.d/override.conf"
+    owner: root
+    group: root
+    content: |
+      [Service]
+      Environment=DLPX_PG_DEBUG=true
+
 - git:
     repo: "{{ item.repo }}"
     dest:
