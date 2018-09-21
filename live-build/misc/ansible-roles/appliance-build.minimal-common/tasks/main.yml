@@ -79,6 +79,29 @@
     state: absent
 
 #
+# Override the nfs-mountd service execution parameters. By default, the
+# service provides the --manage-gids flag so NFS will be aware of group
+# membership for users in more than 16 groups. However, this flag has the
+# undesirable side-effect of preventing users from accessing files owned by
+# a group they are a member of, unless it's their primary group. As we do not
+# have a great deal of control of our users' groups configuration, we have
+# decided to disable the feature. Since Illumos users were already limited
+# to 16 groups for NFS, this is not a change in behavior.
+#
+- file:
+    path: /etc/systemd/system/nfs-mountd.service.d
+    state: directory
+    mode: 0755
+
+- copy:
+    dest: /etc/systemd/system/nfs-mountd.service.d/override.conf
+    mode: 0644
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/sbin/rpc.mountd
+
+#
 # In order for networking to work on first boot, we must explicitly
 # enable this service; it's unclear why it's not already enabled.
 #
