@@ -49,3 +49,18 @@
     recurse: yes
   with_items:
     - dms-core-gate
+
+- file:
+    path: "/etc/systemd/system/delphix-masking.service.d"
+    owner: root
+    group: root
+    state: directory
+    recurse: yes
+
+- copy:
+    dest: "/etc/systemd/system/delphix-masking.service.d/override.conf"
+    owner: root
+    group: root
+    content: |
+      [Service]
+      Environment=MASK_DEBUG=true
