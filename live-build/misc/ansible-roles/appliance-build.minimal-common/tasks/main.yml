@@ -544,3 +544,10 @@
     state: directory
     mode: 0755
     recurse: yes
+
+#
+# Install, but do not enable, the challenge-response PAM module for support
+# logins with the 'delphix' user.
+#
+- apt:
+    name: 'pam-challenge-response'
