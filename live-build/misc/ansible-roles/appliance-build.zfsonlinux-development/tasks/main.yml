@@ -48,6 +48,7 @@
     - nfs-kernel-server
     - parted
     - python-minimal
+    - shellcheck
     - targetcli-fb
     - unzip
     - uuid-dev
