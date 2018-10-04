@@ -92,9 +92,32 @@ cp config/hooks/template.ctl delphix-entire.ctl
 DEPENDS=$(chroot binary \
 	dpkg-query -Wf '${Package} (=${Version}), ' | sed 's/, $//')
 
+if chroot binary dpkg -l | grep -q delphix-virtualization; then
+	#
+	# If the delphix-virtualization package is installed in this
+	# variant, we want the delphix-entire's package version to match
+	# the version of the delphix-virtualization package. The upgrade
+	# logic contained in the virtualization application requires
+	# these two package verions to match.
+	#
+	# shellcheck disable=SC2016
+	VERSION=$(chroot binary dpkg-query \
+		-Wf '${Version}' delphix-virtualization)
+else
+	#
+	# If the delphix-virtualization package is not installed in this
+	# variant, then we just use a default value for the version,
+	# based on when he build occurs. In this case, we only need the
+	# version to be larger than any previous build, to enable
+	# upgrades from one build to another (e.g. when manually using
+	# the "execute" upgrade script).
+	#
+	VERSION=$(date '+%Y.%m.%d.%H')
+fi
+
 sed -i "s/@@DEPENDS@@/$DEPENDS/" delphix-entire.ctl
 sed -i "s/@@VARIANT@@/$APPLIANCE_VARIANT/" delphix-entire.ctl
-sed -i "s/@@DATE@@/$(date '+%Y%m%dT%H%M%S')/" delphix-entire.ctl
+sed -i "s/@@VERSION@@/$VERSION/" delphix-entire.ctl
 
 equivs-build delphix-entire.ctl
 
