@@ -4,7 +4,7 @@ Maintainer: Delphix Engineering <eng@delphix.com>
 Standards-Version: 3.9.2
 
 Package: delphix-entire
-Version: 1.0.0-@@DATE@@
+Version: @@VERSION@@
 Depends: @@DEPENDS@@
 Description: Entirety of Delphix Appliance (@@VARIANT@@)
  This package depends on all of the packages that constitute the entirety of
