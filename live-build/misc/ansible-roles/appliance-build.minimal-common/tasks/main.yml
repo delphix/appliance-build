@@ -290,6 +290,19 @@
     - { key: "net.ipv4.conf.all.promote_secondaries", value: "1" }
     - { key: "net.ipv4.conf.default.promote_secondaries", value: "1" }
     #
+    # Make the various TCP timeouts much shorter than the defaults, so that, in
+    # the case of all errors except brief network outages, we quickly give our
+    # application logic control over error handling. In each case (when
+    # retransmitting a SYN, when retransmitting on an established connection,
+    # and when the connection is idle), we set parameters such that the TCP
+    # connection will be aborted after about 60s of waiting without response.
+    #
+    - { key: "net.ipv4.tcp_syn_retries", value: "5" }
+    - { key: "net.ipv4.tcp_retries2", value: "7" }
+    - { key: "net.ipv4.tcp_keepalive_time", value: "15" }
+    - { key: "net.ipv4.tcp_keepalive_intvl", value: "15" }
+    - { key: "net.ipv4.tcp_keepalive_probes", value: "4" }
+    #
     # Application cores should be written into /var/crash and tagged with the
     # execname, process id, and seconds since the epoch.
     #
