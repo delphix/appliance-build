@@ -557,3 +557,13 @@
     state: directory
     mode: 0755
     recurse: yes
+
+#
+# Setup tmpfs for /tmp
+#
+- mount:
+    path: /tmp
+    src: tmpfs
+    fstype: tmpfs
+    opts: 'nodev,nosuid,mode=1777,size=4G'
+    state: present
