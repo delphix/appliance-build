@@ -29,7 +29,10 @@ if [[ -e /etc/resolv.conf ]]; then
 	cp /etc/resolv.conf binary/etc/resolv.conf
 fi
 
-ansible-playbook -vvvv -i binary, ansible/playbook.yml
+DIR="binary/etc/delphix-platform/ansible"
+find "$DIR" -name playbook.yml | sort -n | while read -r playbook; do
+	ansible-playbook -vvvvv -c chroot -i binary, "$playbook"
+done
 
 if [[ -e binary/etc/resolv.conf ]]; then
 	rm binary/etc/resolv.conf
