@@ -1,0 +1,42 @@
+#!/bin/bash -eux
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# In order for DNS to work when running Ansible chroot-ed in the
+# "binary" directory, we have to copy the host's resolv.conf file into
+# place, and then undo this change when we're done.
+#
+
+if [[ -e binary/etc/resolv.conf || -L binary/etc/resolv.conf ]]; then
+	mv binary/etc/resolv.conf binary/etc/resolv.conf.orig
+fi
+
+if [[ -e /etc/resolv.conf ]]; then
+	cp /etc/resolv.conf binary/etc/resolv.conf
+fi
+
+export DLPX_ANSIBLE_CONNECTION="chroot"
+export DLPX_ANSIBLE_INVENTORY="binary,"
+./binary/etc/delphix-platform/ansible/apply
+
+if [[ -e binary/etc/resolv.conf ]]; then
+	rm binary/etc/resolv.conf
+fi
+
+if [[ -e binary/etc/resolv.conf.orig || -L binary/etc/resolv.conf ]]; then
+	mv binary/etc/resolv.conf.orig binary/etc/resolv.conf
+fi

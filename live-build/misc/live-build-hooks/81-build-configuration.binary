@@ -29,7 +29,7 @@ if [[ -e /etc/resolv.conf ]]; then
 	cp /etc/resolv.conf binary/etc/resolv.conf
 fi
 
-ansible-playbook -vvvv -i binary, ansible/playbook.yml
+ansible-playbook -vv -c chroot -i binary, ansible/playbook.yml
 
 if [[ -e binary/etc/resolv.conf ]]; then
 	rm binary/etc/resolv.conf
