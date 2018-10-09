@@ -14,9 +14,4 @@
 # limitations under the License.
 #
 
----
-- copy:
-    dest: /etc/cloud/cloud.cfg.d/99-delphix-external.cfg
-    mode: 0644
-    content: |
-      datasource_list: [ None ]
+delphix-platform
