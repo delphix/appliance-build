@@ -185,7 +185,7 @@ AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
 AWS_S3_URI_PLATFORM=$(resolve_s3_uri \
 	"$AWS_S3_URI_PLATFORM" \
 	"$AWS_S3_PREFIX_PLATFORM" \
-	"dlpx-app-gate/master/build-package/post-push/latest")
+	"devops-gate/master/delphix-platform/master/post-push/latest")
 
 AWS_S3_URI_MASKING=$(resolve_s3_uri \
 	"$AWS_S3_URI_MASKING" \
