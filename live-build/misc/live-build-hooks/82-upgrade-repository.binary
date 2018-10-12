@@ -92,12 +92,9 @@ cp config/hooks/template.ctl delphix-entire.ctl
 DEPENDS=$(chroot binary \
 	dpkg-query -Wf '${Package} (=${Version}), ' | sed 's/, $//')
 
-# shellcheck disable=SC2016
-VERSION=$(chroot binary dpkg-query -Wf '${Version}' delphix-virtualization)
-
 sed -i "s/@@DEPENDS@@/$DEPENDS/" delphix-entire.ctl
 sed -i "s/@@VARIANT@@/$APPLIANCE_VARIANT/" delphix-entire.ctl
-sed -i "s/@@VERSION@@/$VERSION/" delphix-entire.ctl
+sed -i "s/@@DATE@@/$(date '+%Y%m%dT%H%M%S')/" delphix-entire.ctl
 
 equivs-build delphix-entire.ctl
 
