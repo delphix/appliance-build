@@ -17,6 +17,8 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
+set -o pipefail
+
 function usage() {
 	echo "$(basename "$0"): $*" >&2
 	echo "Usage: $(basename "$0") <version>"
@@ -28,6 +30,18 @@ function apt_get() {
 		-o Dpkg::Options::="--force-confdef" \
 		-o Dpkg::Options::="--force-confold" \
 		"$@"
+}
+
+function pkg_version_impl() {
+	apt-cache policy "$1" | grep "$2" | awk '{print $2}'
+}
+
+function pkg_version_installed() {
+	pkg_version_impl "$1" "Installed:"
+}
+
+function pkg_version_candidate() {
+	pkg_version_impl "$1" "Candidate:"
 }
 
 while getopts ':' c; do
@@ -50,6 +64,11 @@ EOF
 	die "failed to configure apt sources"
 
 apt_get update || die "failed to update apt sources"
-apt_get dist-upgrade -y || die "failed to upgrade apt packages"
+
+INSTALLED_VERSION=$(pkg_version_installed "delphix-entire")
+CANDIDATE_VERSION=$(pkg_version_candidate "delphix-entire")
+
+apt_get install -y "delphix-entire=$CANDIDATE_VERSION" ||
+	die "upgrade failed; from '$INSTALLED_VERSION' to '$CANDIDATE_VERSION'"
 
 exit 0
