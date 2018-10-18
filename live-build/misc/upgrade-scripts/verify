@@ -79,7 +79,7 @@ trap cleanup EXIT
 
 report_progress_inc 0 "Creating upgrade verification container"
 
-CONTAINER=$("$TOP/verify-container" create)
+CONTAINER=$("$TOP/verify-container" create in-place)
 [[ -n "$CONTAINER" ]] || die "failed to create verify container"
 
 report_progress_inc 20 "Starting upgrade verification container"

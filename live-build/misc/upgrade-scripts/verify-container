@@ -21,7 +21,7 @@ CONTAINER=
 
 function create_cleanup() {
 	#
-	# Upon successful creation of the contaienr, don't perform any
+	# Upon successful creation of the container, don't perform any
 	# cleanup logic. Rather, the consumer of the script should
 	# eventually "destroy" the container.
 	#
@@ -39,28 +39,7 @@ function create_cleanup() {
 	destroy "$CONTAINER"
 }
 
-function create() {
-	trap create_cleanup EXIT
-
-	#
-	# We want to use "/var/lib/machines" as the parent directory,
-	# since that directory is used by "systemd-nspawn" when looking
-	# for containers.  This way, we can create the directory and
-	# mount our rootfs clone here, and "systemd-nspawn" will
-	# automatically detect it.
-	#
-	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t verify.XXXXXXX)
-	[[ -d "$DIRECTORY" ]] || die "failed to create verification directory"
-	CONTAINER=$(basename "$DIRECTORY")
-	[[ -n "$CONTAINER" ]] || die "failed to obtain verification name"
-
-	zfs snapshot "rpool/ROOT/ubuntu@$CONTAINER" ||
-		die "failed to create verification snapshot"
-	zfs clone -o mountpoint="$DIRECTORY" \
-		"rpool/ROOT/ubuntu@$CONTAINER" \
-		"rpool/ROOT/$CONTAINER" ||
-		die "failed to create verification clone"
-
+function create_upgrade_container_common() {
 	mkdir -p "/etc/systemd/nspawn" ||
 		die "failed to create directory: '/etc/systemd/nspawn'"
 
@@ -99,7 +78,7 @@ function create() {
 	#
 	# Since UPDATE_DIR is stored on a seperate ZFS filesystem than
 	# the root filesysytem, we need to explicitly make this
-	# directory available inside of the verification container,
+	# directory available inside of the upgrade container,
 	# which is what we're doing here.
 	#
 	# We need UPDATE_DIR to be available inside of the container so
@@ -162,6 +141,70 @@ function create() {
 		die "failed to create container service override file"
 
 	echo "$CONTAINER"
+}
+
+function create_upgrade_container_in_place() {
+	trap create_cleanup EXIT
+
+	#
+	# We want to use "/var/lib/machines" as the parent directory,
+	# since that directory is used by "systemd-nspawn" when looking
+	# for containers.  This way, we can create the directory and
+	# mount our rootfs clone here, and "systemd-nspawn" will
+	# automatically detect it.
+	#
+	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t in-place.XXXXXXX)
+	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
+	CONTAINER=$(basename "$DIRECTORY")
+	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
+
+	zfs snapshot "rpool/ROOT/ubuntu@$CONTAINER" ||
+		die "failed to create upgrade snapshot"
+	zfs clone -o mountpoint="$DIRECTORY" \
+		"rpool/ROOT/ubuntu@$CONTAINER" \
+		"rpool/ROOT/$CONTAINER" ||
+		die "failed to create upgrade clone"
+
+	create_upgrade_container_common
+}
+
+function create_upgrade_container_not_in_place() {
+	trap create_cleanup EXIT
+
+	#
+	# We want to use "/var/lib/machines" as the parent directory,
+	# since that directory is used by "systemd-nspawn" when looking
+	# for containers.  This way, we can create the directory and
+	# mount our new rootfs here, and "systemd-nspawn" will
+	# automatically detect it.
+	#
+	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t not-in-place.XXXXXXX)
+	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
+	CONTAINER=$(basename "$DIRECTORY")
+	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
+
+	zfs create -o mountpoint="$DIRECTORY" \
+		"rpool/ROOT/$CONTAINER" ||
+		die "failed to create upgrade filesystem"
+
+	#
+	# This function needs to return the container's name to stdout,
+	# so that consumers of this function/script can consume that
+	# name and then later start/stop/destroy the container. Thus, we
+	# have to redirect the output from debootstrap away from stdout.
+	#
+	# Also, we need to include the "systemd-container" package when
+	# installing the base systemd with debootstrap so that starting
+	# the container will work properly. Otherwise, after starting
+	# the container, we won't be able to communicate and later run
+	# commands in the container with "systemd-run".
+	#
+	debootstrap --no-check-gpg \
+		--components=delphix --include=systemd-container \
+		bionic "$DIRECTORY" "file://$UPDATE_DIR/$DLPX_VERSION/public" \
+		1>&2 || die "failed to debootstrap upgrade filesystem"
+
+	create_upgrade_container_common
 }
 
 function start() {
@@ -227,7 +270,7 @@ function destroy() {
 
 function usage() {
 	echo "$(basename "$0"): $*" >&2
-	echo "Usage: $(basename "$0") create"
+	echo "Usage: $(basename "$0") create  [in-place|not-in-place <version>]"
 	echo "                        start   <container>"
 	echo "                        stop    <container>"
 	echo "                        destroy <container>"
@@ -235,26 +278,43 @@ function usage() {
 }
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
-[[ $# -gt 2 ]] && usage "too many arguments specified"
-[[ $# -le 0 ]] && usage "too few arguments specified"
 
 case "$1" in
 create)
-	[[ $# -gt 1 ]] && usage "too many arguments specified"
-	create
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+
+	case "$2" in
+	in-place)
+		[[ $# -gt 2 ]] && usage "too many arguments specified"
+		create_upgrade_container_in_place
+		;;
+	not-in-place)
+		[[ $# -lt 3 ]] && usage "too few arguments specified"
+		[[ $# -gt 3 ]] && usage "too many arguments specified"
+		DLPX_VERSION="$3"
+		create_upgrade_container_not_in_place
+		;;
+	*)
+		usage "invalid create type specified: '$2'"
+		;;
+	esac
+
 	;;
 start)
-	[[ $# -le 1 ]] && usage "too few arguments specified"
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
 	CONTAINER="$2"
 	start
 	;;
 stop)
-	[[ $# -le 1 ]] && usage "too few arguments specified"
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
 	CONTAINER="$2"
 	stop
 	;;
 destroy)
-	[[ $# -le 1 ]] && usage "too few arguments specified"
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
 	CONTAINER="$2"
 	destroy
 	;;
