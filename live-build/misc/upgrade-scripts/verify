@@ -18,6 +18,8 @@
 TOP="${BASH_SOURCE%/*}"
 . "$TOP/common.sh"
 
+UPGRADE_VERIFY_CONTAINER_LOG_DIR=/var/delphix/server/upgrade-verify
+
 function usage() {
 	echo "$(basename "$0"): $*" >&2
 	echo "Usage: $(basename "$0") -v <version>"
@@ -26,6 +28,23 @@ function usage() {
 
 function report_progress_inc() {
 	echo "Progress increment: $(date +%T:%N%z), $1, $2"
+}
+
+function collect_logs() {
+	verify_logs_dest="$DROPBOX_DIR/verify_logs"
+
+	if [[ -d "$verify_logs_dest" ]]; then
+		rm -rf "$verify_logs_dest"
+	else
+		mkdir "$verify_logs_dest"
+	fi
+
+	for log_dir in "$@"; do
+		if [[ -d "$log_dir" ]]; then
+			cp -r "$log_dir" "$verify_logs_dest"
+		fi
+	done
+
 }
 
 function cleanup() {
@@ -42,6 +61,15 @@ function cleanup() {
 	# further cleanup for us to do here.
 	#
 	[[ -z "$CONTAINER" ]] && return
+
+	#
+	# Before cleaning the container, we need to copy logs to the
+	# container's host for debugging purpose. Otherwise the logs will
+	# be cleaned up as part of container deletion.
+	#
+	report_progress_inc 70 "Collecting verification logs"
+	local logs_dirs_to_copy="$UPGRADE_VERIFY_CONTAINER_LOG_DIR"
+	collect_logs $logs_dirs_to_copy
 
 	#
 	# On failure, and when DLPX_DEBUG is true, we avoid cleaning up
@@ -105,7 +133,7 @@ fi
 
 systemd-run --machine="$CONTAINER" --quiet --pipe --wait -- \
 	/usr/bin/java \
-	-Dlog.dir=/var/delphix/server/upgrade-verify \
+	-Dlog.dir="$UPGRADE_VERIFY_CONTAINER_LOG_DIR" \
 	-Dmdsverify=true \
 	$VERIFY_DEBUG_OPT \
 	-jar /opt/delphix/server/lib/exec/upgrade-verify/upgrade-verify.jar \
