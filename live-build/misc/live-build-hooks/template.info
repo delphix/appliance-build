@@ -1,0 +1,21 @@
+#
+# This file is used by app-gate to identify an image's version metadata
+# after it is uploaded.
+#
+# Note that any changes to this file's format is a flag-day and must be
+# coupled with an app-gate change.
+#
+
+# The application (product) version.
+VERSION=@@VERSION@@
+
+# The minimum version an engine must be on, in order to upgrade to this image.
+MINIMUM_VERSION=5.3.0.0
+
+#
+# The minimum version from which a reboot upgrade is optional.
+# If the current version before upgrade is greater than or equal to this
+# version, a reboot is optional.
+# If the current version is less than this value, a reboot is mandatory.
+#
+MINIMUM_REBOOT_OPTIONAL_VERSION=5.3.0.0
