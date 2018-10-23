@@ -71,4 +71,8 @@ CANDIDATE_VERSION=$(pkg_version_candidate "delphix-entire")
 apt_get install -y "delphix-entire=$CANDIDATE_VERSION" ||
 	die "upgrade failed; from '$INSTALLED_VERSION' to '$CANDIDATE_VERSION'"
 
+# We treat all upgrades as deferred for now. LX-224 addresses reboot upgrade.
+systemctl restart delphix-platform ||
+	die "failed to restart services after upgrade from '$INSTALLED_VERSION' to '$CANDIDATE_VERSION'"
+
 exit 0
