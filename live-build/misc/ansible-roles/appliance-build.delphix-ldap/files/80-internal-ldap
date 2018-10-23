@@ -1,10 +1,6 @@
 #
 # For convenience, allow passwordless sudo for all ldap users on internal
-# development appliances. Delphix ldap users are in a group with gid 10 because
-# on Illumos gid 10 is assigned to the group staff. On Linux, gid 10 is assigned
-# to the group uucp, so a side effect of this entry is that passwordless sudo is
-# allowed for uucp. We can fix this eventually if we create a new ldap group
-# with a unique gid and add all users to that group in addition to the group
-# staff.
+# development appliances. Delphix ldap users are the only members of the staff
+# group, so allow passwordless sudo for that whole group.
 #
-%#10 ALL=(ALL) NOPASSWD:ALL
+%staff ALL=(ALL) NOPASSWD:ALL
