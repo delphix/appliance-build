@@ -45,6 +45,7 @@
     path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item }}"
     owner: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
     group: staff
+    mode: "g+w"
     state: directory
     recurse: yes
   with_items:
