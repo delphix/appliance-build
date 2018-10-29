@@ -32,18 +32,6 @@ function apt_get() {
 		"$@"
 }
 
-function pkg_version_impl() {
-	apt-cache policy "$1" | grep "$2" | awk '{print $2}'
-}
-
-function pkg_version_installed() {
-	pkg_version_impl "$1" "Installed:"
-}
-
-function pkg_version_candidate() {
-	pkg_version_impl "$1" "Candidate:"
-}
-
 while getopts ':' c; do
 	case $c in
 	r | l | B | f | s) ;; # LX-72: For now, silently ignore these.
@@ -55,8 +43,23 @@ done
 DLPX_VERSION="$1"
 
 [[ -d "$UPDATE_DIR" ]] || die "update directory '$UPDATE_DIR' does not exist"
-[[ -d "$UPDATE_DIR/$1" ]] ||
+[[ -d "$UPDATE_DIR/$DLPX_VERSION" ]] ||
 	die "upgrade image for version '$DLPX_VERSION' was not unpacked"
+[[ -f "$UPDATE_DIR/$DLPX_VERSION/version.info" ]] ||
+	die "upgrade image for version '$DLPX_VERSION' is missing version.info"
+
+#
+# We need to be careful when sourcing this file, since it can conflict
+# with (and clobber) functions and/or variables previously defined.
+#
+. "$UPDATE_DIR/$DLPX_VERSION/version.info" ||
+	die "failed to source version.info file for version '$DLPX_VERSION'"
+
+[[ -n "$VERSION" ]] ||
+	die "VERSION variable is empty after sourcing version.info"
+
+[[ -n "$MINIMUM_VERSION" ]] ||
+	die "MINIMUM_VERSION variable is empty after sourcing version.info"
 
 cat <<EOF >/etc/apt/sources.list ||
 	deb [trusted=yes] file://$UPDATE_DIR/$DLPX_VERSION/public bionic delphix
@@ -65,10 +68,16 @@ EOF
 
 apt_get update || die "failed to update apt sources"
 
-INSTALLED_VERSION=$(pkg_version_installed "delphix-entire")
-CANDIDATE_VERSION=$(pkg_version_candidate "delphix-entire")
+INSTALLED_VERSION=$(dpkg-query -Wf '${Version}' delphix-entire)
+[[ -n "$INSTALLED_VERSION" ]] ||
+	die "failed to determine installed version of delphix-entire package"
 
-apt_get install -y "delphix-entire=$CANDIDATE_VERSION" ||
-	die "upgrade failed; from '$INSTALLED_VERSION' to '$CANDIDATE_VERSION'"
+dpkg --compare-versions "$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
+	die "upgrade not allowed;" \
+		"installed version ($INSTALLED_VERSION)" \
+		"is less than minimum version ($MINIMUM_VERSION)"
+
+apt_get install -y "delphix-entire=$VERSION" ||
+	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
 
 exit 0

@@ -1,21 +1,43 @@
 #
-# This file is used by app-gate to identify an image's version metadata
-# after it is uploaded.
+# This file is consumed by the upgrade logic contained in the "execute"
+# upgrade-script (contained in this repository) and the virtualization
+# application (contained in an external repository). It's used to easily
+# identify the contents of the upgrade image (e.g. the product version
+# contained), as well as define the types of upgrade that should be allowed
+# (and/or disallowed) based on the currently installed version of the
+# product/appliance executing the upgrade.
 #
-# Note that any changes to this file's format is a flag-day and must be
-# coupled with an app-gate change.
+# Note, changes to this file should be done with caution. This file must be
+# able to be consumed by old versions of the virtualization application, so
+# any changes to this file need to be backwards compatible, or risk breaking
+# upgrade for these old versions of the product.
 #
 
-# The application (product) version.
+#
+# The product (i.e. virtualization) version contained in the upgrade image.
+#
 VERSION=@@VERSION@@
 
-# The minimum version an engine must be on, in order to upgrade to this image.
+#
+# The minimum product version an engine must have installed, in order to
+# upgrade using this upgrade image.
+#
+# If the installed version of the appliance before an upgrade, is less than
+# this version, upgrading the appliance using this upgrade image is not
+# allowed. This sets a bound on the old product version(s) that an upgrade
+# image has to be compatible with, and is typically set to be 2 major
+# versions behind the latest version.
+#
 MINIMUM_VERSION=5.3.0.0
 
 #
-# The minimum version from which a reboot upgrade is optional.
-# If the current version before upgrade is greater than or equal to this
-# version, a reboot is optional.
-# If the current version is less than this value, a reboot is mandatory.
+# The minimum version from which a reboot after upgrade is optional.
+#
+# If the installed version of the appliance before an upgrade is greater
+# than or equal to this version, a reboot is optional. If the installed
+# version is less than this value, a reboot is mandatory.
+#
+# This version must be equal to, or greater, than the version specified by
+# MINIMUM_VERSION above.
 #
 MINIMUM_REBOOT_OPTIONAL_VERSION=5.3.0.0
