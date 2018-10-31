@@ -89,8 +89,7 @@ report_progress_inc 20 "Starting upgrade verification container"
 
 report_progress_inc 40 "Performing package upgrade verification"
 
-systemd-run --machine="$CONTAINER" --quiet --pipe --wait -- \
-	"$TOP/execute" "$DLPX_VERSION" ||
+"$TOP/upgrade-container" run "$CONTAINER" "$TOP/execute" "$DLPX_VERSION" ||
 	die "'$TOP/execute' failed in verification container"
 
 report_progress_inc 60 "Performing application upgrade verification"
@@ -103,7 +102,7 @@ if $opt_d; then
 	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
 fi
 
-systemd-run --machine="$CONTAINER" --quiet --pipe --wait -- \
+"$TOP/upgrade-container" run "$CONTAINER" \
 	/usr/bin/java \
 	-Dlog.dir=/var/delphix/server/upgrade-verify \
 	-Dmdsverify=true \
@@ -123,11 +122,11 @@ systemd-run --machine="$CONTAINER" --quiet --pipe --wait -- \
 #
 MDS_SNAPNAME="MDS-CLONE-upgradeverify"
 
-systemd-run --machine="$CONTAINER" --quiet --pipe --wait -- \
+"$TOP/upgrade-container" run "$CONTAINER" \
 	/opt/delphix/server/bin/dx_manage_pg stop -s "$MDS_SNAPNAME" ||
 	die "failed to stop postgres"
 
-systemd-run --machine="$CONTAINER" --quiet --pipe --wait -- \
+"$TOP/upgrade-container" run "$CONTAINER" \
 	/opt/delphix/server/bin/dx_manage_pg cleanup -s "$MDS_SNAPNAME" ||
 	die "failed to cleanup postgres"
 
