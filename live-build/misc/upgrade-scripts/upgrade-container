@@ -227,16 +227,14 @@ function start() {
 	#
 	# shellcheck disable=SC2034
 	for i in {1..600}; do
-		if systemd-run --machine="$CONTAINER" --quiet --wait -- \
-			/bin/systemctl is-active default.target 2>/dev/null; then
+		if run /bin/systemctl is-active default.target &>/dev/null; then
 			break
 		fi
 
 		sleep 1
 	done
 
-	systemd-run --machine="$CONTAINER" --quiet --wait -- \
-		/bin/systemctl is-active default.target ||
+	run /bin/systemctl is-active default.target &>/dev/null ||
 		die "'default.target' inactive in container '$CONTAINER'"
 }
 
@@ -266,6 +264,10 @@ function destroy() {
 		rm -d "/var/lib/machines/$CONTAINER" ||
 			die "failed to remove container directory: '$CONTAINER'"
 	fi
+}
+
+function run() {
+	systemd-run --machine="$CONTAINER" --quiet --wait --pipe -- "$@"
 }
 
 function usage() {
@@ -317,6 +319,12 @@ destroy)
 	[[ $# -gt 2 ]] && usage "too many arguments specified"
 	CONTAINER="$2"
 	destroy
+	;;
+run)
+	[[ $# -lt 3 ]] && usage "too few arguments specified"
+	CONTAINER="$2"
+	shift 2
+	run "$@"
 	;;
 *)
 	usage
