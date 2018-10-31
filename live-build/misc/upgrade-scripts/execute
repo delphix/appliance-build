@@ -69,13 +69,19 @@ EOF
 apt_get update || die "failed to update apt sources"
 
 INSTALLED_VERSION=$(dpkg-query -Wf '${Version}' delphix-entire)
-[[ -n "$INSTALLED_VERSION" ]] ||
-	die "failed to determine installed version of delphix-entire package"
 
-dpkg --compare-versions "$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
-	die "upgrade not allowed;" \
-		"installed version ($INSTALLED_VERSION)" \
-		"is less than minimum version ($MINIMUM_VERSION)"
+#
+# It's possible for delphix-entire not to be already installed on the
+# root filesystem being upgraded when we're doing a not-in-place upgrade.
+# Thus, when we can't determine the installed version of delphix-entire,
+# we assume we're doing a not-in-place upgrade, and skip this check.
+#
+if [[ -n "$INSTALLED_VERSION" ]]; then
+	dpkg --compare-versions "$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
+		die "upgrade not allowed;" \
+			"installed version ($INSTALLED_VERSION)" \
+			"is less than minimum version ($MINIMUM_VERSION)"
+fi
 
 apt_get install -y "delphix-entire=$VERSION" ||
 	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"

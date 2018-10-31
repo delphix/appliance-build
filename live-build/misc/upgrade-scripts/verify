@@ -54,8 +54,8 @@ function cleanup() {
 	else
 		report_progress_inc 80 "Performing upgrade verification cleanup"
 
-		"$TOP/verify-container" stop "$CONTAINER"
-		"$TOP/verify-container" destroy "$CONTAINER"
+		"$TOP/upgrade-container" stop "$CONTAINER"
+		"$TOP/upgrade-container" destroy "$CONTAINER"
 	fi
 
 	[[ $rc -eq 0 ]] &&
@@ -79,12 +79,12 @@ trap cleanup EXIT
 
 report_progress_inc 0 "Creating upgrade verification container"
 
-CONTAINER=$("$TOP/verify-container" create)
+CONTAINER=$("$TOP/upgrade-container" create in-place)
 [[ -n "$CONTAINER" ]] || die "failed to create verify container"
 
 report_progress_inc 20 "Starting upgrade verification container"
 
-"$TOP/verify-container" start "$CONTAINER" ||
+"$TOP/upgrade-container" start "$CONTAINER" ||
 	die "failed to start verify container '$CONTAINER'"
 
 report_progress_inc 40 "Performing package upgrade verification"
