@@ -17,6 +17,9 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
+IMAGE_VERSION=$(get_image_version)
+[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+
 CONTAINER=
 
 function create_cleanup() {
@@ -201,7 +204,7 @@ function create_upgrade_container_not_in_place() {
 	#
 	debootstrap --no-check-gpg \
 		--components=delphix --include=systemd-container \
-		bionic "$DIRECTORY" "file://$UPDATE_DIR/$DLPX_VERSION/public" \
+		bionic "$DIRECTORY" "file://$UPDATE_DIR/$IMAGE_VERSION/public" \
 		1>&2 || die "failed to debootstrap upgrade filesystem"
 
 	create_upgrade_container_common
@@ -291,9 +294,8 @@ create)
 		create_upgrade_container_in_place
 		;;
 	not-in-place)
-		[[ $# -lt 3 ]] && usage "too few arguments specified"
-		[[ $# -gt 3 ]] && usage "too many arguments specified"
-		DLPX_VERSION="$3"
+		[[ $# -lt 2 ]] && usage "too few arguments specified"
+		[[ $# -gt 2 ]] && usage "too many arguments specified"
 		create_upgrade_container_not_in_place
 		;;
 	*)
@@ -327,6 +329,6 @@ run)
 	run "$@"
 	;;
 *)
-	usage
+	usage "invalid option specified: '$1'"
 	;;
 esac
