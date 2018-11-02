@@ -41,10 +41,9 @@ set -o errexit
 set -o pipefail
 
 #
-# Allow the appliance username and password to be configured via these
-# environment variables, but use sane defaults if they're missing.
+# Allow the appliance user's password to be configured via this
+# environment variable, but use a sane default if its missing.
 #
-export APPLIANCE_USERNAME="${APPLIANCE_USERNAME:-delphix}"
 export APPLIANCE_PASSWORD="${APPLIANCE_PASSWORD:-delphix}"
 
 #

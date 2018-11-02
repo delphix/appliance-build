@@ -18,10 +18,6 @@
 # This role allows building ZFS on the appliance.
 #
 ---
-- fail:
-    msg: "Required environment variable 'APPLIANCE_USERNAME' is empty."
-  when: lookup('env', 'APPLIANCE_USERNAME') == ''
-
 - apt:
     name: "{{ item }}"
     state: present
@@ -62,14 +58,14 @@
 - git:
     repo: "https://github.com/delphix/zfs.git"
     dest:
-      "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs"
+      "/export/home/delphix/zfs"
     version: master
     accept_hostkey: yes
     update: no
 
 - file:
-    path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/zfs"
-    owner: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+    path: "/export/home/delphix/zfs"
+    owner: "delphix"
     group: staff
     state: directory
     recurse: yes

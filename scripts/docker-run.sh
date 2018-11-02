@@ -52,7 +52,6 @@ $DOCKER_RUN --rm \
 	--env AWS_S3_URI_MASKING \
 	--env AWS_S3_URI_ZFS \
 	--env APPLIANCE_PASSWORD \
-	--env APPLIANCE_USERNAME \
 	--env AWS_ACCESS_KEY_ID \
 	--env AWS_SECRET_ACCESS_KEY \
 	--volume "$TOP:/opt/appliance-build" \
