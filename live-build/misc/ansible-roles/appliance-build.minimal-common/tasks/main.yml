@@ -16,6 +16,35 @@
 
 ---
 #
+# When using the APPLIANCE_PASSWORD variable, we have to be careful to
+# specify "no_log" to prevent it from being leaked to stdout (e.g. if
+# ansible is run with verbosity).
+#
+- fail:
+    msg: "Required environment variable 'APPLIANCE_PASSWORD' is empty."
+  when: lookup('env', 'APPLIANCE_PASSWORD') == ''
+  no_log: true
+
+#
+# While the "delphix-platform" package will take care of creating the
+# delphix user, it won't configure the user's password. Thus, we have to
+# do that here, during the intial build of the appliance.
+#
+- user:
+    name: delphix
+    password:
+      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
+
+#
+# We also want the root user's password to match the delphix user's
+# password, so we also set that here.
+#
+- user:
+    name: root
+    password:
+      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
+
+#
 # The virtualization package uses the /etc/issue file to store a
 # customer-supplied banner that is displayed prior to login. By default,
 # there should be no banner. Thus, we need to remove this file to
