@@ -22,3 +22,11 @@ function die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1
 }
+
+function get_image_path() {
+	readlink -f "${BASH_SOURCE%/*}"
+}
+
+function get_image_version() {
+	basename "$(get_image_path)"
+}

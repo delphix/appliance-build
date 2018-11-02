@@ -15,8 +15,13 @@
 # limitations under the License.
 #
 
-TOP="${BASH_SOURCE%/*}"
-. "$TOP/common.sh"
+. "${BASH_SOURCE%/*}/common.sh"
+
+IMAGE_PATH=$(get_image_path)
+[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
+
+IMAGE_VERSION=$(get_image_version)
+[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
 
 function usage() {
 	echo "$(basename "$0"): $*" >&2
@@ -54,8 +59,8 @@ function cleanup() {
 	else
 		report_progress_inc 80 "Performing upgrade verification cleanup"
 
-		"$TOP/upgrade-container" stop "$CONTAINER"
-		"$TOP/upgrade-container" destroy "$CONTAINER"
+		"$IMAGE_PATH/upgrade-container" stop "$CONTAINER"
+		"$IMAGE_PATH/upgrade-container" destroy "$CONTAINER"
 	fi
 
 	[[ $rc -eq 0 ]] &&
@@ -63,9 +68,8 @@ function cleanup() {
 }
 
 opt_d=false
-while getopts ':df:l:o:v:' c; do
+while getopts ':df:l:o:' c; do
 	case "$c" in
-	v) DLPX_VERSION=$OPTARG ;;
 	f | l | o) eval "opt_$c=$OPTARG" ;;
 	d) eval "opt_$c=true" ;;
 	*) usage "illegal option -- $OPTARG" ;;
@@ -73,24 +77,23 @@ while getopts ':df:l:o:v:' c; do
 done
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
-[[ -n "$DLPX_VERSION" ]] || usage
 
 trap cleanup EXIT
 
 report_progress_inc 0 "Creating upgrade verification container"
 
-CONTAINER=$("$TOP/upgrade-container" create in-place)
+CONTAINER=$("$IMAGE_PATH/upgrade-container" create in-place)
 [[ -n "$CONTAINER" ]] || die "failed to create verify container"
 
 report_progress_inc 20 "Starting upgrade verification container"
 
-"$TOP/upgrade-container" start "$CONTAINER" ||
+"$IMAGE_PATH/upgrade-container" start "$CONTAINER" ||
 	die "failed to start verify container '$CONTAINER'"
 
 report_progress_inc 40 "Performing package upgrade verification"
 
-"$TOP/upgrade-container" run "$CONTAINER" "$TOP/execute" "$DLPX_VERSION" ||
-	die "'$TOP/execute' failed in verification container"
+"$IMAGE_PATH/upgrade-container" run "$CONTAINER" "$IMAGE_PATH/execute" ||
+	die "'$IMAGE_PATH/execute' failed in verification container"
 
 report_progress_inc 60 "Performing application upgrade verification"
 
@@ -102,7 +105,7 @@ if $opt_d; then
 	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
 fi
 
-"$TOP/upgrade-container" run "$CONTAINER" \
+"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
 	/usr/bin/java \
 	-Dlog.dir=/var/delphix/server/upgrade-verify \
 	-Dmdsverify=true \
@@ -111,7 +114,7 @@ fi
 	-d "${opt_o:-$DROPBOX_DIR/upgrade_verify_report.json}" \
 	-f "${opt_f:-1}" \
 	-l "${opt_l:-en-US}" \
-	-v "$DLPX_VERSION" \
+	-v "$IMAGE_VERSION" \
 	-pl 60 -ph 80 \
 	$VERIFY_LIVE_MDS_OPT ||
 	die "'upgrade-verify.jar' failed in verification container"
@@ -122,11 +125,11 @@ fi
 #
 MDS_SNAPNAME="MDS-CLONE-upgradeverify"
 
-"$TOP/upgrade-container" run "$CONTAINER" \
+"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
 	/opt/delphix/server/bin/dx_manage_pg stop -s "$MDS_SNAPNAME" ||
 	die "failed to stop postgres"
 
-"$TOP/upgrade-container" run "$CONTAINER" \
+"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
 	/opt/delphix/server/bin/dx_manage_pg cleanup -s "$MDS_SNAPNAME" ||
 	die "failed to cleanup postgres"
 

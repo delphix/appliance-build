@@ -17,6 +17,9 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
+IMAGE_VERSION=$(get_image_version)
+[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+
 set -o pipefail
 
 function usage() {
@@ -39,21 +42,18 @@ while getopts ':' c; do
 	esac
 done
 
-[[ $# -eq 1 ]] || die "Must specify a target verison."
-DLPX_VERSION="$1"
-
 [[ -d "$UPDATE_DIR" ]] || die "update directory '$UPDATE_DIR' does not exist"
-[[ -d "$UPDATE_DIR/$DLPX_VERSION" ]] ||
-	die "upgrade image for version '$DLPX_VERSION' was not unpacked"
-[[ -f "$UPDATE_DIR/$DLPX_VERSION/version.info" ]] ||
-	die "upgrade image for version '$DLPX_VERSION' is missing version.info"
+[[ -d "$UPDATE_DIR/$IMAGE_VERSION" ]] ||
+	die "upgrade image for version '$IMAGE_VERSION' was not unpacked"
+[[ -f "$UPDATE_DIR/$IMAGE_VERSION/version.info" ]] ||
+	die "upgrade image for version '$IMAGE_VERSION' is missing version.info"
 
 #
 # We need to be careful when sourcing this file, since it can conflict
 # with (and clobber) functions and/or variables previously defined.
 #
-. "$UPDATE_DIR/$DLPX_VERSION/version.info" ||
-	die "failed to source version.info file for version '$DLPX_VERSION'"
+. "$UPDATE_DIR/$IMAGE_VERSION/version.info" ||
+	die "failed to source version.info file for version '$IMAGE_VERSION'"
 
 [[ -n "$VERSION" ]] ||
 	die "VERSION variable is empty after sourcing version.info"
@@ -62,7 +62,7 @@ DLPX_VERSION="$1"
 	die "MINIMUM_VERSION variable is empty after sourcing version.info"
 
 cat <<EOF >/etc/apt/sources.list ||
-	deb [trusted=yes] file://$UPDATE_DIR/$DLPX_VERSION/public bionic delphix
+deb [trusted=yes] file://$UPDATE_DIR/$IMAGE_VERSION/public bionic delphix
 EOF
 	die "failed to configure apt sources"
 
