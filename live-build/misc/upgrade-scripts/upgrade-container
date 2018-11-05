@@ -156,7 +156,7 @@ function create_upgrade_container_in_place() {
 	# mount our rootfs clone here, and "systemd-nspawn" will
 	# automatically detect it.
 	#
-	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t in-place.XXXXXXX)
+	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t delphix.XXXXXXX)
 	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
 	CONTAINER=$(basename "$DIRECTORY")
 	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
@@ -181,7 +181,7 @@ function create_upgrade_container_not_in_place() {
 	# mount our new rootfs here, and "systemd-nspawn" will
 	# automatically detect it.
 	#
-	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t not-in-place.XXXXXXX)
+	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t delphix.XXXXXXX)
 	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
 	CONTAINER=$(basename "$DIRECTORY")
 	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
