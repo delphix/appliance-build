@@ -146,6 +146,16 @@ function create_upgrade_container_common() {
 	echo "$CONTAINER"
 }
 
+function get_mounted_rootfs_name() {
+	local rootfs
+
+	rootfs=$(mount | awk '$3 == "/" {print $1}')
+	[[ -n "$rootfs" ]] ||
+		die "failed to determine the mounted root filesystem name"
+
+	echo "$rootfs"
+}
+
 function create_upgrade_container_in_place() {
 	trap create_cleanup EXIT
 
@@ -161,10 +171,11 @@ function create_upgrade_container_in_place() {
 	CONTAINER=$(basename "$DIRECTORY")
 	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
 
-	zfs snapshot "rpool/ROOT/ubuntu@$CONTAINER" ||
+	ROOTFS=$(get_mounted_rootfs_name)
+	zfs snapshot "$ROOTFS@$CONTAINER" ||
 		die "failed to create upgrade snapshot"
 	zfs clone -o mountpoint="$DIRECTORY" \
-		"rpool/ROOT/ubuntu@$CONTAINER" \
+		"$ROOTFS@$CONTAINER" \
 		"rpool/ROOT/$CONTAINER" ||
 		die "failed to create upgrade clone"
 
@@ -258,8 +269,9 @@ function destroy() {
 			die "failed to destroy container dataset: '$CONTAINER'"
 	fi
 
-	if zfs list "rpool/ROOT/ubuntu@$CONTAINER" &>/dev/null; then
-		zfs destroy "rpool/ROOT/ubuntu@$CONTAINER" ||
+	ROOTFS=$(get_mounted_rootfs_name)
+	if zfs list "$ROOTFS@$CONTAINER" &>/dev/null; then
+		zfs destroy "$ROOTFS@$CONTAINER" ||
 			die "failed to destroy container snapshot: '$CONTAINER'"
 	fi
 
@@ -273,12 +285,149 @@ function run() {
 	systemd-run --machine="$CONTAINER" --quiet --wait --pipe -- "$@"
 }
 
+function get_bootloader_devices() {
+	#
+	# When installing/updating the bootloader during upgrade, we
+	# need to determine which devices are being used as bootloader
+	# devices. We determine this by listing the devices used by the
+	# rpool. Additionally, we have to filter out devices that could
+	# be attached to the rpool, but would never be used for the
+	# bootloader. Finally, we need to strip off any parition
+	# information, since we want to install the bootloader directly
+	# to the device, rather than to a partition of the device.
+	#
+	zpool list -vH rpool |
+		awk '! /rpool|mirror|replacing|spare/ {print $1}' |
+		sed 's/[0-9]*$//'
+}
+
+function migrate_password_for_user() {
+	local user="$1"
+	local password
+
+	password="$(awk -F: "\$1 == \"$user\" {print \$2}" /etc/shadow)"
+	chroot "/var/lib/machines/$CONTAINER" usermod -p "$password" "$user" ||
+		die "'usermod -p ... $user' failed for '$CONTAINER'"
+}
+
+function migrate_file() {
+	local path="$1"
+	local directory
+
+	if [[ -f "$path" ]]; then
+		directory="$(dirname "$path")"
+		mkdir -p "/var/lib/machines/${CONTAINER}${directory}" ||
+			die "'mkdir -p $directory' failed for '$CONTAINER'"
+		cp "$path" "/var/lib/machines/${CONTAINER}${path}" ||
+			die "'cp $path' failed for '$CONTAINER'"
+	fi
+}
+
+function convert_to_bootfs_cleanup() {
+	for dir in /proc /sys /dev; do
+		umount -R "/var/lib/machines/${CONTAINER}${dir}" ||
+			warn "'umount -R' of '$dir' failed"
+	done
+}
+
+#
+# The purpose of this function is to convert an existing upgrade
+# container (specified by the $CONTAINER global variable) into the next
+# boot filesystem used by the appliance; i.e. after calling this
+# function, the container's root filesystem will be used as the
+# appliance's root filesystem, the next time the appliance boots.
+#
+# This is done by updating the appliance's bootloader (i.e. grub) to
+# point to the container's filesystem, along with setting the mountpoint
+# of the filesystem to be "/" instead of "/var/lib/machines/$CONTAINER".
+# This effectively removes the container, since systemd-nspawn only
+# looks in /var/lib/machines, so it'll no longer find the container
+# after the mountpoint changes.
+#
+function convert_to_bootfs() {
+	trap convert_to_bootfs_cleanup EXIT
+
+	for dir in /proc /sys /dev; do
+		mount --rbind "$dir" "/var/lib/machines/${CONTAINER}${dir}" ||
+			die "'mount --rbind' of '$dir' failed"
+		mount --make-rslave "/var/lib/machines/${CONTAINER}${dir}" ||
+			die "'mount --make-rslave' of '$dir' failed"
+	done
+
+	#
+	# When performing a not-in-place upgrade, the root and delphix
+	# users will not have any password by default. Thus, we need to
+	# explicitly configure the passwords on the new root filesystem.
+	# Here, we ensure the passwords for the root and delphix user on
+	# the new root filesystem match their current values.
+	#
+	migrate_password_for_user delphix
+	migrate_password_for_user root
+
+	#
+	# LX-72 Until we have a proper solution for migrating the
+	# configuration of a given appliance to the new root filesystem
+	# (i.e. any configuration that isn't supplied by a package), we
+	# resort to explicitly migrating some of this configuration
+	# here. The files listed here are dynamically generated and/or
+	# modified by appliance-build.
+	#
+	while read -r file; do
+		migrate_file "$file"
+	done <<-EOF
+		/etc/cloud/cloud.cfg.d/99-delphix-development.cfg
+		/etc/cloud/cloud.cfg.d/99-delphix-internal.cfg
+		/etc/issue
+		/etc/nftables.conf
+		/etc/ssh/sshd_config
+		/etc/systemd/system/delphix-masking.service.d/override.conf
+		/etc/systemd/system/delphix-mgmt.service.d/override.conf
+		/etc/systemd/system/delphix-postgres@.service.d/override.conf
+		/var/opt/delphix/server.conf
+	EOF
+
+	chroot "/var/lib/machines/$CONTAINER" update-grub ||
+		die "'update-grub' failed in '$CONTAINER'"
+
+	for dev in $(get_bootloader_devices); do
+		[[ -e "/dev/$dev" ]] ||
+			die "bootloader device '/dev/$dev' not found"
+
+		[[ -b "/dev/$dev" ]] ||
+			die "bootloader device '/dev/$dev' not block device"
+
+		chroot "/var/lib/machines/$CONTAINER" \
+			grub-install "/dev/$dev" ||
+			die "'grub-install /dev/$dev' failed in '$CONTAINER'"
+	done
+
+	convert_to_bootfs_cleanup
+	trap - EXIT
+
+	zfs umount "rpool/ROOT/$CONTAINER" ||
+		die "'zfs umount rpool/ROOT/$CONTAINER' failed"
+
+	zfs set canmount=noauto "rpool/ROOT/$CONTAINER" ||
+		die "'zfs set canmount=noauto rpool/ROOT/$CONTAINER' failed"
+
+	zfs set mountpoint=/ "rpool/ROOT/$CONTAINER" ||
+		die "'zfs set mountpoint=/ rpool/ROOT/$CONTAINER' failed"
+}
+
 function usage() {
 	echo "$(basename "$0"): $*" >&2
-	echo "Usage: $(basename "$0") create  [in-place|not-in-place <version>]"
-	echo "                        start   <container>"
-	echo "                        stop    <container>"
-	echo "                        destroy <container>"
+
+	PREFIX_STRING="Usage: $(basename "$0")"
+	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
+	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
+
+	echo "$PREFIX_STRING create [in-place|not-in-place]"
+	echo "$PREFIX_SPACES start <container>"
+	echo "$PREFIX_SPACES stop <container>"
+	echo "$PREFIX_SPACES destroy <container>"
+	echo "$PREFIX_SPACES run <container> <command>"
+	echo "$PREFIX_SPACES convert-to-bootfs <container>"
+
 	exit 2
 }
 
@@ -327,6 +476,12 @@ run)
 	CONTAINER="$2"
 	shift 2
 	run "$@"
+	;;
+convert-to-bootfs)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	convert_to_bootfs
 	;;
 *)
 	usage "invalid option specified: '$1'"
