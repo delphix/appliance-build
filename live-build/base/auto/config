@@ -27,6 +27,12 @@
 # are run.
 #
 lb config noauto \
+	--parent-mirror-bootstrap "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-chroot "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-binary "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-bootstrap "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-chroot "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-binary "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
 	--archive-areas "main restricted universe multiverse" \
 	--bootstrap-flavour minimal \
 	--chroot-filesystem none \
