@@ -27,6 +27,24 @@
 # are run.
 #
 lb config noauto \
+	--parent-mirror-bootstrap "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-chroot "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-chroot-security "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-chroot-volatile "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-chroot-backports "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-binary "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-binary-security "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-binary-volatile "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--parent-mirror-binary-backports "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-bootstrap "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-chroot "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-chroot-security "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-chroot-volatile "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-chroot-backports "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-binary "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-binary-security "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-binary-volatile "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
+	--mirror-binary-backports "http://us-west-2.ec2.archive.ubuntu.com/ubuntu" \
 	--archive-areas "main restricted universe multiverse" \
 	--bootstrap-flavour minimal \
 	--chroot-filesystem none \
