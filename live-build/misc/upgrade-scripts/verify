@@ -58,6 +58,11 @@ function cleanup() {
 		report_progress 80 "Skipping upgrade verification cleanup"
 	fi
 
+	[[ $rc -eq 0 ]] &&
+		# On success, we must report 100 progress. Java stack treats
+		# script execution a failure if non-zero status is reported or
+		# 100 progress is not reported.
+		report_progress 100 "Upgrade verification was successful"
 	return "$rc"
 }
 
