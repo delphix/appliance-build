@@ -22,6 +22,11 @@ FINDEXEC.Darwin := -perm +111
 FINDEXEC.Linux := -executable
 FINDEXEC := $(FINDEXEC.$(shell uname -s))
 
+SHELL_CHECKSTYLE_FILES = $(shell find scripts -type f $(FINDEXEC)) \
+                $(shell find live-build/misc/live-build-hooks -type f $(FINDEXEC)) \
+                $(shell find live-build/misc/upgrade-scripts -type f) \
+                $(shell find live-build/misc/migration-scripts -type f)
+
 .PHONY: \
 	all-external \
 	all-internal \
@@ -54,10 +59,7 @@ ancillary-repository:
 	./scripts/build-ancillary-repository.sh
 
 shellcheck:
-	shellcheck --exclude=SC1090,SC1091 \
-		$$(find scripts -type f $(FINDEXEC)) \
-		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC)) \
-		$$(find live-build/misc/upgrade-scripts -type f)
+	shellcheck --exclude=SC1090,SC1091 $(SHELL_CHECKSTYLE_FILES)
 
 #
 # There doesn't appear to be a way to have "shfmt" return non-zero when
@@ -80,9 +82,7 @@ shellcheck:
 # problematic lines are conveyed to the user so they can be fixed.
 #
 shfmtcheck:
-	! shfmt -d $$(find scripts -type f $(FINDEXEC)) \
-		$$(find live-build/misc/live-build-hooks -type f $(FINDEXEC)) \
-		$$(find live-build/misc/upgrade-scripts -type f) | grep .
+	! shfmt -d $(SHELL_CHECKSTYLE_FILES) | grep .
 
 ansiblecheck:
 	ansible-lint $$(find bootstrap live-build/variants -name playbook.yml)

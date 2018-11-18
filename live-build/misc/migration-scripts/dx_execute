@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Copyright 2018 Delphix
 #
@@ -14,9 +15,10 @@
 # limitations under the License.
 #
 
-*
-!*/
-!ansible/**
-!config/hooks
-!upgrade-scripts
-!migration-scripts
+#
+# [WIP]
+# The existence of this file is checked by dx_unpack, thus we provide
+# it as an empty file until the needed functionality is added.
+#
+
+exit 0

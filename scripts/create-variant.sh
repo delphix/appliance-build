@@ -63,3 +63,6 @@ ln -s ../../../misc/live-build-hooks \
 
 ln -s ../../misc/upgrade-scripts \
 	"$TOP/live-build/variants/$1/upgrade-scripts"
+
+ln -s ../../misc/migration-scripts \
+	"$TOP/live-build/variants/$1/migration-scripts"
