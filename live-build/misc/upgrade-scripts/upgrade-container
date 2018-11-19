@@ -149,7 +149,7 @@ function create_upgrade_container_common() {
 function get_mounted_rootfs_name() {
 	local rootfs
 
-	rootfs=$(mount | awk '$3 == "/" {print $1}')
+	rootfs=$(zfs list -Ho name /)
 	[[ -n "$rootfs" ]] ||
 		die "failed to determine the mounted root filesystem name"
 
