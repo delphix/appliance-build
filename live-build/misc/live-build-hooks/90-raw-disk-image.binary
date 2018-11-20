@@ -100,7 +100,8 @@ FSNAME=$(basename "$DIRECTORY")
 #
 # Initialize the root pool using the partition we previously created.
 #
-zpool create \
+zpool create -d \
+	-o version=28 \
 	-O canmount=off \
 	-O mountpoint=none \
 	-R "$DIRECTORY" \
