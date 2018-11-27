@@ -44,6 +44,7 @@ RUN \
       livecd-rootfs \
       make \
       man \
+      pigz \
       rename \
       shellcheck \
       vim \

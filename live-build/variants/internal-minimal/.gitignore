@@ -19,3 +19,4 @@
 !ansible/**
 !config/hooks
 !upgrade-scripts
+!migration-scripts
