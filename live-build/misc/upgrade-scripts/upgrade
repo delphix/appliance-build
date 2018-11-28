@@ -93,8 +93,12 @@ function upgrade_in_place() {
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
 	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-		/bin/systemctl start delphix-platform ||
-		die "'systemctl start delphix-platform' failed in '$CONTAINER'"
+		/bin/systemctl reload delphix-platform ||
+		die "'systemctl reload delphix-platform' failed in '$CONTAINER'"
+
+	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
+		/bin/systemctl restart delphix-platform ||
+		die "'systemctl restart delphix-platform' failed in '$CONTAINER'"
 
 	if [[ "$DLPX_UPGRADE_SKIP_VERIFY" != "true" ]]; then
 		"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
@@ -143,8 +147,12 @@ function upgrade_not_in_place() {
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
 	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-		/bin/systemctl start delphix-platform ||
-		die "'systemctl start delphix-platform' failed in '$CONTAINER'"
+		/bin/systemctl reload delphix-platform ||
+		die "'systemctl reload delphix-platform' failed in '$CONTAINER'"
+
+	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
+		/bin/systemctl restart delphix-platform ||
+		die "'systemctl restart delphix-platform' failed in '$CONTAINER'"
 
 	if [[ "$DLPX_UPGRADE_SKIP_VERIFY" != "true" ]]; then
 		"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
