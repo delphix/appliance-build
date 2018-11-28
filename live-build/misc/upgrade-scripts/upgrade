@@ -93,6 +93,10 @@ function upgrade_in_place() {
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
 	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
+		/bin/rm -f /etc/delphix-platform/ansible-done ||
+		die "'rm -f /etc/delphix-platform/ansible-done' failed in '$CONTAINER'"
+
+	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
 		/bin/systemctl start delphix-platform ||
 		die "'systemctl start delphix-platform' failed in '$CONTAINER'"
 
@@ -141,6 +145,10 @@ function upgrade_not_in_place() {
 	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
 		"$IMAGE_PATH/execute" ||
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
+
+	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
+		/bin/rm -f /etc/delphix-platform/ansible-done ||
+		die "'rm -f /etc/delphix-platform/ansible-done' failed in '$CONTAINER'"
 
 	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
 		/bin/systemctl start delphix-platform ||
