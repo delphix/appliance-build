@@ -182,10 +182,10 @@ AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
 	"$AWS_S3_PREFIX_VIRTUALIZATION" \
 	"dlpx-app-gate/master/build-package/post-push/latest")
 
-AWS_S3_URI_PLATFORM=$(resolve_s3_uri \
-	"$AWS_S3_URI_PLATFORM" \
-	"$AWS_S3_PREFIX_PLATFORM" \
-	"devops-gate/master/delphix-platform/master/post-push/latest")
+AWS_S3_URI_LINUX_PKG=$(resolve_s3_uri \
+	"$AWS_S3_URI_LINUX_PKG" \
+	"$AWS_S3_PREFIX_LINUX_PKG" \
+	"devops-gate/master/linux-pkg-build/master/post-push/latest")
 
 AWS_S3_URI_MASKING=$(resolve_s3_uri \
 	"$AWS_S3_URI_MASKING" \
@@ -209,7 +209,7 @@ PKG_DIRECTORY=$(mktemp -d -p "$PWD" tmp.pkgs.XXXXXXXXXX)
 # proceed to download these packages.
 #
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_PLATFORM"
+download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_LINUX_PKG"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_ZFS"
 
