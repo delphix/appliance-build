@@ -215,7 +215,7 @@ function create_upgrade_container_not_in_place() {
 	#
 	debootstrap --no-check-gpg \
 		--components=delphix --include=systemd-container \
-		bionic "$DIRECTORY" "file://$UPDATE_DIR/$IMAGE_VERSION/public" \
+		cosmic "$DIRECTORY" "file://$UPDATE_DIR/$IMAGE_VERSION/public" \
 		1>&2 || die "failed to debootstrap upgrade filesystem"
 
 	create_upgrade_container_common

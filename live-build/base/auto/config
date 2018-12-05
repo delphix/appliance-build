@@ -49,7 +49,7 @@ lb config noauto \
 	--bootstrap-flavour minimal \
 	--chroot-filesystem none \
 	--architectures amd64 \
-	--distribution bionic \
+	--distribution cosmic \
 	--binary-images none \
 	--bootloader none \
 	--system normal \

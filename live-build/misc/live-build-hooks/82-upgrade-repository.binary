@@ -142,7 +142,7 @@ rm -rf "binary/$DEBS_DIRECTORY"
 # was just generated.
 #
 rm -rf ~/.aptly
-aptly repo create -distribution=bionic -component=delphix upgrade-repository
+aptly repo create -distribution=cosmic -component=delphix upgrade-repository
 
 aptly repo add upgrade-repository binary/packages
 aptly repo add upgrade-repository ./*.deb

@@ -62,7 +62,7 @@ done
 	die "MINIMUM_VERSION variable is empty after sourcing version.info"
 
 cat <<EOF >/etc/apt/sources.list ||
-deb [trusted=yes] file://$UPDATE_DIR/$IMAGE_VERSION/public bionic delphix
+deb [trusted=yes] file://$UPDATE_DIR/$IMAGE_VERSION/public cosmic delphix
 EOF
 	die "failed to configure apt sources"
 
