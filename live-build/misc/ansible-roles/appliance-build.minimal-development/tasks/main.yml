@@ -21,3 +21,23 @@
     content: |
       apt:
         preserve_sources_list: false
+
+#
+# We use "no_log" here to ensure we don't accidentally leak the contents
+# of these AWS_* environment variables to stdout; e.g. this would happen
+# if this playbook were run with extra verbosity via the `-v` flag to
+# ansible-playbook.
+#
+- lineinfile:
+    dest: /etc/environment
+    regexp: '^{{ item.key }}='
+    line: '{{ item.key }}="{{ item.value }}"'
+  with_items:
+    - { key: 'AWS_ACCESS_KEY_ID',
+        value: '{{ lookup("env", "AWS_ACCESS_KEY_ID") }}' }
+    - { key: 'AWS_SECRET_ACCESS_KEY',
+        value: '{{ lookup("env", "AWS_SECRET_ACCESS_KEY") }}' }
+  when:
+    - lookup('env', 'AWS_ACCESS_KEY_ID') != ''
+    - lookup('env', 'AWS_SECRET_ACCESS_KEY') != ''
+  no_log: true
