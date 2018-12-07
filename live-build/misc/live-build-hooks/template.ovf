@@ -148,6 +148,7 @@
       <vmw:Config ovf:required="false" vmw:key="tools.beforeGuestStandby" vmw:value="true"/>
       <vmw:Config ovf:required="false" vmw:key="tools.syncTimeWithHost" vmw:value="false"/>
       <vmw:Config ovf:required="false" vmw:key="tools.toolsUpgradePolicy" vmw:value="manual"/>
+      <vmw:ExtraConfig ovf:required="false" vmw:key="disk.EnableUUID" vmw:value="true"/>
     </VirtualHardwareSection>
     <AnnotationSection ovf:required="false">
       <Info>A human-readable annotation</Info>
