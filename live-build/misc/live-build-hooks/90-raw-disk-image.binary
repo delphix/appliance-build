@@ -152,22 +152,18 @@ rsync --info=stats3 -Wa binary/* "$DIRECTORY/"
 # need to have the /dev, /proc, and /sys mountpoints present in that chroot
 # environment, which is why we bind mount here.
 #
-mount --rbind /dev "$DIRECTORY/dev"
-mount --rbind /proc "$DIRECTORY/proc"
-mount --rbind /sys "$DIRECTORY/sys"
+mount --make-slave "$DIRECTORY"
+for dir in /dev /proc /sys; do
+	mount --rbind "$dir" "${DIRECTORY}${dir}"
+	mount --make-rslave "${DIRECTORY}${dir}"
+done
 
 chroot "$DIRECTORY" grub-install "/dev/$LOOPNAME"
 chroot "$DIRECTORY" update-grub
 
-#
-# This will unmount everything mounted under $DIRECTORY, undoing the
-# mounts created earlier. This is required because we used "--rbind"
-# when mounting directories like /sys and /proc, so we need to unmount
-# any of those recursively mounted mountpoints; a simple "umount /sys"
-# will fail with EBUSY.
-#
-mount | grep -v zfs | tac | awk -v "d=$DIRECTORY" '$0 ~ d {print $3}' |
-	xargs -i{} umount -lf {}
+for dir in /dev /proc /sys; do
+	umount -R "${DIRECTORY}${dir}"
+done
 
 zfs umount rpool/home
 zfs umount rpool/crashdump
