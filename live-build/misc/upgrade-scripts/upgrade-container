@@ -282,7 +282,7 @@ function destroy() {
 }
 
 function run() {
-	systemd-run --machine="$CONTAINER" --quiet --wait --pipe -- "$@"
+	systemd-run --machine="$CONTAINER" --setenv=CONTAINER="$CONTAINER" --quiet --wait --pipe -- "$@"
 }
 
 function get_bootloader_devices() {
