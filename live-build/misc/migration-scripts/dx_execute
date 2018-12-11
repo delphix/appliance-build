@@ -16,9 +16,73 @@
 #
 
 #
-# [WIP]
-# The existence of this file is checked by dx_unpack, thus we provide
-# it as an empty file until the needed functionality is added.
+# Sets up the FreeBSD bootloader to boot into that Linux image next time
+# we reboot.
 #
+
+set -o pipefail
+
+function die() {
+	report "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+[[ "$(uname -s)" == "SunOS" ]] || die "script can only be used in illumos"
+
+#
+# Undo any existing default timeout commands in the bootloader's menu.
+#
+sed -i '/menu_timeout_command/d' /boot/menu.rc.local
+[[ "$(grep -cF 'menu_timeout_command' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup previous default command"
+
+#
+# Get the RDS and the current ZFS pool that we're currently using.
+#
+RDS=$(mount | awk '/^\/ /{ print $3 }')
+RPOOL=${RDS%%/*}
+
+#
+# Check that the version to which we are upgrading is compatible with the
+# currently installed version. (Look at version.info to see if we are
+# above the minimum version required. Since we are doing a migration the
+# minimum version should be the latest 5.3.
+#
+# CURRENT_DDS=$(dirname "$(mount | awk '/^\/opt\/delphix /{ print $3 }')")
+# CURRENT_VERSION=$(basename $current_dds)
+#
+# WIP: check if current version is 5.3, if not bail
+#
+
+#
+# Ensure that the expected Linux dataset layout exists.
+#
+[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 2 ]] ||
+	die "could not find the expected linux dataset layout"
+LX_RPOOL_ROOT=$(zfs list -o name -H "$RPOOL/ROOT")
+[[ -n $LX_RPOOL_ROOT ]] || die "could not find Linux ROOT dataset"
+LX_RDS=$(zfs list -o name -Hr "$RPOOL/ROOT" | tail -n 1)
+
+#
+# Ensure that the expected bootloader fields are there.
+#
+[[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no caption for the Linux option in the bootloader menu"
+[[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no keycode for the Linux option in the bootloader menu"
+[[ "$(grep -cF 'mainmenu_command[8]' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no command for the Linux option in the bootloader menu"
+[[ "$(grep -c "$LX_RDS" /boot/menu.rc.local)" -eq 1 ]] ||
+	die "the expected Linux RDS ($LX_RDS) was either not found or has" \
+		"been specified more than once in the bootloader's menu file"
+
+#
+# Read the command from option 8 which should be the one that boots
+# into Linux. Then make it so that the same command runs whenever we
+# hit the timer of the FreeBSD bootloader menu.
+#
+MAIN_MENU_LINUX_CMD=$(grep -F 'mainmenu_command[8]' /boot/menu.rc.local |
+	cut -d = -f 2-)
+echo "set menu_timeout_command=$MAIN_MENU_LINUX_CMD" >>/boot/menu.rc.local
 
 exit 0

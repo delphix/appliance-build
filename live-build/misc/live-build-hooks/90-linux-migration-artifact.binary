@@ -131,28 +131,28 @@ cp migration-scripts/* $DEPOT_DIRECTORY
 )
 
 #
-# DLPX_SIGNING_LOGIN is used for signing our migration image.
+# DELPHIX_SIGNATURE_TOKEN is used for signing our migration image.
 # The signature is later unpacked and verified on the VM
-# performing the migration. If DLPX_SIGNING_LOGIN has not been
+# performing the migration. If DELPHIX_SIGNATURE_TOKEN has not been
 # specified by the user when running this hook we skip generating
-# the signature for this image.
+# the signature for this image. Similarly for DELPHIX_SIGNATURE_URL.
 #
-if [[ -n "${DLPX_SIGNING_LOGIN:-}" ]] && [[ -n "${DLPX_KEY_URL:-}" ]]; then
+if [[ -n "${DELPHIX_SIGNATURE_TOKEN:-}" ]] && [[ -n "${DELPHIX_SIGNATURE_URL:-}" ]]; then
 	#
 	# Generate depot/hashes.sig[.<release>]
 	#
 	# Assumption: we always migrate from version 5.3
 	#
-	UPGRADE_VERSION="5.3"
-	DLPX_SIGNING_URL="$DLPX_KEY_URL/upgrade/keyVersion/$UPGRADE_VERSION/sign"
+	VERSION="5.3"
+	SIGN_URL="$DELPHIX_SIGNATURE_URL/upgrade/keyVersion/$VERSION/sign"
 
 	set -o pipefail
 	curl -s -f -H "Content-Type: application/json" \
-		-u "$DLPX_SIGNING_LOGIN" "$DLPX_SIGNING_URL" -d @- <<-EOF |
+		-u "$DELPHIX_SIGNATURE_TOKEN" "$SIGN_URL" -d @- <<-EOF |
 			{"data": "$(base64 -w 0 $DEPOT_DIRECTORY/hashes)"}
 		EOF
 		jq -r .signature |
-		base64 -d >$DEPOT_DIRECTORY/hashes.sig.$UPGRADE_VERSION
+		base64 -d >$DEPOT_DIRECTORY/hashes.sig.$VERSION
 fi
 
 #
