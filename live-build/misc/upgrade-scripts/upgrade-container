@@ -424,6 +424,16 @@ function convert_to_bootfs() {
 	# if the applications change in a way that requires changes to
 	# this list, we can it up with a flag-day situation.
 	#
+	# Note, we migrate the "/etc/modprobe.d/20-zfs.conf" file without
+	# verifying the tunables contained in that file make sense for the
+	# new rootfs. We're reliant on this file being verified by some
+	# other mechanism (e.g. the virtualization application's upgrade
+	# verification), and failing the upgrade if the file's contents is
+	# incompatible with the new appliance version. Without this
+	# verification, the file could contain tunables that are not
+	# appropriate for the new version, and could cause the appliance
+	# to mis-behave after booting to the new rootfs.
+	#
 	while read -r file; do
 		migrate_file "$file"
 	done <<-EOF
@@ -439,6 +449,7 @@ function convert_to_bootfs() {
 		/etc/krb5.conf
 		/etc/krb5.keytab
 		/etc/mds_upgrader
+		/etc/modprobe.d/20-zfs.conf
 		/etc/ntp.conf
 		/etc/snmp/snmpd.conf
 		/etc/rtslib-fb-target/saveconfig.json
