@@ -312,14 +312,27 @@ function migrate_password_for_user() {
 
 function migrate_file() {
 	local path="$1"
-	local directory
+	local parentdir
 
 	if [[ -f "$path" ]]; then
-		directory="$(dirname "$path")"
-		mkdir -p "/var/lib/machines/${CONTAINER}${directory}" ||
-			die "'mkdir -p $directory' failed for '$CONTAINER'"
+		parentdir="$(dirname "$path")"
+		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
+			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
 		cp "$path" "/var/lib/machines/${CONTAINER}${path}" ||
 			die "'cp $path' failed for '$CONTAINER'"
+	fi
+}
+
+function migrate_directory() {
+	local path="$1"
+	local parentdir
+
+	if [[ -d "$path" ]]; then
+		parentdir="$(dirname "$path")"
+		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
+			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
+		cp -a "$path" "/var/lib/machines/${CONTAINER}${path}" ||
+			die "'cp -a $path' failed for '$CONTAINER'"
 	fi
 }
 
@@ -368,11 +381,82 @@ function convert_to_bootfs() {
 	migrate_password_for_user root
 
 	#
-	# LX-72 Until we have a proper solution for migrating the
-	# configuration of a given appliance to the new root filesystem
-	# (i.e. any configuration that isn't supplied by a package), we
-	# resort to explicitly migrating some of this configuration
-	# here. The files listed here are dynamically generated and/or
+	# These files are generic OS files that are required for the
+	# system to properly operate; these must be preserved acorss
+	# upgrades.
+	#
+	# Note, the "/etc/resolv.conf" file is in this list, but the
+	# "migrate_file" function will only migrate this path if it
+	# points to a regular file. Often, this file will be a symlink,
+	# in which case it won't be migrated, and we don't want it to
+	# be. We only want to migrate this file if the admin (or some
+	# software on the system) has converted it to a regular file,
+	# and configured some host specific DNS settings, in which case
+	# we want these settings to persist across the upgrade.
+	#
+	while read -r file; do
+		migrate_file "$file"
+	done <<-EOF
+		/etc/hostid
+		/etc/hostname
+		/etc/hosts
+		/etc/machine-id
+		/etc/netplan/50-cloud-init.yaml
+		/etc/resolv.conf
+		/etc/ssh/ssh_host_dsa_key
+		/etc/ssh/ssh_host_dsa_key.pub
+		/etc/ssh/ssh_host_ecdsa_key
+		/etc/ssh/ssh_host_ecdsa_key.pub
+		/etc/ssh/ssh_host_ed25519_key
+		/etc/ssh/ssh_host_ed25519_key.pub
+		/etc/ssh/ssh_host_rsa_key
+		/etc/ssh/ssh_host_rsa_key.pub
+		/etc/sudoers.d/90-cloud-init-users
+		/etc/zfs/zpool.cache
+	EOF
+
+	#
+	# These files are specific to the delphix virtualization and/or
+	# masking application, and must be preserved across upgrades.
+	# Ideally this list would be provided by the applications
+	# themselves, rather than specified here, but the infrastructure
+	# to enable the applications to do this doesn't yet exist. Thus,
+	# if the applications change in a way that requires changes to
+	# this list, we can it up with a flag-day situation.
+	#
+	while read -r file; do
+		migrate_file "$file"
+	done <<-EOF
+		/etc/challenge_response.key
+		/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+		/etc/delphix-interface-names.yaml
+		/etc/default/locale
+		/etc/engine-code
+		/etc/engine-uuid
+		/etc/engine.install
+		/etc/fluent/fluent.conf
+		/etc/issue
+		/etc/krb5.conf
+		/etc/krb5.keytab
+		/etc/mds_upgrader
+		/etc/ntp.conf
+		/etc/snmp/snmpd.conf
+		/etc/rtslib-fb-target/saveconfig.json
+		/var/opt/delphix/server.conf
+	EOF
+
+	#
+	# This directory is specific to the delphix virtualization and
+	# masking applications, and must be preserved across upgrades.
+	#
+	while read -r file; do
+		migrate_directory "$file"
+	done <<-EOF
+		/var/delphix
+	EOF
+
+	#
+	# The files listed here are dynamically generated and/or
 	# modified by appliance-build.
 	#
 	while read -r file; do
@@ -380,13 +464,10 @@ function convert_to_bootfs() {
 	done <<-EOF
 		/etc/cloud/cloud.cfg.d/99-delphix-development.cfg
 		/etc/cloud/cloud.cfg.d/99-delphix-internal.cfg
-		/etc/issue
 		/etc/nftables.conf
-		/etc/ssh/sshd_config
 		/etc/systemd/system/delphix-masking.service.d/override.conf
 		/etc/systemd/system/delphix-mgmt.service.d/override.conf
 		/etc/systemd/system/delphix-postgres@.service.d/override.conf
-		/var/opt/delphix/server.conf
 	EOF
 
 	chroot "/var/lib/machines/$CONTAINER" update-grub ||
