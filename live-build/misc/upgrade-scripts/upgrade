@@ -20,6 +20,9 @@
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
+IMAGE_VERSION=$(get_image_version)
+[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+
 #
 # This variable is used to determine if the application verification
 # checks should be run as part of the upgrade. The default value can be
@@ -194,10 +197,13 @@ shift $((OPTIND - 1))
 case "$1" in
 in-place)
 	shift 1
+	verify_upgrade_is_allowed
+	verify_upgrade_in_place_is_allowed
 	upgrade_in_place "$@"
 	;;
 not-in-place)
 	shift 1
+	verify_upgrade_is_allowed
 	upgrade_not_in_place "$@"
 	;;
 *)
