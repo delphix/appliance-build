@@ -48,7 +48,8 @@ done
 # Thus, when we can't determine the installed version of delphix-entire,
 # we assume we're doing a not-in-place upgrade, and skip this check.
 #
-[[ -n "$(get_installed_version)" ]] && verify_upgrade_is_allowed
+INSTALLED_VERSION=$(get_installed_version)
+[[ -n "$INSTALLED_VERSION" ]] && verify_upgrade_is_allowed
 
 if [[ -f /etc/apt/sources.list ]]; then
 	mv /etc/apt/sources.list /etc/apt/sources.list.orig ||
@@ -61,6 +62,8 @@ EOF
 	die "failed to configure apt sources"
 
 apt_get update || die "failed to update apt sources"
+
+source_version_information
 apt_get install -y "delphix-entire=$VERSION" ||
 	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
 
