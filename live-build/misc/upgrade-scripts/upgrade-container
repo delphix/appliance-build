@@ -17,8 +17,8 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
-IMAGE_VERSION=$(get_image_version)
-[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+IMAGE_PATH=$(get_image_path)
+[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
 CONTAINER=
 
@@ -215,8 +215,8 @@ function create_upgrade_container_not_in_place() {
 	#
 	debootstrap --no-check-gpg \
 		--components=delphix --include=systemd-container \
-		bionic "$DIRECTORY" "file://$UPDATE_DIR/$IMAGE_VERSION/public" \
-		1>&2 || die "failed to debootstrap upgrade filesystem"
+		bionic "$DIRECTORY" "file://$IMAGE_PATH/public" 1>&2 ||
+		die "failed to debootstrap upgrade filesystem"
 
 	create_upgrade_container_common
 }

@@ -37,3 +37,57 @@ function get_image_path() {
 function get_image_version() {
 	basename "$(get_image_path)"
 }
+
+function get_installed_version() {
+	dpkg-query -Wf '${Version}' delphix-entire
+}
+
+function compare_versions() {
+	dpkg --compare-versions "$@"
+}
+
+function source_version_information() {
+	local IMAGE_PATH="${IMAGE_PATH:-$(get_image_path)}"
+	[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
+
+	local IMAGE_VERSION="${IMAGE_VERSION:-$(get_image_version)}"
+	[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+
+	[[ -f "$IMAGE_PATH/version.info" ]] ||
+		die "image for version '$IMAGE_VERSION' missing version.info"
+	. "$IMAGE_PATH/version.info" ||
+		die "failed to source version.info for version '$IMAGE_VERSION'"
+
+	[[ -n "$VERSION" ]] || die "VERSION is empty"
+	[[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION is empty"
+	[[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
+		die "MINIMUM_REBOOT_OPTIONAL_VERSION is empty"
+}
+
+function verify_upgrade_is_allowed() {
+	source_version_information
+
+	local INSTALLED_VERSION
+	INSTALLED_VERSION=$(get_installed_version)
+
+	compare_versions \
+		"$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
+		die "upgrade in-place is not allowed;" \
+			"installed version ($INSTALLED_VERSION)" \
+			"is less than minimum allowed version" \
+			"($MINIMUM_VERSION)"
+}
+
+function verify_upgrade_in_place_is_allowed() {
+	source_version_information
+
+	local INSTALLED_VERSION
+	INSTALLED_VERSION=$(get_installed_version)
+
+	compare_versions \
+		"$INSTALLED_VERSION" "ge" "$MINIMUM_REBOOT_OPTIONAL_VERSION" ||
+		die "upgrade in-place is not allowed;" \
+			"installed version ($INSTALLED_VERSION)" \
+			"is less than minimum allowed version" \
+			"($MINIMUM_REBOOT_OPTIONAL_VERSION)"
+}

@@ -17,8 +17,8 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
-IMAGE_VERSION=$(get_image_version)
-[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+IMAGE_PATH=$(get_image_path)
+[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
 set -o pipefail
 
@@ -42,47 +42,20 @@ while getopts ':rlBfs' c; do
 	esac
 done
 
-[[ -d "$UPDATE_DIR" ]] || die "update directory '$UPDATE_DIR' does not exist"
-[[ -d "$UPDATE_DIR/$IMAGE_VERSION" ]] ||
-	die "upgrade image for version '$IMAGE_VERSION' was not unpacked"
-[[ -f "$UPDATE_DIR/$IMAGE_VERSION/version.info" ]] ||
-	die "upgrade image for version '$IMAGE_VERSION' is missing version.info"
-
-#
-# We need to be careful when sourcing this file, since it can conflict
-# with (and clobber) functions and/or variables previously defined.
-#
-. "$UPDATE_DIR/$IMAGE_VERSION/version.info" ||
-	die "failed to source version.info file for version '$IMAGE_VERSION'"
-
-[[ -n "$VERSION" ]] ||
-	die "VERSION variable is empty after sourcing version.info"
-
-[[ -n "$MINIMUM_VERSION" ]] ||
-	die "MINIMUM_VERSION variable is empty after sourcing version.info"
-
-cat <<EOF >/etc/apt/sources.list ||
-deb [trusted=yes] file://$UPDATE_DIR/$IMAGE_VERSION/public bionic delphix
-EOF
-	die "failed to configure apt sources"
-
-apt_get update || die "failed to update apt sources"
-
-INSTALLED_VERSION=$(dpkg-query -Wf '${Version}' delphix-entire)
-
 #
 # It's possible for delphix-entire not to be already installed on the
 # root filesystem being upgraded when we're doing a not-in-place upgrade.
 # Thus, when we can't determine the installed version of delphix-entire,
 # we assume we're doing a not-in-place upgrade, and skip this check.
 #
-if [[ -n "$INSTALLED_VERSION" ]]; then
-	dpkg --compare-versions "$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
-		die "upgrade not allowed;" \
-			"installed version ($INSTALLED_VERSION)" \
-			"is less than minimum version ($MINIMUM_VERSION)"
-fi
+[[ -n "$(get_installed_version)" ]] && verify_upgrade_is_allowed
 
+cat <<EOF >/etc/apt/sources.list ||
+deb [trusted=yes] file://$IMAGE_PATH/public bionic delphix
+EOF
+	die "failed to configure apt sources"
+
+apt_get update || die "failed to update apt sources"
 apt_get install -y "delphix-entire=$VERSION" ||
 	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
 
