@@ -54,8 +54,8 @@ $DOCKER_RUN --rm \
 	--env APPLIANCE_PASSWORD \
 	--env AWS_ACCESS_KEY_ID \
 	--env AWS_SECRET_ACCESS_KEY \
-	--env DLPX_KEY_URL \
-	--env DLPX_SIGNING_LOGIN \
+	--env DELPHIX_SIGNATURE_URL \
+	--env DELPHIX_SIGNATURE_TOKEN \
 	--volume "$TOP:/opt/appliance-build" \
 	--workdir "/opt/appliance-build" \
 	appliance-build "$@"
