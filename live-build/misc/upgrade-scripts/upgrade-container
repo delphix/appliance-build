@@ -79,6 +79,20 @@ function create_upgrade_container_common() {
 		die "failed to create container configuration file"
 
 	#
+	# Certain software (e.g. update-grub) running in the container
+	# require access to the disk backing the root filesystem. Thus,
+	# we expose this device to the container here; we're careful to
+	# only expose it read-only, though, to prevent software in the
+	# container from inadvertently corrupting the device.
+	#
+	for device in $(grub-probe --target=device /); do
+		cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+			BindReadOnly=$device
+		EOF
+			die "failed to add '$device' to container config file"
+	done
+
+	#
 	# Since UPDATE_DIR is stored on a seperate ZFS filesystem than
 	# the root filesysytem, we need to explicitly make this
 	# directory available inside of the upgrade container,
