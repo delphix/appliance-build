@@ -97,9 +97,6 @@ LOOPNAME=$(kpartx -asv "$APPLIANCE_VARIANT.img" |
 DIRECTORY=$(mktemp -d -p "/mnt" -t delphix.XXXXXXX)
 FSNAME=$(basename "$DIRECTORY")
 
-#
-# Initialize the root pool using the partition we previously created.
-#
 zpool create -d \
 	-o version=28 \
 	-O canmount=off \
@@ -107,12 +104,35 @@ zpool create -d \
 	-R "$DIRECTORY" \
 	rpool "/dev/mapper/${LOOPNAME}p1"
 
-#
-# Initialize the root datasets.
-#
-zfs create -o canmount=off -o mountpoint=none rpool/ROOT
-zfs create -o canmount=noauto -o mountpoint=/ "rpool/ROOT/$FSNAME"
-zfs mount "rpool/ROOT/$FSNAME"
+zfs create \
+	-o canmount=off \
+	-o mountpoint=none \
+	"rpool/ROOT"
+
+zfs create \
+	-o canmount=off \
+	-o mountpoint=none \
+	"rpool/ROOT/$FSNAME"
+
+zfs create \
+	-o canmount=noauto \
+	-o compression=on \
+	-o mountpoint=/ \
+	"rpool/ROOT/$FSNAME/root"
+
+zfs mount "rpool/ROOT/$FSNAME/root"
+
+zfs create \
+	-o canmount=on \
+	-o compression=on \
+	-o mountpoint=/export/home \
+	"rpool/ROOT/$FSNAME/home"
+
+zfs create \
+	-o canmount=on \
+	-o compression=on \
+	-o mountpoint=/var/delphix \
+	"rpool/ROOT/$FSNAME/data"
 
 #
 # Initialize the crashdump dataset. This is used to store core files
@@ -126,18 +146,6 @@ zfs create \
 	-o mountpoint=/var/crash \
 	-o quota="$(echo "$(zpool list -Hpo size rpool) / 4" | bc)b" \
 	rpool/crashdump
-
-#
-# Initialize the home dataset which is used for the delphix user's home
-# directory. We do this for two reasons: 1. the contents of the delphix
-# home directory is not versioned along with the OS version, 2. we want
-# to preserve the home directory contents across upgrades.
-#
-zfs create \
-	-o canmount=on \
-	-o compression=on \
-	-o mountpoint=/export/home \
-	rpool/home
 
 #
 # Populate the root filesystem with the contents of the "binary" directory
@@ -165,8 +173,9 @@ for dir in /dev /proc /sys; do
 	umount -R "${DIRECTORY}${dir}"
 done
 
-zfs umount rpool/home
 zfs umount rpool/crashdump
-zfs umount "rpool/ROOT/$FSNAME"
+zfs umount "rpool/ROOT/$FSNAME/data"
+zfs umount "rpool/ROOT/$FSNAME/home"
+zfs umount "rpool/ROOT/$FSNAME/root"
 zpool export rpool
 kpartx -d "$APPLIANCE_VARIANT.img"
