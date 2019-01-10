@@ -94,11 +94,15 @@ cp migration-scripts/* $DEPOT_DIRECTORY
 #
 {
 	#
-	# Note that both the following fields are bogus and supplied
+	# Note that both the following field is bogus and supplied
 	# solely for making dx_unpack happy.
 	#
-	echo "DLPX_DATE=bogus"
 	echo "DLPX_OS_VERSION=Linux"
+
+	#
+	# UpgradeManager expects a valid date for DLPX_DATE.
+	#
+	echo "DLPX_DATE=$(date '+%Y.%m.%d.%H.%M.%S')"
 
 	#
 	# DLPX_MIN_VERSION is specified for ensuring that we are
