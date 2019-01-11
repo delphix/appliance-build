@@ -38,7 +38,7 @@ function cleanup() {
 		die "Failed to remove verify log directory ${UPDATE_VERIFY_LOG_DIR}."
 	mkdir -p "${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}" ||
 		die "Failed to create verify log directory ${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}."
-	${SUPPORT_INFO_SCRIPT} -o "${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}" -t "log dropbox" ||
+	${SUPPORT_INFO_SCRIPT} -s -o "${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}" -t "log dropbox" ||
 		die "Failed to collect verify logs."
 
 	return "$rc"
