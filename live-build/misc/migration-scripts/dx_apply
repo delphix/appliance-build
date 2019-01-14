@@ -35,6 +35,10 @@ function usage() {
 	exit 2
 }
 
+function report_progress_inc() {
+	echo "Progress increment: $(date +%T:%N%z), $1, $2"
+}
+
 [[ "$(uname -s)" == "SunOS" ]] || die "script can only be used in illumos"
 
 while getopts ':h' opt; do
@@ -85,6 +89,8 @@ sed -i '/set mainmenu_keycode\[8\]/d' /boot/menu.rc.local
 sed -i '/set mainmenu_command\[8\]/d' /boot/menu.rc.local
 [[ "$(grep -cF 'mainmenu_command[8]' /boot/menu.rc.local)" -eq 0 ]] ||
 	die "failed to cleanup mainmenu_command from previous run"
+
+report_progress_inc 20
 
 #
 # Check that the version to which we are upgrading is compatible with the
@@ -238,5 +244,7 @@ zfs umount "$RPOOL/ROOT/$FSNAME" ||
 	die "couldn't unmount linux root dataset from temporary mountpoint"
 zfs set mountpoint=/ "$RPOOL/ROOT/$FSNAME" ||
 	die "could not reset mountpoint for linux root dataset"
+
+report_progress_inc 100
 
 exit 0

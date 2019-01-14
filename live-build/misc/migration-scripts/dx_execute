@@ -27,6 +27,27 @@ function die() {
 	exit 1
 }
 
+function usage() {
+	[[ -n "$1" ]] && echo "$1"
+	cat <<EOM
+Usage:
+  $(basename "$0") [-s]"
+    Reset system to the Linux version that has been previously installed using
+    dx_apply.
+      -s Shutdown (instead of reboot) after upgrade.
+EOM
+	exit 2
+}
+
+opt_s=false
+while getopts :hs c; do
+	case "$c" in
+	\?) usage "Invalid option: -$OPTARG." ;;
+	h) usage ;;
+	s) eval "opt_$c=true" ;;
+	esac
+done
+
 [[ "$(uname -s)" == "SunOS" ]] || die "script can only be used in illumos"
 
 #
@@ -84,5 +105,17 @@ LX_RDS=$(zfs list -o name -Hr "$RPOOL/ROOT" | tail -n 1)
 MAIN_MENU_LINUX_CMD=$(grep -F 'mainmenu_command[8]' /boot/menu.rc.local |
 	cut -d = -f 2-)
 echo "set menu_timeout_command=$MAIN_MENU_LINUX_CMD" >>/boot/menu.rc.local
+
+# Constants used by the uadmin syscall.
+A_SHUTDOWN=2
+AD_POWEROFF=6
+AD_BOOT=1
+
+# reboot or shutdown
+if $opt_s; then
+	uadmin $A_SHUTDOWN $AD_POWEROFF
+else
+	uadmin $A_SHUTDOWN $AD_BOOT
+fi
 
 exit 0

@@ -21,4 +21,10 @@
 # it as an empty file until the needed functionality is added.
 #
 
+function report_progress_inc() {
+	echo "Progress increment: $(date +%T:%N%z), $1, $2"
+}
+
+report_progress_inc 100
+
 exit 0
