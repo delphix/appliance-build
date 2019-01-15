@@ -57,14 +57,24 @@ function create_upgrade_container() {
 	local type="$1"
 
 	#
+	# This will consume the "version.info" file from the unpacked
+	# upgrade image, and will expose some global variables to this
+	# script. We'll now have a "VERSION" global variable, which
+	# contains the version of the "delphix-entire" package that is
+	# contained in the upgrade image
+	#
+	source_version_information
+
+	#
 	# We want to use "/var/lib/machines" as the parent directory,
 	# since that directory is used by "systemd-nspawn" when looking
 	# for containers.  This way, we can create the directory and
 	# mount our rootfs clone here, and "systemd-nspawn" will
 	# automatically detect it.
 	#
-	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t delphix.XXXXXXX)
+	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t "$VERSION.XXXXXXX")
 	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
+
 	CONTAINER=$(basename "$DIRECTORY")
 	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
 

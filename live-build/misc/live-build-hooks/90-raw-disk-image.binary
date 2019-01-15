@@ -94,7 +94,9 @@ LOOPNAME=$(kpartx -asv "$APPLIANCE_VARIANT.img" |
 # migration. Thus, if the name is changed here, we also need to update
 # the name used during upgrade so the names remain consistent.
 #
-DIRECTORY=$(mktemp -d -p "/mnt" -t delphix.XXXXXXX)
+# shellcheck disable=SC2016
+VERSION=$(chroot binary dpkg-query -Wf '${Version}' delphix-entire)
+DIRECTORY=$(mktemp -d -p "/mnt" -t "$VERSION.XXXXXXX")
 FSNAME=$(basename "$DIRECTORY")
 
 zpool create -d \

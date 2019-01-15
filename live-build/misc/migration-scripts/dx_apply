@@ -54,6 +54,7 @@ ARCHIVE_DIR="$1"
 [[ -f $ARCHIVE_DIR/version.info ]] ||
 	die "$ARCHIVE_DIR does not have a version.info file"
 . "$ARCHIVE_DIR/version.info"
+[[ -n "$DLPX_VERSION" ]] || die "DLPX_VERSION variable is empty"
 #
 # WIP: Assert MINIMUM VERSION field for migration.
 # The idea here is to ensure that we are running this script against
@@ -70,7 +71,7 @@ RPOOL=${RDS%%/*}
 #
 # Cleanup any previous intermediate state.
 #
-rm -rf /tmp/delphix.* ||
+rm -rf /tmp/migration-scripts ||
 	die "failed to destroy old delphix temporary directories"
 rm -f /boot/vmlinuz-* /boot/initrd.img-* ||
 	die "failed to destroy previously copied Linux kernel data"
@@ -107,7 +108,8 @@ report_progress_inc 20
 #
 # Create dataset layout similar to the linux upgrade.
 #
-TMPDIR=$(mktemp -d -p "/tmp" -t delphix.XXXXXXX)
+mkdir -p /tmp/migration-scripts
+TMPDIR=$(mktemp -d -p "/tmp/migration-scripts" -t "$DLPX_VERSION.XXXXXXX")
 FSNAME=$(basename "$TMPDIR")
 TMP_ROOT="$TMPDIR/root"
 
