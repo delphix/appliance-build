@@ -31,7 +31,7 @@ fi
 
 export DLPX_ANSIBLE_CONNECTION="chroot"
 export DLPX_ANSIBLE_INVENTORY="binary,"
-./binary/etc/delphix-platform/ansible/apply
+./binary/var/lib/delphix-platform/ansible/apply
 
 if [[ -e binary/etc/resolv.conf ]]; then
 	rm binary/etc/resolv.conf
