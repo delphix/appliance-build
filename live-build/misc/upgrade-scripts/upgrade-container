@@ -42,7 +42,110 @@ function create_cleanup() {
 	destroy "$CONTAINER"
 }
 
-function create_upgrade_container_common() {
+function get_mounted_rootfs_name() {
+	local rootfs
+
+	rootfs=$(zfs list -Ho name /)
+	[[ -n "$rootfs" ]] ||
+		die "failed to determine the mounted root filesystem name"
+
+	echo "$rootfs"
+}
+
+function create_upgrade_container() {
+	trap create_cleanup EXIT
+	local type="$1"
+
+	#
+	# We want to use "/var/lib/machines" as the parent directory,
+	# since that directory is used by "systemd-nspawn" when looking
+	# for containers.  This way, we can create the directory and
+	# mount our rootfs clone here, and "systemd-nspawn" will
+	# automatically detect it.
+	#
+	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t delphix.XXXXXXX)
+	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
+	CONTAINER=$(basename "$DIRECTORY")
+	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
+
+	ROOTFS_PARENT=$(dirname "$(get_mounted_rootfs_name)")
+	zfs snapshot -r "$ROOTFS_PARENT@$CONTAINER" ||
+		die "failed to create recursive upgrade container snapshot"
+
+	zfs create \
+		-o canmount=off \
+		-o mountpoint=none \
+		"rpool/ROOT/$CONTAINER" ||
+		die "failed to create upgrade filesystem"
+
+	case "$type" in
+	in-place)
+		zfs clone \
+			-o canmount=noauto \
+			-o compression=on \
+			-o mountpoint="$DIRECTORY" \
+			"$ROOTFS_PARENT/root@$CONTAINER" \
+			"rpool/ROOT/$CONTAINER/root" ||
+			die "failed to create upgrade / clone"
+
+		zfs mount "rpool/ROOT/$CONTAINER/root" ||
+			die "failed to mount upgrade / clone"
+		;;
+	not-in-place)
+		zfs create \
+			-o canmount=noauto \
+			-o compression=on \
+			-o mountpoint="$DIRECTORY" \
+			"rpool/ROOT/$CONTAINER/root" ||
+			die "failed to create upgrade / filesystem"
+
+		zfs mount "rpool/ROOT/$CONTAINER/root" ||
+			die "failed to mount upgrade / filesystem"
+
+		#
+		# This function needs to return the container's name to stdout,
+		# so that consumers of this function/script can consume that
+		# name and then later start/stop/destroy the container. Thus, we
+		# have to redirect the output from debootstrap away from stdout.
+		#
+		# Also, we need to include the "systemd-container" package when
+		# installing the base systemd with debootstrap so that starting
+		# the container will work properly. Otherwise, after starting
+		# the container, we won't be able to communicate and later run
+		# commands in the container with "systemd-run".
+		#
+		debootstrap --no-check-gpg \
+			--components=delphix --include=systemd-container \
+			bionic "$DIRECTORY" "file://$IMAGE_PATH/public" 1>&2 ||
+			die "failed to debootstrap upgrade filesystem"
+		;;
+	*)
+		die "unsupported upgrade container type specified: '$1'"
+		;;
+	esac
+
+	#
+	# We require the contents of /export/home and /var/delphix to persist
+	# across an upgrade, so we always use a clone of these datasets,
+	# regardless of if we're creating an in-place or not-in-place upgrade
+	# container.
+	#
+	zfs clone \
+		-o canmount=on \
+		-o compression=on \
+		-o mountpoint="$DIRECTORY/export/home" \
+		"$ROOTFS_PARENT/home@$CONTAINER" \
+		"rpool/ROOT/$CONTAINER/home" ||
+		die "failed to create upgrade /export/home clone"
+
+	zfs clone \
+		-o canmount=on \
+		-o compression=on \
+		-o mountpoint="$DIRECTORY/var/delphix" \
+		"$ROOTFS_PARENT/data@$CONTAINER" \
+		"rpool/ROOT/$CONTAINER/data" ||
+		die "failed to create upgrade /var/delphix clone"
+
 	mkdir -p "/etc/systemd/nspawn" ||
 		die "failed to create directory: '/etc/systemd/nspawn'"
 
@@ -160,86 +263,14 @@ function create_upgrade_container_common() {
 	echo "$CONTAINER"
 }
 
-function get_mounted_rootfs_name() {
-	local rootfs
-
-	rootfs=$(zfs list -Ho name /)
-	[[ -n "$rootfs" ]] ||
-		die "failed to determine the mounted root filesystem name"
-
-	echo "$rootfs"
-}
-
-function create_upgrade_container_in_place() {
-	trap create_cleanup EXIT
-
-	#
-	# We want to use "/var/lib/machines" as the parent directory,
-	# since that directory is used by "systemd-nspawn" when looking
-	# for containers.  This way, we can create the directory and
-	# mount our rootfs clone here, and "systemd-nspawn" will
-	# automatically detect it.
-	#
-	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t delphix.XXXXXXX)
-	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
-	CONTAINER=$(basename "$DIRECTORY")
-	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
-
-	ROOTFS=$(get_mounted_rootfs_name)
-	zfs snapshot "$ROOTFS@$CONTAINER" ||
-		die "failed to create upgrade snapshot"
-	zfs clone -o mountpoint="$DIRECTORY" \
-		"$ROOTFS@$CONTAINER" \
-		"rpool/ROOT/$CONTAINER" ||
-		die "failed to create upgrade clone"
-
-	create_upgrade_container_common
-}
-
-function create_upgrade_container_not_in_place() {
-	trap create_cleanup EXIT
-
-	#
-	# We want to use "/var/lib/machines" as the parent directory,
-	# since that directory is used by "systemd-nspawn" when looking
-	# for containers.  This way, we can create the directory and
-	# mount our new rootfs here, and "systemd-nspawn" will
-	# automatically detect it.
-	#
-	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t delphix.XXXXXXX)
-	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
-	CONTAINER=$(basename "$DIRECTORY")
-	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
-
-	zfs create -o mountpoint="$DIRECTORY" \
-		"rpool/ROOT/$CONTAINER" ||
-		die "failed to create upgrade filesystem"
-
-	#
-	# This function needs to return the container's name to stdout,
-	# so that consumers of this function/script can consume that
-	# name and then later start/stop/destroy the container. Thus, we
-	# have to redirect the output from debootstrap away from stdout.
-	#
-	# Also, we need to include the "systemd-container" package when
-	# installing the base systemd with debootstrap so that starting
-	# the container will work properly. Otherwise, after starting
-	# the container, we won't be able to communicate and later run
-	# commands in the container with "systemd-run".
-	#
-	debootstrap --no-check-gpg \
-		--components=delphix --include=systemd-container \
-		bionic "$DIRECTORY" "file://$IMAGE_PATH/public" 1>&2 ||
-		die "failed to debootstrap upgrade filesystem"
-
-	create_upgrade_container_common
-}
-
 function start() {
 	if [[ ! -d "/var/lib/machines/$CONTAINER" ]] ||
 		[[ ! -f "/etc/systemd/nspawn/$CONTAINER.nspawn" ]] ||
 		[[ ! -d "/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d" ]] ||
-		! zfs list "rpool/ROOT/$CONTAINER" &>/dev/null; then
+		! zfs list "rpool/ROOT/$CONTAINER" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/home" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null; then
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
@@ -279,13 +310,32 @@ function destroy() {
 		die "failed to remove directory: $CONTAINER.service.d"
 
 	if zfs list "rpool/ROOT/$CONTAINER" &>/dev/null; then
-		zfs destroy "rpool/ROOT/$CONTAINER" ||
+		#
+		# In order to safely perform the recursive destroy
+		# below, we need to ensure the filesystems are unmounted
+		# in the correct order. Since the "data" and "home"
+		# datasets are mounted inside the "root" dataset, we
+		# need to unmount these two datasets before attempting
+		# to unmount (and/or destroy) the "root" dataset.
+		#
+		# Further, we don't check the return value of these
+		# commands for simplicity's sake. If these fail, it
+		# could be because they aren't mounted, or due to an
+		# actual failure to unmount. If those datasets cannot be
+		# unmounted, this will cause the destroy to fail below,
+		# which we will catch, and then notify the user.
+		#
+		zfs unmount "rpool/ROOT/$CONTAINER/data" &>/dev/null
+		zfs unmount "rpool/ROOT/$CONTAINER/home" &>/dev/null
+		zfs unmount "rpool/ROOT/$CONTAINER/root" &>/dev/null
+
+		zfs destroy -r "rpool/ROOT/$CONTAINER" ||
 			die "failed to destroy container dataset: '$CONTAINER'"
 	fi
 
-	ROOTFS=$(get_mounted_rootfs_name)
-	if zfs list "$ROOTFS@$CONTAINER" &>/dev/null; then
-		zfs destroy "$ROOTFS@$CONTAINER" ||
+	ROOTFS_PARENT=$(dirname "$(get_mounted_rootfs_name)")
+	if zfs list "$ROOTFS_PARENT@$CONTAINER" &>/dev/null; then
+		zfs destroy -r "$ROOTFS_PARENT@$CONTAINER" ||
 			die "failed to destroy container snapshot: '$CONTAINER'"
 	fi
 
@@ -367,14 +417,28 @@ function convert_to_bootfs() {
 	convert_to_bootfs_cleanup
 	trap - EXIT
 
-	zfs umount "rpool/ROOT/$CONTAINER" ||
-		die "'zfs umount rpool/ROOT/$CONTAINER' failed"
+	zfs umount "rpool/ROOT/$CONTAINER/data" ||
+		die "'zfs umount rpool/ROOT/$CONTAINER/data' failed"
+	zfs set mountpoint=/var/delphix "rpool/ROOT/$CONTAINER/data" ||
+		die "'zfs set mountpoint rpool/ROOT/$CONTAINER/data' failed"
 
-	zfs set canmount=noauto "rpool/ROOT/$CONTAINER" ||
-		die "'zfs set canmount=noauto rpool/ROOT/$CONTAINER' failed"
+	zfs umount "rpool/ROOT/$CONTAINER/home" ||
+		die "'zfs umount rpool/ROOT/$CONTAINER/home' failed"
+	zfs set mountpoint=/export/home "rpool/ROOT/$CONTAINER/home" ||
+		die "'zfs set mountpoint rpool/ROOT/$CONTAINER/home' failed"
 
-	zfs set mountpoint=/ "rpool/ROOT/$CONTAINER" ||
-		die "'zfs set mountpoint=/ rpool/ROOT/$CONTAINER' failed"
+	zfs umount "rpool/ROOT/$CONTAINER/root" ||
+		die "'zfs umount rpool/ROOT/$CONTAINER/root' failed"
+	zfs set mountpoint=/ "rpool/ROOT/$CONTAINER/root" ||
+		die "zfs set mountpoint rpool/ROOT/$CONTAINER/root' failed"
+
+	ROOTFS_PARENT=$(dirname "$(get_mounted_rootfs_name)")
+	zfs set canmount=noauto "$ROOTFS_PARENT/data" ||
+		die "'zfs set canmount $ROOTFS_PARENT/data' failed"
+	zfs set canmount=noauto "$ROOTFS_PARENT/home" ||
+		die "'zfs set canmount $ROOTFS_PARENT/home' failed"
+	zfs set canmount=noauto "$ROOTFS_PARENT/root" ||
+		die "'zfs set canmount $ROOTFS_PARENT/root' failed"
 }
 
 function migrate_password_for_user() {
@@ -396,19 +460,6 @@ function migrate_file() {
 			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
 		cp "$path" "/var/lib/machines/${CONTAINER}${path}" ||
 			die "'cp $path' failed for '$CONTAINER'"
-	fi
-}
-
-function migrate_directory() {
-	local path="$1"
-	local parentdir
-
-	if [[ -d "$path" ]]; then
-		parentdir="$(dirname "$path")"
-		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
-			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
-		cp -a "$path" "/var/lib/machines/${CONTAINER}${path}" ||
-			die "'cp -a $path' failed for '$CONTAINER'"
 	fi
 }
 
@@ -500,16 +551,6 @@ function migrate_configuration() {
 	EOF
 
 	#
-	# This directory is specific to the delphix virtualization and
-	# masking applications, and must be preserved across upgrades.
-	#
-	while read -r file; do
-		migrate_directory "$file"
-	done <<-EOF
-		/var/delphix
-	EOF
-
-	#
 	# The files listed here are dynamically generated and/or
 	# modified by appliance-build.
 	#
@@ -548,16 +589,11 @@ function usage() {
 case "$1" in
 create)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
 
 	case "$2" in
-	in-place)
-		[[ $# -gt 2 ]] && usage "too many arguments specified"
-		create_upgrade_container_in_place
-		;;
-	not-in-place)
-		[[ $# -lt 2 ]] && usage "too few arguments specified"
-		[[ $# -gt 2 ]] && usage "too many arguments specified"
-		create_upgrade_container_not_in_place
+	in-place | not-in-place)
+		create_upgrade_container "$2"
 		;;
 	*)
 		usage "invalid create type specified: '$2'"

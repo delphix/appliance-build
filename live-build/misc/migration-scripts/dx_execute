@@ -78,11 +78,11 @@ RPOOL=${RDS%%/*}
 #
 # Ensure that the expected Linux dataset layout exists.
 #
-[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 2 ]] ||
+[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 5 ]] ||
 	die "could not find the expected linux dataset layout"
-LX_RPOOL_ROOT=$(zfs list -o name -H "$RPOOL/ROOT")
-[[ -n $LX_RPOOL_ROOT ]] || die "could not find Linux ROOT dataset"
-LX_RDS=$(zfs list -o name -Hr "$RPOOL/ROOT" | tail -n 1)
+LX_RDS_PARENT=$(zfs list -o name -H -d 1 "$RPOOL/ROOT" | tail -n 1)
+[[ -n $LX_RDS_PARENT ]] || die "could not find Linux RDS parent dataset"
+LX_RDS="$LX_RDS_PARENT/root"
 
 #
 # Ensure that the expected bootloader fields are there.
