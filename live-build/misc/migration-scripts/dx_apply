@@ -134,22 +134,30 @@ zfs mount "$RPOOL/ROOT/$FSNAME/root" ||
 	die "failed to mount $RPOOL/ROOT/$FSNAME/root in temporary dir $TMP_ROOT"
 
 zfs create \
-	-o canmount=on \
 	-o compression=on \
-	-o mountpoint="$TMP_ROOT/export/home" \
+	-o mountpoint=legacy \
 	"$RPOOL/ROOT/$FSNAME/home" ||
 	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/home"
 
 zfs create \
-	-o canmount=on \
 	-o compression=on \
-	-o mountpoint="$TMP_ROOT/var/delphix" \
+	-o mountpoint=legacy \
 	"$RPOOL/ROOT/$FSNAME/data" ||
 	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/data"
+
+mkdir -p "$TMP_ROOT/export/home"
+mount -F zfs "$RPOOL/ROOT/$FSNAME/home" "$TMP_ROOT/export/home"
+
+mkdir -p "$TMP_ROOT/var/delphix"
+mount -F zfs "$RPOOL/ROOT/$FSNAME/data" "$TMP_ROOT/var/delphix"
 
 (
 	cd "$TMP_ROOT"
 	cpio -imu
+	cat <<-EOF >"/etc/fstab"
+		$RPOOL/ROOT/$FSNAME/home /export/home zfs defaults 0 0
+		$RPOOL/ROOT/$FSNAME/data /var/delphix zfs defaults 0 0
+	EOF
 ) <"$ARCHIVE_DIR/os-root.cpio" 2>&1 ||
 	die "failed to unpack os-root.cpio"
 
@@ -261,17 +269,13 @@ MAIN_MENU_FICL=(
 } >>/boot/menu.rc.local ||
 	die "failed to update /boot/menu.rc.local"
 
-zfs umount "$RPOOL/ROOT/$FSNAME/data" ||
-	die "couldn't unmount linux dataset $RPOOL/ROOT/$FSNAME/data"
-zfs umount "$RPOOL/ROOT/$FSNAME/home" ||
-	die "couldn't unmount linux dataset $RPOOL/ROOT/$FSNAME/home"
+umount "$TMP_ROOT/var/delphix" ||
+	die "couldn't unmount linux directory $TMP_ROOT/var/delphix"
+umount "$TMP_ROOT/export/home" ||
+	die "couldn't unmount linux dataset $TMP_ROOT/export/home"
+
 zfs umount "$RPOOL/ROOT/$FSNAME/root" ||
 	die "couldn't unmount linux dataset $RPOOL/ROOT/$FSNAME/root"
-
-zfs set mountpoint=/var/delphix "$RPOOL/ROOT/$FSNAME/data" ||
-	die "could not set mountpoint for linux dataset $RPOOL/ROOT/$FSNAME/data"
-zfs set mountpoint=/export/home "$RPOOL/ROOT/$FSNAME/home" ||
-	die "could not set mountpoint for linux dataset $RPOOL/ROOT/$FSNAME/home"
 zfs set mountpoint=/ "$RPOOL/ROOT/$FSNAME/root" ||
 	die "could not set mountpoint for linux dataset $RPOOL/ROOT/$FSNAME/root"
 

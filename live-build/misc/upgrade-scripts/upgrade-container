@@ -131,20 +131,29 @@ function create_upgrade_container() {
 	# container.
 	#
 	zfs clone \
-		-o canmount=on \
 		-o compression=on \
-		-o mountpoint="$DIRECTORY/export/home" \
+		-o mountpoint=legacy \
 		"$ROOTFS_PARENT/home@$CONTAINER" \
 		"rpool/ROOT/$CONTAINER/home" ||
 		die "failed to create upgrade /export/home clone"
 
 	zfs clone \
-		-o canmount=on \
 		-o compression=on \
-		-o mountpoint="$DIRECTORY/var/delphix" \
+		-o mountpoint=legacy \
 		"$ROOTFS_PARENT/data@$CONTAINER" \
 		"rpool/ROOT/$CONTAINER/data" ||
 		die "failed to create upgrade /var/delphix clone"
+
+	#
+	# We rely on the "/etc/fstab" file to mount the non-root ZFS
+	# filesystems, so that when a specific rootfs dataset is booted,
+	# it'll automatically mount the correct non-rootfs datasets
+	# associated with that rootfs dataset.
+	#
+	cat <<-EOF >"$DIRECTORY/etc/fstab"
+		rpool/ROOT/$CONTAINER/home /export/home zfs defaults 0 0
+		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults 0 0
+	EOF
 
 	mkdir -p "/etc/systemd/nspawn" ||
 		die "failed to create directory: '/etc/systemd/nspawn'"
@@ -346,7 +355,10 @@ function destroy() {
 }
 
 function run() {
-	systemd-run --machine="$CONTAINER" --setenv=CONTAINER="$CONTAINER" --quiet --wait --pipe -- "$@"
+	systemd-run \
+		--machine="$CONTAINER" \
+		--setenv=CONTAINER="$CONTAINER" \
+		--quiet --wait --pipe -- "$@"
 }
 
 function get_bootloader_devices() {
@@ -417,28 +429,10 @@ function convert_to_bootfs() {
 	convert_to_bootfs_cleanup
 	trap - EXIT
 
-	zfs umount "rpool/ROOT/$CONTAINER/data" ||
-		die "'zfs umount rpool/ROOT/$CONTAINER/data' failed"
-	zfs set mountpoint=/var/delphix "rpool/ROOT/$CONTAINER/data" ||
-		die "'zfs set mountpoint rpool/ROOT/$CONTAINER/data' failed"
-
-	zfs umount "rpool/ROOT/$CONTAINER/home" ||
-		die "'zfs umount rpool/ROOT/$CONTAINER/home' failed"
-	zfs set mountpoint=/export/home "rpool/ROOT/$CONTAINER/home" ||
-		die "'zfs set mountpoint rpool/ROOT/$CONTAINER/home' failed"
-
 	zfs umount "rpool/ROOT/$CONTAINER/root" ||
 		die "'zfs umount rpool/ROOT/$CONTAINER/root' failed"
 	zfs set mountpoint=/ "rpool/ROOT/$CONTAINER/root" ||
 		die "zfs set mountpoint rpool/ROOT/$CONTAINER/root' failed"
-
-	ROOTFS_PARENT=$(dirname "$(get_mounted_rootfs_name)")
-	zfs set canmount=noauto "$ROOTFS_PARENT/data" ||
-		die "'zfs set canmount $ROOTFS_PARENT/data' failed"
-	zfs set canmount=noauto "$ROOTFS_PARENT/home" ||
-		die "'zfs set canmount $ROOTFS_PARENT/home' failed"
-	zfs set canmount=noauto "$ROOTFS_PARENT/root" ||
-		die "'zfs set canmount $ROOTFS_PARENT/root' failed"
 }
 
 function migrate_password_for_user() {
