@@ -17,8 +17,17 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
+IMAGE_PATH=$(get_image_path)
+[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
+
 IMAGE_VERSION=$(get_image_version)
 [[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+
+UPDATE_DIR="$(dirname "$IMAGE_PATH")"
+[[ -n "$UPDATE_DIR" ]] || die "failed to determine update directory"
+
+LOG_DIR="${UPDATE_DIR}/verify-logs"
+LOG_SCRIPT="/opt/delphix/server/bin/support_info"
 
 function usage() {
 	echo "$(basename "$0"): $*" >&2
@@ -26,19 +35,10 @@ function usage() {
 	exit 2
 }
 
-function cleanup() {
+function run_support_info_script() {
 	local rc="$?"
 
-	#
-	# Persist container logs by saving to the container's host.
-	# Delete and create verify log destination directory to save only one copy of log to limit
-	# space usage.
-	#
-	rm -rf "${UPDATE_VERIFY_LOG_DIR:?}" ||
-		die "Failed to remove verify log directory ${UPDATE_VERIFY_LOG_DIR}."
-	mkdir -p "${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}" ||
-		die "Failed to create verify log directory ${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}."
-	${SUPPORT_INFO_SCRIPT} -o "${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}" -t "log dropbox" ||
+	"${LOG_SCRIPT}" -o "${LOG_DIR}/${CONTAINER}" -t "log dropbox" ||
 		die "Failed to collect verify logs."
 
 	return "$rc"
@@ -63,14 +63,30 @@ if $opt_d; then
 	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
 fi
 
-trap cleanup EXIT
+#
+# We use this directory to store the upgrade verification logs of this
+# container. This directory is accessible from both the container, and
+# the host. This allows the software running on the host to easily
+# access the logs after the verification is performed.
+#
+# Additionally, we only want to save the logs for one verification
+# invocation at any given time; mostly to avoid these logs from
+# consuming storage unnecessarily. Thus, we delete the existing
+# directory first, and then recreate an empty directory.
+#
+rm -rf "${LOG_DIR:?}" ||
+	die "failed to remove directory: '${LOG_DIR}'"
+mkdir -p "${LOG_DIR}/${CONTAINER}" ||
+	die "failed to create directory: '${LOG_DIR}/${CONTAINER}'"
+
+trap run_support_info_script EXIT
 
 /usr/bin/java \
 	-Dlog.dir=/var/delphix/server/upgrade-verify \
 	-Dmdsverify=true \
 	$VERIFY_DEBUG_OPT \
 	-jar /opt/delphix/server/lib/exec/upgrade-verify/upgrade-verify.jar \
-	-d "${opt_o:-$DROPBOX_DIR/upgrade_verify_report.json}" \
+	-d "${opt_o:-${LOG_DIR}/${CONTAINER}/upgrade_verify_report.json}" \
 	-f "${opt_f:-1}" \
 	-l "${opt_l:-en-US}" \
 	-v "$IMAGE_VERSION" \

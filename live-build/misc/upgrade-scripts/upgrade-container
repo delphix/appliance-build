@@ -235,18 +235,6 @@ function create_upgrade_container() {
 	fi
 
 	#
-	# Lastly, we expose the host's DROPBOX_DIR to the container, so
-	# that this directory can be used from within the container, to
-	# store files that need to be preserved after the container is
-	# destroyed; e.g. logs of the upgrade verification java process
-	# are stored here (by default).
-	#
-	cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
-		Bind=$DROPBOX_DIR
-	EOF
-		die "failed to add '$DROPBOX_DIR' to container config file"
-
-	#
 	# We want to enable all available capabilities to the container
 	# that we will use to run the ugprade verification. Ideally, we
 	# would accomplish this by using "CAPABILITY=all" in the

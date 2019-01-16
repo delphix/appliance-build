@@ -15,12 +15,6 @@
 # limitations under the License.
 #
 
-# shellcheck disable=SC2034
-UPDATE_DIR=${UPDATE_DIR:-"/var/dlpx-update"}
-UPDATE_VERIFY_LOG_DIR=${UPDATE_DIR}/verify-logs
-SUPPORT_INFO_SCRIPT=${SUPPORT_INFO_SCRIPT:-"/opt/delphix/server/bin/support_info"}
-DROPBOX_DIR=${DROPBOX_DIR:-"/var/delphix/dropbox"}
-
 function die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1
