@@ -235,6 +235,21 @@ function create_upgrade_container() {
 	fi
 
 	#
+	# Lastly, we create the log directory and bind mount this into
+	# the container. This is meant as a way for software running in
+	# the container, to share files with software running on the
+	# host; e.g. during upgrade verify, this directory can be used
+	# to store logs, such that they persist after the container is
+	# destroyed.
+	#
+	mkdir -p "$LOG_DIRECTORY" ||
+		die "failed to create directory: '$LOG_DIRECTORY'"
+	cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+		Bind=$LOG_DIRECTORY
+	EOF
+		die "failed to add '$LOG_DIRECTORY' to container config file"
+
+	#
 	# We want to enable all available capabilities to the container
 	# that we will use to run the ugprade verification. Ideally, we
 	# would accomplish this by using "CAPABILITY=all" in the

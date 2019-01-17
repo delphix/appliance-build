@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+# shellcheck disable=SC2034
+LOG_DIRECTORY="/var/log/delphix-upgrade"
+
 function die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1
