@@ -235,16 +235,19 @@ function create_upgrade_container() {
 	fi
 
 	#
-	# Lastly, we expose the host's DROPBOX_DIR to the container, so
-	# that this directory can be used from within the container, to
-	# store files that need to be preserved after the container is
-	# destroyed; e.g. logs of the upgrade verification java process
-	# are stored here (by default).
+	# Lastly, we create the log directory and bind mount this into
+	# the container. This is meant as a way for software running in
+	# the container, to share files with software running on the
+	# host; e.g. during upgrade verify, this directory can be used
+	# to store logs, such that they persist after the container is
+	# destroyed.
 	#
+	mkdir -p "$LOG_DIRECTORY" ||
+		die "failed to create directory: '$LOG_DIRECTORY'"
 	cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
-		Bind=$DROPBOX_DIR
+		Bind=$LOG_DIRECTORY
 	EOF
-		die "failed to add '$DROPBOX_DIR' to container config file"
+		die "failed to add '$LOG_DIRECTORY' to container config file"
 
 	#
 	# We want to enable all available capabilities to the container

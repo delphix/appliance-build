@@ -26,20 +26,12 @@ function usage() {
 	exit 2
 }
 
-function cleanup() {
+function run_support_info() {
 	local rc="$?"
 
-	#
-	# Persist container logs by saving to the container's host.
-	# Delete and create verify log destination directory to save only one copy of log to limit
-	# space usage.
-	#
-	rm -rf "${UPDATE_VERIFY_LOG_DIR:?}" ||
-		die "Failed to remove verify log directory ${UPDATE_VERIFY_LOG_DIR}."
-	mkdir -p "${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}" ||
-		die "Failed to create verify log directory ${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}."
-	${SUPPORT_INFO_SCRIPT} -o "${UPDATE_VERIFY_LOG_DIR}/${CONTAINER}" -t "log dropbox" ||
-		die "Failed to collect verify logs."
+	/opt/delphix/server/bin/support_info \
+		-o "${LOG_DIRECTORY}/${CONTAINER}" \
+		-t "log dropbox" || die "Failed to collect verify logs."
 
 	return "$rc"
 }
@@ -63,14 +55,23 @@ if $opt_d; then
 	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
 fi
 
-trap cleanup EXIT
+#
+# We use this directory to store the upgrade verification logs of this
+# container. This directory is accessible from both the container, and
+# the host. This allows the software running on the host to easily
+# access the logs after the verification is performed.
+#
+mkdir -p "${LOG_DIRECTORY}/${CONTAINER}" ||
+	die "failed to create directory: '${LOG_DIRECTORY}/${CONTAINER}'"
+
+trap run_support_info EXIT
 
 /usr/bin/java \
 	-Dlog.dir=/var/delphix/server/upgrade-verify \
 	-Dmdsverify=true \
 	$VERIFY_DEBUG_OPT \
 	-jar /opt/delphix/server/lib/exec/upgrade-verify/upgrade-verify.jar \
-	-d "${opt_o:-$DROPBOX_DIR/upgrade_verify_report.json}" \
+	-d "${opt_o:-${LOG_DIRECTORY}/${CONTAINER}/upgrade_verify.json}" \
 	-f "${opt_f:-1}" \
 	-l "${opt_l:-en-US}" \
 	-v "$IMAGE_VERSION" \

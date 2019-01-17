@@ -16,10 +16,7 @@
 #
 
 # shellcheck disable=SC2034
-UPDATE_DIR=${UPDATE_DIR:-"/var/dlpx-update"}
-UPDATE_VERIFY_LOG_DIR=${UPDATE_DIR}/verify-logs
-SUPPORT_INFO_SCRIPT=${SUPPORT_INFO_SCRIPT:-"/opt/delphix/server/bin/support_info"}
-DROPBOX_DIR=${DROPBOX_DIR:-"/var/delphix/dropbox"}
+LOG_DIRECTORY="/var/log/delphix-upgrade"
 
 function die() {
 	echo "$(basename "$0"): $*" >&2
