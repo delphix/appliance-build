@@ -205,6 +205,21 @@ function create_upgrade_container() {
 	done
 
 	#
+	# Since UPDATE_DIR is stored on a seperate ZFS filesystem than
+	# the root filesysytem, we need to explicitly make this
+	# directory available inside of the upgrade container,
+	# which is what we're doing here.
+	#
+	# We need UPDATE_DIR to be available inside of the container so
+	# that we can use the APT repository that it contains to upgrade
+	# the packages inside the container, and verify that process.
+	#
+	cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+		Bind=$UPDATE_DIR
+	EOF
+		die "failed to add '$UPDATE_DIR' to container config file"
+
+	#
 	# We also need to make "/domain0" available from within the
 	# container, since that's required by the "upgrade-verify" JAR
 	# that's run later. This allows the Virtualization upgrade
