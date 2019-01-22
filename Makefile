@@ -24,7 +24,7 @@ FINDEXEC := $(FINDEXEC.$(shell uname -s))
 
 SHELL_CHECKSTYLE_FILES = $(shell find scripts -type f $(FINDEXEC)) \
                 $(shell find live-build/misc/live-build-hooks -type f $(FINDEXEC)) \
-                $(shell find live-build/misc/upgrade-scripts -type f) \
+                $(shell find live-build/misc/upgrade-scripts -type f | grep -v README.md) \
                 $(shell find live-build/misc/migration-scripts -type f)
 
 .PHONY: \
