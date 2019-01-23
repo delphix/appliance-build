@@ -133,6 +133,28 @@ zfs create \
 	"rpool/ROOT/$FSNAME/data"
 
 #
+# Initialize the grub dataset. This dataset will be used to contain all
+# of the grub-specific files; this includes the "grub.cfg" file, along
+# with the files created when running "grub-install".
+#
+# We maintain a seperate dataset for grub, so that we can maintain it
+# differently than how we maintain and version the root filesystems.
+# This allows us to have a single configuration for the bootloader,
+# spanning all of the root filesystems that may be present on the
+# system; rather than trying to have a configuration on each root
+# filesystem, and trying to keep them all consistent with each other.
+#
+# Additionally, we use the "legacy" mountpoint so we can carefully
+# control when this dataset is mounted, to help ensure the dataset isn't
+# modified unexpectedly. Thus, we mount it on-demand when we need to
+# make changes to it, and then quickly unmount it.
+#
+zfs create \
+	-o compression=on \
+	-o mountpoint=legacy \
+	rpool/grub
+
+#
 # Initialize the crashdump dataset. This is used to store core files
 # from processes that have crashed. Since we don't have control on how
 # many of these core files accumulate, we set a reasonable quota (25% of
@@ -187,8 +209,14 @@ for dir in /dev /proc /sys; do
 	mount --make-rslave "${DIRECTORY}${dir}"
 done
 
-chroot "$DIRECTORY" grub-install "/dev/$LOOPNAME"
-chroot "$DIRECTORY" update-grub
+#
+# We need to use the dedicated grub dataset when running "grub-install"
+# and "grub-mkconfig", so we need to mount this dataset first.
+#
+chroot "$DIRECTORY" mount -t zfs rpool/grub /mnt
+chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
+chroot "$DIRECTORY" grub-install --root-directory=/mnt "/dev/$LOOPNAME"
+chroot "$DIRECTORY" umount /mnt
 
 for dir in /dev /proc /sys; do
 	umount -R "${DIRECTORY}${dir}"
