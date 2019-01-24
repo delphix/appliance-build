@@ -381,6 +381,9 @@ function get_bootloader_devices() {
 }
 
 function convert_to_bootfs_cleanup() {
+	umount "/var/lib/machines/$CONTAINER/mnt" ||
+		warn "'umount' of '/var/lib/machines/$CONTAINER/mnt' failed"
+
 	for dir in /proc /sys /dev; do
 		umount -R "/var/lib/machines/${CONTAINER}${dir}" ||
 			warn "'umount -R' of '$dir' failed"
@@ -414,8 +417,8 @@ function convert_to_bootfs() {
 			die "'mount --make-rslave' of '$dir' failed"
 	done
 
-	chroot "/var/lib/machines/$CONTAINER" update-grub ||
-		die "'update-grub' failed in '$CONTAINER'"
+	mount -t zfs rpool/grub "/var/lib/machines/$CONTAINER/mnt" ||
+		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
 
 	for dev in $(get_bootloader_devices); do
 		[[ -e "/dev/$dev" ]] ||
@@ -425,9 +428,13 @@ function convert_to_bootfs() {
 			die "bootloader device '/dev/$dev' not block device"
 
 		chroot "/var/lib/machines/$CONTAINER" \
-			grub-install "/dev/$dev" ||
-			die "'grub-install /dev/$dev' failed in '$CONTAINER'"
+			grub-install --root-directory=/mnt "/dev/$dev" ||
+			die "'grub-install' for '$dev' failed in '$CONTAINER'"
 	done
+
+	chroot "/var/lib/machines/$CONTAINER" \
+		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+		die "'grub-mkconfig' failed in '$CONTAINER'"
 
 	convert_to_bootfs_cleanup
 	trap - EXIT
