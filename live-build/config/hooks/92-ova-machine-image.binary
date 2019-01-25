@@ -1,0 +1,82 @@
+#!/bin/bash -ex
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+[[ "$APPLIANCE_PLATFORM" == esx ]] || exit 0
+
+#
+# This script is intended to be used as part of Delphix's build process.
+# It's role is to generate an OVA virtual machine image, using the
+# previously created ".vmdk" disk image as the VM's boot disk.
+#
+
+source /usr/share/livecd-rootfs/live-build/functions
+
+#
+# We want to use different virtual hardware configuration depending on
+# if we're building an OVA meant for internal uses (e.g. we'll use it
+# for development) or external uses (e.g. we'll give it to customers).
+#
+case "$APPLIANCE_VARIANT" in
+internal-*)
+	CPUS_COUNT=2
+	MEMORY_MB=$((8 * 1024))
+	;;
+external-*)
+	CPUS_COUNT=8
+	MEMORY_MB=$((64 * 1024))
+	;;
+*)
+	echo "Invalid variant specified: '$APPLIANCE_VARIANT'" 1>&2
+	exit 1
+	;;
+esac
+
+DATE=$(date --utc --iso-8601=seconds)
+
+VMDK_FILESIZE=$(qemu-img info --output=json "$ARTIFACT_NAME.vmdk" |
+	jq '.["actual-size"]')
+VMDK_CAPACITY=$(qemu-img info --output=json "$ARTIFACT_NAME.vmdk" |
+	jq '.["virtual-size"]')
+
+OVA_DIRECTORY=$(mktemp -d -p . tmp.ova.XXXXXXXXXX)
+
+cp "$ARTIFACT_NAME.vmdk" "$OVA_DIRECTORY/$ARTIFACT_NAME.vmdk"
+
+cp config/hooks/template.ovf "$OVA_DIRECTORY/$ARTIFACT_NAME.ovf"
+sed -i "$OVA_DIRECTORY/$ARTIFACT_NAME.ovf" \
+	-e "s/@@VMDK_FILENAME@@/$ARTIFACT_NAME.vmdk/g" \
+	-e "s/@@VMDK_FILESIZE@@/$VMDK_FILESIZE/g" \
+	-e "s/@@VMDK_CAPACITY@@/$VMDK_CAPACITY/g" \
+	-e "s/@@CPUS_COUNT@@/$CPUS_COUNT/g" \
+	-e "s/@@MEMORY_MB@@/$MEMORY_MB/g" \
+	-e "s/@@VM_NAME@@/Delphix Appliance $DATE/g"
+
+find "$OVA_DIRECTORY" -type f | while read -r file; do
+	NAME=$(basename "$file")
+	HASH=$(sha1sum "$file" | awk '{print $1}')
+	cat <<-EOF >>"$OVA_DIRECTORY/$ARTIFACT_NAME.mf"
+		SHA1($NAME)= $HASH
+	EOF
+done
+
+rm -f "$ARTIFACT_NAME.ova"
+tar -C "$OVA_DIRECTORY" -cf "$ARTIFACT_NAME.ova" \
+	"$ARTIFACT_NAME.ovf" \
+	"$ARTIFACT_NAME.mf" \
+	"$ARTIFACT_NAME.vmdk"
+
+rm -rf "$OVA_DIRECTORY"

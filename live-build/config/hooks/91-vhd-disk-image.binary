@@ -1,3 +1,4 @@
+#!/bin/bash -ex
 #
 # Copyright 2018 Delphix
 #
@@ -14,6 +15,13 @@
 # limitations under the License.
 #
 
-.gradle/
-.gradleUserHome/
-build/
+#
+# This script is intended to be used as part of Delphix's build process.
+# It's role is to convert the ".img" file previously generated, and
+# assumed to be a "raw" disk image, into a VHD formated disk image.
+#
+
+[[ "$APPLIANCE_PLATFORM" == azure ]] || exit 0
+
+qemu-img convert "$ARTIFACT_NAME.img" \
+	-O vpc -o subformat=fixed "$ARTIFACT_NAME.vhd"
