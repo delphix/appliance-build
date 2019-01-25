@@ -1,0 +1,145 @@
+#!/bin/bash -eux
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# This script is intended to be used as part of Delphix's build process.
+# Its role is to generate a tar archive that contains all of the debian
+# packages that exist on the build for this platform. The collection
+# of packages for each platform will eventually be merged to create a
+# single upgrade image; see scripts/build-upgrade-image.sh for details.
+#
+
+set -o pipefail
+
+#
+# Sanity check to make sure we haven't installed multiple kernel versions.
+# This could happen if the version of the ZFS modules we install is not the
+# same as the kernel version installed with the package 'linux-generic'.
+#
+# If the kernel version of the ZFS packages is lower than the one for
+# 'linux-generic' then we will boot into a kernel that doesn't have Delphix ZFS
+# modules and will use the built-in Ubuntu ones (while using Delphix userland
+# packages, which are not compatible). If on the other hand the kernel version
+# is higher, then we will boot into a kernel image that contains our ZFS
+# modules (ZFS modules depend on 'linux-image-KVERS', and will install it
+# along). However, the 'linux-generic' package has more dependencies than just
+# 'linux-image-KVERS', which will not be installed along with the ZFS modules
+# for the running kernel version, and which our appliance expects to have.
+#
+# shellcheck disable=SC2012
+if [[ $(ls binary/lib/modules | wc -l) -gt 1 ]]; then
+	echo "Error: multiple kernel versions detected:" >&2
+	ls binary/lib/modules >&2
+	exit 1
+fi
+
+#
+# Here, we generate a list of all of the packages that have been
+# installed in the "binary" chroot directory, including package version,
+# and then use this list to download each of these packages.
+#
+# We must perform the package download while chrooted in the binary
+# directory to ensure we use the same APT sources that were used when
+# installing the packages.
+#
+# This directory of download packages will later be passed to Aptly to
+# build our "upgrade repository".
+#
+chroot binary bash -eux <<'EOF'
+set -o pipefail
+
+mkdir -p /packages
+cd /packages
+
+apt-get update
+
+dpkg-query -Wf '${Package}=${Version}\n' | xargs apt-get download
+EOF
+
+#
+# After downloading the packages, the package filenames any have the
+# sequence of characters "%3a" embedded in them. These characters cause
+# problems when the files are exported over HTTP via the Aptly served
+# repository. Thus, we convert this sequence back to the original ":"
+# character (which is what the sequence represents) as a workaround, so
+# the files can be properly served by Aptly.
+#
+rename 's/\%3a/:/g' binary/packages/*.deb
+
+#
+# Now we need to create the "delphix-entire" metapackage that will
+# depend on all of the packages that have been installed in the binary
+# chroot environment.
+#
+cp config/hooks/template.ctl delphix-entire.ctl
+
+# shellcheck disable=SC2016
+DEPENDS=$(chroot binary \
+	dpkg-query -Wf '${Package} (=${Version}), ' | sed 's/, $//')
+
+if chroot binary dpkg -l delphix-virtualization &>/dev/null; then
+	#
+	# If the delphix-virtualization package is installed in this
+	# variant, we want the delphix-entire's package version to match
+	# the version of the delphix-virtualization package. The upgrade
+	# logic contained in the virtualization application requires
+	# these two package verions to match.
+	#
+	# shellcheck disable=SC2016
+	VERSION=$(chroot binary dpkg-query \
+		-Wf '${Version}' delphix-virtualization)
+else
+	#
+	# If the delphix-virtualization package is not installed in this
+	# variant, then we just use a default value for the version,
+	# based on when he build occurs. In this case, we only need the
+	# version to be larger than any previous build, to enable
+	# upgrades from one build to another (e.g. when manually using
+	# the "execute" upgrade script).
+	#
+	VERSION=$(date '+%Y.%m.%d.%H')
+fi
+
+sed -i "s/@@DEPENDS@@/$DEPENDS/" delphix-entire.ctl
+sed -i "s/@@VARIANT@@/$APPLIANCE_VARIANT/" delphix-entire.ctl
+sed -i "s/@@VERSION@@/$VERSION/" delphix-entire.ctl
+sed -i "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/" delphix-entire.ctl
+
+equivs-build delphix-entire.ctl
+
+#
+# Once we have the "delphix-entire" metapackage built, we need to
+# install it into the variant's binary chroot environment, so that the
+# appliance has this package installed. Otherwise, this package would
+# wind up in the upgrade repository, but not already installed in a
+# running appliance that hasn't yet be upgraded.
+#
+DEBS_DIRECTORY=$(mktemp -d -p /tmp tmp.debs.XXXXXXXXXX)
+
+cp ./*.deb "$DEBS_DIRECTORY"
+mv "$DEBS_DIRECTORY" "binary/$DEBS_DIRECTORY"
+chroot binary bash -c "dpkg -i $DEBS_DIRECTORY/*.deb"
+
+rm -rf "binary/$DEBS_DIRECTORY"
+
+#
+# This intermediate build artifact is eventually used to build an
+# upgrade image. See scripts/build-upgrade-image.sh for details.
+#
+tar -czf "$ARTIFACT_NAME.debs.tar.gz" ./*.deb -C binary/packages .
+
+rm -rf binary/packages

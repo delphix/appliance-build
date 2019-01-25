@@ -1,3 +1,4 @@
+#!/bin/bash -ex
 #
 # Copyright 2018 Delphix
 #
@@ -14,6 +15,14 @@
 # limitations under the License.
 #
 
-.gradle/
-.gradleUserHome/
-build/
+#
+# This script is intended to be used as part of Delphix's build process.
+# It's role is to convert the ".img" file previously generated, and
+# assumed to be a "raw" disk image, into a qcow2 formated disk image.
+#
+
+[[ "$APPLIANCE_PLATFORM" == kvm ]] || exit 0
+
+source /usr/share/livecd-rootfs/live-build/functions
+rm -f "$ARTIFACT_NAME.qcow2"
+convert_to_qcow2 "$ARTIFACT_NAME.img" "$ARTIFACT_NAME.qcow2"

@@ -1,0 +1,140 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+. "${BASH_SOURCE%/*}/common.sh"
+
+IMAGE_PATH=$(get_image_path)
+[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
+
+set -o pipefail
+
+function usage() {
+	echo "$(basename "$0"): $*" >&2
+	echo "Usage: $(basename "$0") -p <platform>"
+	exit 2
+}
+
+function apt_get() {
+	DEBIAN_FRONTEND=noninteractive apt-get \
+		-o Dpkg::Options::="--force-confdef" \
+		-o Dpkg::Options::="--force-confold" \
+		"$@"
+}
+
+while getopts ':rlBfsp:' c; do
+	case $c in
+	r | l | B | f | s) ;; # LX-72: For now, silently ignore these.
+	p)
+		platform=$OPTARG
+		;;
+	*) usage "illegal options -- $OPTARG" ;;
+	esac
+done
+
+[[ -z "$platform" ]] && usage "platform must be specified"
+
+#
+# It's possible for delphix-entire not to be already installed on the
+# root filesystem being upgraded when we're doing a not-in-place upgrade.
+# Thus, when we can't determine the installed version of delphix-entire,
+# we assume we're doing a not-in-place upgrade, and skip this check.
+#
+INSTALLED_VERSION=$(get_installed_version)
+[[ -n "$INSTALLED_VERSION" ]] && verify_upgrade_is_allowed
+
+if [[ -f /etc/apt/sources.list ]]; then
+	mv /etc/apt/sources.list /etc/apt/sources.list.orig ||
+		die "failed to save /etc/apt/sources.list"
+fi
+
+cat <<EOF >/etc/apt/sources.list ||
+deb [trusted=yes] file://$IMAGE_PATH/public bionic delphix
+EOF
+	die "failed to configure apt sources"
+
+apt_get update || die "failed to update apt sources"
+
+#
+# First make sure delphix-platform-<platform> is installed. This package
+# is a dependency of delphix-entire-<platform> and would be installed
+# even if we just directly installed delphix-entire-<platform>. However,
+# there are problems related to virtual packages that arise if we just
+# directly install delphix-entire-<platform>. In particular, if
+# delphix-entire is installed first, the following can happen (using
+# AWS as the example for the platform on which the upgrade is being
+# done):
+#
+#  - We run 'apt-get install delphix-entire-aws'
+#
+#  - Apt sees delphix-entire-aws relies on delphix-virtualization, so it
+#    marks that package and its dependencies for installation. One of
+#    its dependencies is the virtual package delphix-platform.
+#
+#  - Apt sees that there are multiple concrete packages which provide
+#    the delphix-platform virtual package. It chooses one of these
+#    arbitrarily, say delphix-platform-kvm.
+#
+#  - Apt marks all of the transitive dependencies of
+#    delphix-platform-kvm for installation, including, say,
+#    linux-image-4.15.0-1028-kvm.
+#
+#  - After finishing processing the dependencies of
+#    delphix-virtualization, Apt continues processing the other
+#    dependencies of delphix-entire-aws, including delphix-platform-aws.
+#
+#  - Apt sees that delphix-platform-aws conflicts with
+#    delphix-platform-kvm, so it un-marks delphix-platform-kvm for
+#    installation, allowing delphix-platform-aws to satisfy
+#    virtualization's dependency on delphix-platform instead. However,
+#    it does _not_ unmark all of the dependencies of
+#    delphix-platform-kvm, so some unnecessary kvm-related packages end
+#    up being installed, such as linux-image-4.15.0-1028-kvm.
+#
+# In short, we can end up with some unwanted packages installed because
+# Apt marked and then unmarked some package for installation while
+# trying to satisfy a dependency on a virtual package.
+#
+# To avoid this we install the delphix-platform-<platform> package that
+# we want before installing delphix-entire-<platform>. If some
+# delphix-platform package is already installed, that dependency is
+# already satisfied and Apt doesn't need to choose an arbitrary one to
+# satisfy the dependency.
+#
+# In general, we don't want upgrade to need know too much about the set
+# of packages to be installed. However, it seems reasonable to make an
+# exception for delphix-platform because delphix-platform is a
+# fundemental piece of the architecture of the appliance. Among other
+# things, it is the mechanism that we use to orchestrate the installation
+# all of the platform-dependant bits of the appliance.
+#
+apt_get install -y "delphix-platform-$platform" ||
+	die "failed to install delphix-platform"
+
+#
+# Now that we know we have a delphix-platform-<platform> packages
+# installed, go ahead and install delphix-entire-<platform>.
+#
+source_version_information
+apt_get install -y "delphix-entire-$platform=$VERSION" ||
+	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
+
+if [[ -f /etc/apt/sources.list.orig ]]; then
+	mv /etc/apt/sources.list.orig /etc/apt/sources.list ||
+		die "failed to restore /etc/apt/sources.list"
+fi
+
+exit 0

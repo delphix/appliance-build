@@ -51,11 +51,13 @@ $DOCKER_RUN --rm \
 	--env AWS_S3_URI_LINUX_PKG \
 	--env AWS_S3_URI_MASKING \
 	--env AWS_S3_URI_ZFS \
+	--env AWS_S3_URI_LIVEBUILD_ARTIFACTS \
 	--env APPLIANCE_PASSWORD \
 	--env AWS_ACCESS_KEY_ID \
 	--env AWS_SECRET_ACCESS_KEY \
 	--env DELPHIX_SIGNATURE_URL \
 	--env DELPHIX_SIGNATURE_TOKEN \
+	--env DELPHIX_PLATFORMS \
 	--volume "$TOP:/opt/appliance-build" \
 	--workdir "/opt/appliance-build" \
 	appliance-build "$@"
