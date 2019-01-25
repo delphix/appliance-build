@@ -19,6 +19,70 @@
 
 CONTAINER=
 
+function get_dataset_snapshots() {
+	zfs list -rt snapshot -Hpo name "$1"
+}
+
+function get_snapshot_clones() {
+	zfs get clones -Hpo value "$1"
+}
+
+function delete() {
+	zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
+		die "rootfs container '$CONTAINER' does not exist"
+
+	MOUNTED=$(zfs get mounted -Hpo value "rpool/ROOT/$CONTAINER/root")
+	[[ "$MOUNTED" == "no" ]] ||
+		die "cannot delete mounted rootfs container: '$CONTAINER'"
+
+	#
+	# In the common case, the "root" dataset should never have
+	# clones of it. With that said, it is possible for clones to
+	# exist in a couple edge cases:
+	#
+	# 1. When "in-place" upgrade occurs, it'll clone the root
+	#    dataset during the upgrade verification phase; i.e. when
+	#    creating the in-place upgrade container. Thus, if there
+	#    happens to be a concurrent in-place upgrade running, a
+	#    clone of the "root" dataset could exist.
+	#
+	# 2. If an "in-place" upgrade container has been manually
+	#    created, i.e. explicitly via the "upgrade-container"
+	#    script, then it's possible for a clone of the "root"
+	#    dataset to exist.
+	#
+	# Thus, to handle these edge cases, we abort the delete
+	# operation if a clone of "root" exists.
+	#
+	for snap in $(get_dataset_snapshots "rpool/ROOT/$CONTAINER/root"); do
+		for clone in $(get_snapshot_clones "$snap"); do
+			die \
+				"cannot delete rootfs container: '$CONTAINER'," \
+				"'root' dataset clone exists: '$clone'"
+		done
+	done
+
+	#
+	# The "data" and "home" datasets of a rootfs container may have
+	# been cloned as part of an upgrade. Thus, in order to delete
+	# this specific rootfs container, we need to promote any clones
+	# that exist. Otherwise we won't be able to destroy the snapshots
+	# for the "data" and "home" datasets, and thus can't destroy the
+	# datasets themselves.
+	#
+	for snap in \
+		$(get_dataset_snapshots "rpool/ROOT/$CONTAINER/data") \
+		$(get_dataset_snapshots "rpool/ROOT/$CONTAINER/home"); do
+		for clone in $(get_snapshot_clones "$snap"); do
+			zfs promote "$clone" ||
+				die "'zfs promote $clone' failed"
+		done
+	done
+
+	zfs destroy -r "rpool/ROOT/$CONTAINER" ||
+		die "'zfs destroy -r rpool/ROOT/$CONTAINER' failed"
+}
+
 function get_bootloader_devices() {
 	#
 	# When installing/updating the bootloader during upgrade, we
@@ -184,6 +248,7 @@ function usage() {
 	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
 	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
 
+	echo "$PREFIX_SPACES delete <container>"
 	echo "$PREFIX_SPACES set-bootfs <container>"
 
 	exit 2
@@ -192,6 +257,13 @@ function usage() {
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
 case "$1" in
+delete)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+
+	CONTAINER="$2"
+	delete
+	;;
 set-bootfs)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
 	[[ $# -gt 2 ]] && usage "too many arguments specified"
