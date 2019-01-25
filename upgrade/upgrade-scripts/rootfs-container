@@ -1,0 +1,218 @@
+#!/bin/bash
+#
+# Copyright 2019 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+. "${BASH_SOURCE%/*}/common.sh"
+
+CONTAINER=
+
+function get_bootloader_devices() {
+	#
+	# When installing/updating the bootloader during upgrade, we
+	# need to determine which devices are being used as bootloader
+	# devices. We determine this by listing the devices used by the
+	# rpool. Additionally, we have to filter out devices that could
+	# be attached to the rpool, but would never be used for the
+	# bootloader. Finally, we need to strip off any parition
+	# information, since we want to install the bootloader directly
+	# to the device, rather than to a partition of the device.
+	#
+	zpool list -vH rpool |
+		awk '! /rpool|mirror|replacing|spare/ {print $1}' |
+		sed 's/[0-9]*$//'
+}
+
+function set_bootfs_not_mounted_cleanup() {
+	umount "/var/lib/machines/$CONTAINER/mnt" ||
+		warn "'umount' of '/var/lib/machines/$CONTAINER/mnt' failed"
+
+	for dir in /proc /sys /dev; do
+		umount -R "/var/lib/machines/${CONTAINER}${dir}" ||
+			warn "'umount -R' of '$dir' failed"
+	done
+
+	zfs umount "rpool/ROOT/$CONTAINER/root" ||
+		warn "'zfs umount rpool/ROOT/$CONTAINER/root' failed"
+	zfs set mountpoint=/ "rpool/ROOT/$CONTAINER/root" ||
+		warn "zfs set mountpoint rpool/ROOT/$CONTAINER/root' failed"
+}
+
+#
+# This function assumes the rootfs container specified is not currently
+# mounted; see the "set_bootfs_mounted" function for doing this same
+# operation, but for an already mounted rootfs container.
+#
+function set_bootfs_not_mounted() {
+	trap set_bootfs_not_mounted_cleanup EXIT
+
+	zfs set mountpoint="/var/lib/machines/$CONTAINER" \
+		"rpool/ROOT/$CONTAINER/root" ||
+		die "zfs set mountpoint rpool/ROOT/$CONTAINER/root' failed"
+
+	zfs mount "rpool/ROOT/$CONTAINER/root" ||
+		die "'zfs mount rpool/ROOT/$CONTAINER/root' failed"
+
+	mount --make-slave "/var/lib/machines/$CONTAINER" ||
+		die "'mount --make-slave /var/lib/machines/$CONTAINER' failed"
+
+	for dir in /proc /sys /dev; do
+		mount --rbind "$dir" "/var/lib/machines/${CONTAINER}${dir}" ||
+			die "'mount --rbind' of '$dir' failed"
+		mount --make-rslave "/var/lib/machines/${CONTAINER}${dir}" ||
+			die "'mount --make-rslave' of '$dir' failed"
+	done
+
+	mount -t zfs rpool/grub "/var/lib/machines/$CONTAINER/mnt" ||
+		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
+
+	for dev in $(get_bootloader_devices); do
+		[[ -e "/dev/$dev" ]] ||
+			die "bootloader device '/dev/$dev' not found"
+
+		[[ -b "/dev/$dev" ]] ||
+			die "bootloader device '/dev/$dev' not block device"
+
+		chroot "/var/lib/machines/$CONTAINER" \
+			grub-install --root-directory=/mnt "/dev/$dev" ||
+			die "'grub-install' for '$dev' failed in '$CONTAINER'"
+	done
+
+	chroot "/var/lib/machines/$CONTAINER" \
+		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+		die "'grub-mkconfig' failed in '$CONTAINER'"
+
+	set_bootfs_not_mounted_cleanup
+	trap - EXIT
+
+	#
+	# The mountpoint for the root filesystem should have been reset
+	# back to "/" in the cleanup function called above. Since that
+	# function will only "warn" when setting the mountpoint fails,
+	# we verify the mountpoint here, and "die" if it's incorrect.
+	#
+	MOUNTPOINT=$(zfs get mountpoint -Hpo value "rpool/ROOT/$CONTAINER/root")
+	[[ "$MOUNTPOINT" == "/" ]] ||
+		die "incorrect mountpoint for '$CONTAINER' root: '$MOUNTPOINT'"
+}
+
+function set_bootfs_mounted_cleanup() {
+	umount "/mnt" || warn "'umount' of '/mnt' failed"
+}
+
+#
+# This function assumes the rootfs container specified is currently
+# mounted; see the "set_bootfs_not_mounted" function for doing this same
+# operation, but for a rootfs container that's not mounted.
+#
+function set_bootfs_mounted() {
+	trap set_bootfs_mounted_cleanup EXIT
+
+	#
+	# Since this function assumes the rootfs container is mounted,
+	# we verify that it's mounted as the root filesystem; otherwise
+	# the logic below will fail.
+	#
+	MOUNTPOINT=$(zfs get mountpoint -Hpo value "rpool/ROOT/$CONTAINER/root")
+	[[ "$MOUNTPOINT" == "/" ]] ||
+		die "incorrect mountpoint for '$CONTAINER' root: '$MOUNTPOINT'"
+
+	mount -t zfs rpool/grub "/mnt" ||
+		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
+
+	for dev in $(get_bootloader_devices); do
+		[[ -e "/dev/$dev" ]] ||
+			die "bootloader device '/dev/$dev' not found"
+
+		[[ -b "/dev/$dev" ]] ||
+			die "bootloader device '/dev/$dev' not block device"
+
+		grub-install --root-directory=/mnt "/dev/$dev" ||
+			die "'grub-install' for '$dev' failed in '$CONTAINER'"
+	done
+
+	grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+		die "'grub-mkconfig' failed in '$CONTAINER'"
+
+	set_bootfs_mounted_cleanup
+	trap - EXIT
+}
+
+#
+# The purpose of this function is to convert an existing rootfs container
+# (specified by the $CONTAINER global variable) to be used as the boot
+# filesystem by the appliance; i.e. after calling this function, the
+# specified rootfs container will be used as the appliance's root
+# filesystem, the next time the appliance boots. This is done by
+# updating the appliance's bootloader (i.e. grub) to point to the
+# container's filesystem.
+#
+function set_bootfs() {
+	zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
+		die "rootfs container '$CONTAINER' does not exist"
+
+	MOUNTED=$(zfs get mounted -Hpo value "rpool/ROOT/$CONTAINER/root")
+	case "$MOUNTED" in
+	yes)
+		set_bootfs_mounted
+		;;
+	no)
+		set_bootfs_not_mounted
+		;;
+	*)
+		die "'zfs get mounted' returned unexpected value: '$MOUNTED'"
+		;;
+	esac
+}
+
+function usage() {
+	echo "$(basename "$0"): $*" >&2
+
+	PREFIX_STRING="Usage: $(basename "$0")"
+	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
+	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
+
+	echo "$PREFIX_SPACES set-bootfs <container>"
+
+	exit 2
+}
+
+[[ "$EUID" -ne 0 ]] && die "must be run as root"
+
+case "$1" in
+set-bootfs)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+
+	#
+	# We only have a single bootloader on any given appliance, so we
+	# need to ensure that only a single process is attempting to
+	# update the bootloader at any given time. The locking done here
+	# is to help prevent accidential corruption of the bootloader,
+	# by ensuring only a single invocation of this script can set
+	# the boot filesystem at any given time.
+	#
+	if [[ "$SET_BOOTFS_LOCKED" != "true" ]]; then
+		exec env SET_BOOTFS_LOCKED="true" \
+			flock -e "/var/run/delphix-set-bootfs-lock" "$0" "$@"
+	fi
+
+	CONTAINER="$2"
+	set_bootfs
+	;;
+*)
+	usage "invalid option specified: '$1'"
+	;;
+esac

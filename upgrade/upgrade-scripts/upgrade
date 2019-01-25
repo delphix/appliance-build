@@ -166,17 +166,20 @@ function upgrade_not_in_place() {
 		die "failed to stop '$CONTAINER'"
 
 	#
-	# After this point, we no longer want to execute the normal
-	# cleanup handler on any failure. The following command will
-	# convert the container to be used as the next boot/root
-	# filesystem, and thus the "stop" and "destroy" container logic
-	# will no longer work. So, if the "convert-to-bootfs" script
-	# fails, we'll need to manually rectify the situation.
+	# After this point, we no longer want to execute the normal cleanup
+	# handler on any failure. The following command will convert the
+	# container to be used as the next boot/root filesystem, and thus
+	# the "stop" and "destroy" container logic will no longer work. So,
+	# if either the "convert-to-rootfs" or "set-bootfs" logic fails,
+	# we'll need to manually rectify the situation.
 	#
 	trap - EXIT
 
-	"$IMAGE_PATH/upgrade-container" convert-to-bootfs "$CONTAINER" ||
-		die "failed to convert-to-bootfs '$CONTAINER'"
+	"$IMAGE_PATH/upgrade-container" convert-to-rootfs "$CONTAINER" ||
+		die "failed to convert-to-rootfs '$CONTAINER'"
+
+	"$IMAGE_PATH/rootfs-container" set-bootfs "$CONTAINER" ||
+		die "failed to set-bootfs '$CONTAINER'"
 }
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"

@@ -364,81 +364,16 @@ function run() {
 		--quiet --wait --pipe -- "$@"
 }
 
-function get_bootloader_devices() {
+function convert_to_rootfs() {
 	#
-	# When installing/updating the bootloader during upgrade, we
-	# need to determine which devices are being used as bootloader
-	# devices. We determine this by listing the devices used by the
-	# rpool. Additionally, we have to filter out devices that could
-	# be attached to the rpool, but would never be used for the
-	# bootloader. Finally, we need to strip off any parition
-	# information, since we want to install the bootloader directly
-	# to the device, rather than to a partition of the device.
+	# We're relying on the "mountpoint" property for the "data" and
+	# "home" datasets already being set properly when those datasets
+	# are first created, so we don't explicitly set them here.
 	#
-	zpool list -vH rpool |
-		awk '! /rpool|mirror|replacing|spare/ {print $1}' |
-		sed 's/[0-9]*$//'
-}
-
-function convert_to_bootfs_cleanup() {
-	umount "/var/lib/machines/$CONTAINER/mnt" ||
-		warn "'umount' of '/var/lib/machines/$CONTAINER/mnt' failed"
-
-	for dir in /proc /sys /dev; do
-		umount -R "/var/lib/machines/${CONTAINER}${dir}" ||
-			warn "'umount -R' of '$dir' failed"
-	done
-}
-
-#
-# The purpose of this function is to convert an existing upgrade
-# container (specified by the $CONTAINER global variable) into the next
-# boot filesystem used by the appliance; i.e. after calling this
-# function, the container's root filesystem will be used as the
-# appliance's root filesystem, the next time the appliance boots.
-#
-# This is done by updating the appliance's bootloader (i.e. grub) to
-# point to the container's filesystem, along with setting the mountpoint
-# of the filesystem to be "/" instead of "/var/lib/machines/$CONTAINER".
-# This effectively removes the container, since systemd-nspawn only
-# looks in /var/lib/machines, so it'll no longer find the container
-# after the mountpoint changes.
-#
-function convert_to_bootfs() {
-	trap convert_to_bootfs_cleanup EXIT
-
-	mount --make-slave "/var/lib/machines/$CONTAINER" ||
-		die "'mount --make-slave /var/lib/machines/$CONTAINER' failed"
-
-	for dir in /proc /sys /dev; do
-		mount --rbind "$dir" "/var/lib/machines/${CONTAINER}${dir}" ||
-			die "'mount --rbind' of '$dir' failed"
-		mount --make-rslave "/var/lib/machines/${CONTAINER}${dir}" ||
-			die "'mount --make-rslave' of '$dir' failed"
-	done
-
-	mount -t zfs rpool/grub "/var/lib/machines/$CONTAINER/mnt" ||
-		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
-
-	for dev in $(get_bootloader_devices); do
-		[[ -e "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not found"
-
-		[[ -b "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not block device"
-
-		chroot "/var/lib/machines/$CONTAINER" \
-			grub-install --root-directory=/mnt "/dev/$dev" ||
-			die "'grub-install' for '$dev' failed in '$CONTAINER'"
-	done
-
-	chroot "/var/lib/machines/$CONTAINER" \
-		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
-		die "'grub-mkconfig' failed in '$CONTAINER'"
-
-	convert_to_bootfs_cleanup
-	trap - EXIT
-
+	# Additionally, we're also relying on the "canmount" property of
+	# the "root" dataset already being set properly, so we don't
+	# explicitly set that here, either.
+	#
 	zfs umount "rpool/ROOT/$CONTAINER/root" ||
 		die "'zfs umount rpool/ROOT/$CONTAINER/root' failed"
 	zfs set mountpoint=/ "rpool/ROOT/$CONTAINER/root" ||
@@ -582,7 +517,7 @@ function usage() {
 	echo "$PREFIX_SPACES stop <container>"
 	echo "$PREFIX_SPACES destroy <container>"
 	echo "$PREFIX_SPACES run <container> <command>"
-	echo "$PREFIX_SPACES convert-to-bootfs <container>"
+	echo "$PREFIX_SPACES convert-to-rootfs <container>"
 	echo "$PREFIX_SPACES migrate-configuration <container>"
 
 	exit 2
@@ -629,11 +564,11 @@ run)
 	shift 2
 	run "$@"
 	;;
-convert-to-bootfs)
+convert-to-rootfs)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
 	[[ $# -gt 2 ]] && usage "too many arguments specified"
 	CONTAINER="$2"
-	convert_to_bootfs
+	convert_to_rootfs
 	;;
 migrate-configuration)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
