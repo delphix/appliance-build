@@ -77,7 +77,8 @@ report_progress 20 "Starting upgrade verification container"
 	die "failed to start '$CONTAINER'"
 
 report_progress 40 "Performing package upgrade verification"
-"$IMAGE_PATH/upgrade-container" run "$CONTAINER" "$IMAGE_PATH/execute" ||
+"$IMAGE_PATH/upgrade-container" run "$CONTAINER" "$IMAGE_PATH/execute" \
+	-p "$(get_platform)" ||
 	die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
 report_progress 60 "Performing application upgrade verification"
