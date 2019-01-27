@@ -30,14 +30,23 @@ set -o errexit
 TOP=$(git rev-parse --show-toplevel 2>/dev/null)
 
 function fetch_artifacts() {
-	local S3_URI="$1"
+
 	local tmp_dir
+
+	#
+	# S3 considers duplicate slashes significant, so put the URI in
+	# a known state by removing the trailing slash if there is one.
+	#
+	local S3_URI="${1%/}"
 
 	tmp_dir=$(mktemp -d -p "$TOP/build" livebuild_artifacts.XXXXXXXXXX)
 	pushd "$tmp_dir" &>/dev/null
 
-	aws s3 sync --only-show-errors "$S3_URI" .
-	sha256sum -c --strict SHA256SUMS
+	debs_file=$(aws s3 ls "$S3_URI/" | awk '{ print $4 }' | grep 'debs.tar.gz')
+	aws s3 cp --only-show-errors "$S3_URI/$debs_file" .
+	aws s3 cp --only-show-errors "$S3_URI/SHA256SUMS" .
+
+	sha256sum -c --strict <(grep "$debs_file" <SHA256SUMS)
 	rm SHA256SUMS
 
 	mv ./* "$TOP/live-build/build/artifacts/"
