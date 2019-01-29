@@ -120,6 +120,18 @@ if [[ ! -f binary/SHA256SUMS ]]; then
 	exit 1
 fi
 
+case $APPLIANCE_PLATFORM in
+aws) vm_artifact_ext=vmdk ;;
+azure) vm_artifact_ext=vhdx ;;
+esx) vm_artifact_ext=ova ;;
+gcp) vm_artifact_ext=gcp.tar.gz ;;
+kvm) vm_artifact_ext=qcow2 ;;
+*)
+	echo "Invalid platform"
+	exit 1
+	;;
+esac
+
 #
 # After running the build successfully, it should have produced various
 # virtual machine artifacts. We move these artifacts into a specific
@@ -127,7 +139,7 @@ fi
 # user (e.g. other software); this is most useful when multiple variants
 # are built via a single call to "make" (e.g. using the "all" target).
 #
-for ext in ova qcow2 debs.tar.gz migration.tar.gz gcp.tar.gz vhdx vmdk; do
+for ext in debs.tar.gz migration.tar.gz $vm_artifact_ext; do
 	if [[ -f "$ARTIFACT_NAME.$ext" ]]; then
 		mv "$ARTIFACT_NAME.$ext" "$TOP/live-build/build/artifacts/"
 	fi
