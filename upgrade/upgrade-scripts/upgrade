@@ -17,6 +17,13 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
+#
+# Any changes to this value needs to be careful to properly support
+# existing rootfs container datasets which may have this property
+# already set. Thus, changes here may require backwards compatibility.
+#
+ROLLBACK_PROPERTY="com.delphix:rollback-container"
+
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
@@ -42,6 +49,7 @@ function usage() {
 
 	echo "$PREFIX_STRING [-v] in-place"
 	echo "$PREFIX_SPACES [-v] not-in-place"
+	echo "$PREFIX_SPACES rollback"
 
 	exit 2
 }
@@ -136,8 +144,22 @@ function cleanup_not_in_place_upgrade() {
 	return "$rc"
 }
 
+function get_mounted_rootfs_container() {
+	basename "$(dirname "$(zfs list -Hpo name /)")"
+}
+
 function upgrade_not_in_place() {
 	trap cleanup_not_in_place_upgrade EXIT
+
+	#
+	# We query the mounted rootfs container name here, so that if we
+	# can't get this information for whatever reason, we can easily
+	# handle the error and abort; rather than having to handle this
+	# error later, when it might require more work to handle it.
+	#
+	MOUNTED_CONTAINER="$(get_mounted_rootfs_container)"
+	[[ -n "$MOUNTED_CONTAINER" ]] ||
+		die "failed to determine mounted rootfs container"
 
 	CONTAINER=$("$IMAGE_PATH/upgrade-container" create not-in-place)
 	[[ -n "$CONTAINER" ]] || die "failed to create upgrade container"
@@ -166,17 +188,51 @@ function upgrade_not_in_place() {
 		die "failed to stop '$CONTAINER'"
 
 	#
-	# After this point, we no longer want to execute the normal
-	# cleanup handler on any failure. The following command will
-	# convert the container to be used as the next boot/root
-	# filesystem, and thus the "stop" and "destroy" container logic
-	# will no longer work. So, if the "convert-to-bootfs" script
-	# fails, we'll need to manually rectify the situation.
+	# After this point, we no longer want to execute the normal cleanup
+	# handler on any failure. The following command will convert the
+	# container to be used as the next boot/root filesystem, and thus
+	# the "stop" and "destroy" container logic will no longer work. So,
+	# if either the "convert-to-rootfs" or "set-bootfs" logic fails,
+	# we'll need to manually rectify the situation.
 	#
 	trap - EXIT
 
-	"$IMAGE_PATH/upgrade-container" convert-to-bootfs "$CONTAINER" ||
-		die "failed to convert-to-bootfs '$CONTAINER'"
+	"$IMAGE_PATH/upgrade-container" convert-to-rootfs "$CONTAINER" ||
+		die "failed to convert-to-rootfs '$CONTAINER'"
+
+	#
+	# In order for the "rollback" back command to work, we need to
+	# know which rootfs container to rollback to. Thus, we embed
+	# this information into the rootfs container using a ZFS
+	# property; rollback will read this information, to determine
+	# which rootfs container to rollback to.
+	#
+	zfs set \
+		"$ROLLBACK_PROPERTY=$MOUNTED_CONTAINER" \
+		"rpool/ROOT/$CONTAINER" ||
+		die "'zfs set com.delphix:rollback-container' failed"
+
+	"$IMAGE_PATH/rootfs-container" set-bootfs "$CONTAINER" ||
+		die "failed to set-bootfs '$CONTAINER'"
+}
+
+function rollback() {
+	MOUNTED_CONTAINER="$(get_mounted_rootfs_container)"
+	[[ -n "$MOUNTED_CONTAINER" ]] ||
+		die "failed to determine mounted rootfs container"
+
+	ROLLBACK_CONTAINER="$(zfs get -Hpo value \
+		"$ROLLBACK_PROPERTY" "rpool/ROOT/$MOUNTED_CONTAINER")"
+	[[ -n "$ROLLBACK_CONTAINER" && "$ROLLBACK_CONTAINER" != "-" ]] ||
+		die "failed to determine rollback rootfs container"
+
+	#
+	# The "rollback" operation is nothing more than "set-bootfs" of
+	# a specific rootfs container. Now that we have the specific
+	# rootfs container that we want to use as the next bootfs.
+	#
+	"$IMAGE_PATH/rootfs-container" set-bootfs "$ROLLBACK_CONTAINER" ||
+		die "failed to set-bootfs '$ROLLBACK_CONTAINER'"
 }
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
@@ -204,6 +260,10 @@ not-in-place)
 	shift 1
 	verify_upgrade_is_allowed
 	upgrade_not_in_place "$@"
+	;;
+rollback)
+	shift 1
+	rollback "$@"
 	;;
 *)
 	usage "invalid option -- '$1'"
