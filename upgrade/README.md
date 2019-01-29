@@ -40,6 +40,10 @@ Log into that VM using the "delphix" user, and run these commands:
     $ sudo unpack-image internal-dev.upgrade.tar.gz
     $ sudo /var/dlpx-update/latest/upgrade -v in-place
 
+## FAQ
+
+See the [FAQ](FAQ.md) for answers to commonly asked questions.
+
 ## Statement of Support
 
 This software is provided as-is, without warranty of any kind or
