@@ -1,7 +1,10 @@
+timeout-sec = 21600
+
 pr_status = [
   "license/cla"
 ]
 
 status = [
-  "continuous-integration/travis-ci/push"
+  "continuous-integration/travis-ci/push",
+  "jenkins/appliance-build"
 ]
