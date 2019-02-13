@@ -132,6 +132,21 @@ source_version_information
 apt_get install -y "delphix-entire-$platform=$VERSION" ||
 	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
 
+#
+# Finally, for all of the packages that delphix-entire depends on, we
+# verify the package is installed and its version is correct; this is
+# simply to help us be confident that upgrade behaves as we expect.
+#
+dpkg-query -Wf '${Depends}' "delphix-entire-$platform" |
+	sed 's/, /\n/g' |
+	sed 's/^\(.*\) (\(.*\) \(.*\))$/\1 \2 \3/g' |
+	while read -r package op dependency; do
+		installed=$(dpkg-query -Wf '${Version}' "$package")
+		compare_versions "$installed" "$op" "$dependency" ||
+			die "'$package' package version incompatible;" \
+				"'$installed' '$op' '$dependency'"
+	done || die "verification of package versions failed"
+
 if [[ -f /etc/apt/sources.list.orig ]]; then
 	mv /etc/apt/sources.list.orig /etc/apt/sources.list ||
 		die "failed to restore /etc/apt/sources.list"
