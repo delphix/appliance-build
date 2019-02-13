@@ -29,6 +29,7 @@
     - curl
     - emacs-nox
     - fakeroot
+    - flake8
     - gdebi
     - git
     - gawk
@@ -41,6 +42,7 @@
     - libtool
     - libudev-dev
     - lsscsi
+    - mandoc
     - nfs-kernel-server
     - parted
     - python-minimal
