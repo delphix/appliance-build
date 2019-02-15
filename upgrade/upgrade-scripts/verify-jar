@@ -26,13 +26,24 @@ function usage() {
 	exit 2
 }
 
-function run_support_info() {
+function verify_jar_verify_cleanup() {
 	local rc="$?"
 
-	/opt/delphix/server/bin/support_info \
-		-o "${LOG_DIRECTORY}/${CONTAINER}" \
-		-t "log dropbox" || die "Failed to collect verify logs."
+	#
+	# This name is used by the "upgrade-verify.jar" just executed, so we
+	# cannot change this value without also modifying that JAR.
+	#
+	MDS_SNAPNAME="MDS-CLONE-upgradeverify"
 
+	if /opt/delphix/server/bin/dx_manage_pg isrunning -s ${MDS_SNAPNAME}; then
+		/opt/delphix/server/bin/dx_manage_pg stop -s "${MDS_SNAPNAME}" ||
+			die "failed to stop postgres for snapshot '${MDS_SNAPNAME}'."
+	fi
+
+	if zfs list "${MDS_SNAPNAME}" &>/dev/null; then
+		/opt/delphix/server/bin/dx_manage_pg cleanup -s "${MDS_SNAPNAME}" ||
+			die "failed to cleanup postgres for snapshot '${MDS_SNAPNAME}'."
+	fi
 	return "$rc"
 }
 
@@ -55,16 +66,7 @@ if $opt_d; then
 	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
 fi
 
-#
-# We use this directory to store the upgrade verification logs of this
-# container. This directory is accessible from both the container, and
-# the host. This allows the software running on the host to easily
-# access the logs after the verification is performed.
-#
-mkdir -p "${LOG_DIRECTORY}/${CONTAINER}" ||
-	die "failed to create directory: '${LOG_DIRECTORY}/${CONTAINER}'"
-
-trap run_support_info EXIT
+trap verify_jar_verify_cleanup EXIT
 
 /usr/bin/java \
 	-Dlog.dir=/var/delphix/server/upgrade-verify \
@@ -78,17 +80,5 @@ trap run_support_info EXIT
 	-pl 60 -ph 80 \
 	$VERIFY_LIVE_MDS_OPT ||
 	die "'upgrade-verify.jar' failed in verification container"
-
-#
-# This name is used by the "upgrade-verify.jar" just executed, so we
-# cannot change this value without also modifying that JAR.
-#
-MDS_SNAPNAME="MDS-CLONE-upgradeverify"
-
-/opt/delphix/server/bin/dx_manage_pg stop -s "$MDS_SNAPNAME" ||
-	die "failed to stop postgres"
-
-/opt/delphix/server/bin/dx_manage_pg cleanup -s "$MDS_SNAPNAME" ||
-	die "failed to cleanup postgres"
 
 exit 0

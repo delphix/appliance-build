@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+. "${BASH_SOURCE%/*}/common.sh"
+
+STACK_STARTUP_MDS_SNAPNAME="MDS-CLONE-stack-startup-verify"
+
+function stack_startup_verify_cleanup() {
+	local rc="$?"
+
+	if /opt/delphix/server/bin/dx_manage_pg isrunning -s ${STACK_STARTUP_MDS_SNAPNAME}; then
+		/opt/delphix/server/bin/dx_manage_pg stop -s "${STACK_STARTUP_MDS_SNAPNAME}" ||
+			die "failed to stop postgres for snapshot '${STACK_STARTUP_MDS_SNAPNAME}'."
+	fi
+
+	if zfs list | grep -q ${STACK_STARTUP_MDS_SNAPNAME}; then
+		/opt/delphix/server/bin/dx_manage_pg cleanup -s "${STACK_STARTUP_MDS_SNAPNAME}" ||
+			die "failed to cleanup postgres for snapshot '${STACK_STARTUP_MDS_SNAPNAME}'."
+	fi
+
+	return "$rc"
+}
+
+trap stack_startup_verify_cleanup EXIT
+
+#
+# Make sure delphix-mgmt and delphix-postgres aren't running within container.
+#
+IS_ACTIVE_MGMT=$(systemctl is-active delphix-mgmt)
+[[ "${IS_ACTIVE_MGMT}" == "inactive" ]] ||
+	die "delphix-mgmt service expected to be 'inactive', found to be '${IS_ACTIVE_MGMT}'"
+IS_ACTIVE_POSTGRES=$(systemctl is-active delphix-postgres@default)
+[[ "${IS_ACTIVE_POSTGRES}" == "inactive" ]] ||
+	die "delphix-postgres@default service expected to be 'inactive', found to be '${IS_ACTIVE_POSTGRES}'"
+
+#
+# Create a copy of MDS and start the postgres service.
+#
+/opt/delphix/server/bin/dx_manage_pg clone -s "${STACK_STARTUP_MDS_SNAPNAME}" -l ||
+	die "failed to clone postgres"
+/opt/delphix/server/bin/dx_manage_pg start -s "${STACK_STARTUP_MDS_SNAPNAME}" -p 5432 ||
+	die "failed to start postgres"
+
+#
+# Start management stack up to post-upgrade logic.
+#
+/opt/delphix/server/bin/start_mgmt_server_jvm -f /var/run/delphix-mgmt.pid ||
+	die "Stack startup verification failed."
+
+exit 0

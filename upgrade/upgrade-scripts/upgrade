@@ -113,8 +113,11 @@ function upgrade_in_place() {
 
 	if [[ "$DLPX_UPGRADE_SKIP_VERIFY" != "true" ]]; then
 		"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-			"$IMAGE_PATH/verify-impl" "$@" ||
-			die "'$IMAGE_PATH/verify-impl' '$*' failed in '$CONTAINER'"
+			"$IMAGE_PATH/verify-jar" "$@" ||
+			die "'$IMAGE_PATH/verify-jar' '$*' failed in '$CONTAINER'"
+		"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
+			"$IMAGE_PATH/verify-stack" "$@" ||
+			die "'$IMAGE_PATH/verify-stack' '$*' failed in '$CONTAINER'"
 	fi
 
 	"$IMAGE_PATH/execute" -p "$(get_platform)" ||
@@ -180,8 +183,8 @@ function upgrade_not_in_place() {
 
 	if [[ "$DLPX_UPGRADE_SKIP_VERIFY" != "true" ]]; then
 		"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-			"$IMAGE_PATH/verify-impl" "$@" ||
-			die "'$IMAGE_PATH/verify-impl' '$*' failed in '$CONTAINER'"
+			"$IMAGE_PATH/verify-jar" "$@" ||
+			die "'$IMAGE_PATH/verify-jar' '$*' failed in '$CONTAINER'"
 	fi
 
 	"$IMAGE_PATH/upgrade-container" stop "$CONTAINER" ||
