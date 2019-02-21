@@ -154,12 +154,18 @@ mount -F zfs "$RPOOL/ROOT/$FSNAME/data" "$TMP_ROOT/var/delphix"
 (
 	cd "$TMP_ROOT"
 	cpio -imu
-	cat <<-EOF >"/etc/fstab"
-		$RPOOL/ROOT/$FSNAME/home /export/home zfs defaults 0 0
-		$RPOOL/ROOT/$FSNAME/data /var/delphix zfs defaults 0 0
-	EOF
 ) <"$ARCHIVE_DIR/os-root.cpio" 2>&1 ||
 	die "failed to unpack os-root.cpio"
+
+#
+# /export/home and /var/delphix datasets are not mounted automatically.
+# On Illumos this kind of mounting logic was performed by dxinit and svc-boot.
+# On Linux /etc/fstab is used instead.
+#
+cat <<-EOF >"$TMP_ROOT/etc/fstab" || die "Failed to setup /etc/fstab"
+	$RPOOL/ROOT/$FSNAME/home /export/home zfs defaults 0 0
+	$RPOOL/ROOT/$FSNAME/data /var/delphix zfs defaults 0 0
+EOF
 
 #
 # WIP: Add here any operations that generate files from illumos,
@@ -269,8 +275,25 @@ MAIN_MENU_FICL=(
 } >>/boot/menu.rc.local ||
 	die "failed to update /boot/menu.rc.local"
 
-umount "$TMP_ROOT/var/delphix" ||
-	die "couldn't unmount linux directory $TMP_ROOT/var/delphix"
+#
+# Note that the new /var/delphix should not contain any useful data as it will
+# be replaced by a clone of the current /var/delphix dataset in dx_execute.
+# We do not clone the current /var/delphix right away as the clone will be
+# outdated by the time dx_execute is called. Before deleting the dataset we
+# first verify that it doesn't contain anything useful.
+#
+(
+	cd "$TMP_ROOT/var/delphix" || die "failed to cd into $TMP_ROOT/var/delphix"
+	# We only expect to find:
+	#  ./dropbox
+	[[ $(find . -mindepth 1 | wc -l) -eq 1 ]] ||
+		die "linux dataset for /var/delphix contains unexpected files"
+	[[ -d dropbox ]] ||
+		die "linux dataset for /var/delphix should contain directory dropbox"
+) || die "verification of /var/delphix failed"
+
+zfs destroy "$RPOOL/ROOT/$FSNAME/data" ||
+	die "failed to destroy linux dataset $RPOOL/ROOT/$FSNAME/data"
 umount "$TMP_ROOT/export/home" ||
 	die "couldn't unmount linux dataset $TMP_ROOT/export/home"
 
