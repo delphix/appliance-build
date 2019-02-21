@@ -23,7 +23,7 @@
 set -o pipefail
 
 function die() {
-	report "$(basename "$0"): $*" >&2
+	echo "$(basename "$0"): $*" >&2
 	exit 1
 }
 
@@ -77,8 +77,9 @@ RPOOL=${RDS%%/*}
 
 #
 # Ensure that the expected Linux dataset layout exists.
+# Note that this excludes the "data" dataset which was destroyed in dx_apply.
 #
-[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 5 ]] ||
+[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 4 ]] ||
 	die "could not find the expected linux dataset layout"
 LX_RDS_PARENT=$(zfs list -o name -H -d 1 "$RPOOL/ROOT" | tail -n 1)
 [[ -n $LX_RDS_PARENT ]] || die "could not find Linux RDS parent dataset"
@@ -96,6 +97,20 @@ LX_RDS="$LX_RDS_PARENT/root"
 [[ "$(grep -c "$LX_RDS" /boot/menu.rc.local)" -eq 1 ]] ||
 	die "the expected Linux RDS ($LX_RDS) was either not found or has" \
 		"been specified more than once in the bootloader's menu file"
+
+#
+# Create linux /var/delphix dataset from a clone of the current
+# /var/delphix dataset.
+#
+LX_VAR_DLPX="$LX_RDS_PARENT/data"
+LX_CONTAINER="${LX_RDS_PARENT##*/}"
+CUR_VAR_DLPX=$(zfs list -Ho name /var/delphix)
+[[ -n $CUR_VAR_DLPX ]] || die "could not determine current /var/delphix dataset"
+zfs list "$CUR_VAR_DLPX" >/dev/null 2>&1 ||
+	die "'$CUR_VAR_DLPX' is not a valid zfs dataset"
+zfs snapshot "${CUR_VAR_DLPX}@${LX_CONTAINER}"
+zfs clone -o compression=on -o mountpoint=legacy \
+	"${CUR_VAR_DLPX}@${LX_CONTAINER}" "$LX_VAR_DLPX"
 
 #
 # Read the command from option 8 which should be the one that boots
