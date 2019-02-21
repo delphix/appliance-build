@@ -69,7 +69,8 @@ for (variant in allVariants) {
 
             for (envVar in ["APPLIANCE_PASSWORD",
                             "DELPHIX_SIGNATURE_URL",
-                            "DELPHIX_SIGNATURE_TOKEN"]) {
+                            "DELPHIX_SIGNATURE_TOKEN",
+                            "DELPHIX_APPLIANCE_VERSION"]) {
                 inputs.property(envVar, System.getenv(envVar)).optional(true)
             }
 

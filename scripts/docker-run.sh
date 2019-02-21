@@ -58,6 +58,7 @@ $DOCKER_RUN --rm \
 	--env DELPHIX_SIGNATURE_URL \
 	--env DELPHIX_SIGNATURE_TOKEN \
 	--env DELPHIX_PLATFORMS \
+	--env DELPHIX_APPLIANCE_VERSION \
 	--volume "$TOP:/opt/appliance-build" \
 	--workdir "/opt/appliance-build" \
 	appliance-build "$@"
