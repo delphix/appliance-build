@@ -149,14 +149,24 @@ if [[ -n "${DELPHIX_SIGNATURE_TOKEN:-}" ]] && [[ -n "${DELPHIX_SIGNATURE_URL:-}"
 	#
 	VERSION="5.3"
 	SIGN_URL="$DELPHIX_SIGNATURE_URL/upgrade/keyVersion/$VERSION/sign"
+	(
+		cd $DEPOT_DIRECTORY
 
-	set -o pipefail
-	curl -s -f -H "Content-Type: application/json" \
-		-u "$DELPHIX_SIGNATURE_TOKEN" "$SIGN_URL" -d @- <<-EOF |
-			{"data": "$(base64 -w 0 $DEPOT_DIRECTORY/hashes)"}
-		EOF
-		jq -r .signature |
-		base64 -d >$DEPOT_DIRECTORY/hashes.sig.$VERSION
+		# Encode payload for signature request
+		base64 -w 0 hashes >hashes64
+		echo "{\"data\": \"$(cat hashes64)\"}" >hashes64.payload
+
+		# Request signature
+		curl -s -f -H "Content-Type: application/json" \
+			-u "$DELPHIX_SIGNATURE_TOKEN" "$SIGN_URL" -d @hashes64.payload >hashes.response
+
+		# Decode generated signature
+		jq -r .signature <hashes.response >sig.encoded
+		base64 -d sig.encoded >hashes.sig.$VERSION
+
+		# Remove intermediate files
+		rm hashes64 hashes64.payload hashes.response sig.encoded
+	)
 fi
 
 #
