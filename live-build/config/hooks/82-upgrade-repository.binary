@@ -102,7 +102,11 @@ else
 	# Otherwise, just use a default value for the version, based on when
 	# the build occurs.
 	#
-	VERSION=$(date '+%Y.%m.%d.%H')
+	# Note that we want to generate the timestamp without any leading
+	# zeroes, because the Delphix API handles versions as integers.
+	# Leading zeroes will be stripped and cause mismatches.
+	#
+	VERSION=$(date '+%Y.%-m.%-d.%-H')
 fi
 
 sed -i "s/@@DEPENDS@@/$DEPENDS/" delphix-entire.ctl
