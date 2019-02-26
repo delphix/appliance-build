@@ -133,6 +133,16 @@ apt_get install -y "delphix-entire-$platform=$VERSION" ||
 	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
 
 #
+# After we've successfully installed the new delphix-entire package, we
+# need to remove all packages that are no longer required. For example,
+# if the old version depended on a package, and the new version no
+# longer depends on that package, the upgrade performed above will not
+# remove this package. Thus, we need to run the "autoremove" to remove
+# these packages that are no longer required.
+#
+apt_get autoremove --purge -y || die "autoremove after upgrade failed"
+
+#
 # Finally, for all of the packages that delphix-entire depends on, we
 # verify the package is installed and its version is correct; this is
 # simply to help us be confident that upgrade behaves as we expect.
