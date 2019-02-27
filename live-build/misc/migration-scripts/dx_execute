@@ -99,11 +99,32 @@ LX_RDS="$LX_RDS_PARENT/root"
 		"been specified more than once in the bootloader's menu file"
 
 #
+# Re-mount the root dataset and run the migration logic.
+#
+rm -rf /var/delphix/migration
+mkdir -p /var/delphix/migration ||
+	die "failed to create /var/delphix/migration"
+MIGRATION_SCRIPT="/opt/delphix/migration/migrate_config.py"
+LX_CONTAINER="${LX_RDS_PARENT##*/}"
+LX_RDS_MOUNT="/tmp/delphix.$LX_CONTAINER/root"
+mkdir -p "$LX_RDS_MOUNT"
+mount -F zfs -o ignoremountpoint "$LX_RDS" "$LX_RDS_MOUNT" ||
+	die "failed to mount the root Linux dataset"
+"${LX_RDS_MOUNT}${MIGRATION_SCRIPT}" pre-upgrade \
+	>>/var/delphix/migration/log 2>&1 || die "failed to run migration"
+#
+# Create a flag file that notifies the delphix-migration service that
+# post-reboot migration logic should be run. Note that the /var/delphix
+# dataset is carried over into Linux.
+#
+touch /var/delphix/migration/perform-migration ||
+	die "failed to create delphix-migration flag file"
+
+#
 # Create linux /var/delphix dataset from a clone of the current
 # /var/delphix dataset.
 #
 LX_VAR_DLPX="$LX_RDS_PARENT/data"
-LX_CONTAINER="${LX_RDS_PARENT##*/}"
 CUR_VAR_DLPX=$(zfs list -Ho name /var/delphix)
 [[ -n $CUR_VAR_DLPX ]] || die "could not determine current /var/delphix dataset"
 zfs list "$CUR_VAR_DLPX" >/dev/null 2>&1 ||
