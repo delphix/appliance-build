@@ -40,7 +40,7 @@ function verify_jar_verify_cleanup() {
 			die "failed to stop postgres for snapshot '${MDS_SNAPNAME}'."
 	fi
 
-	if zfs list "${MDS_SNAPNAME}" &>/dev/null; then
+	if zfs list "domain0/${MDS_SNAPNAME}" &>/dev/null; then
 		/opt/delphix/server/bin/dx_manage_pg cleanup -s "${MDS_SNAPNAME}" ||
 			die "failed to cleanup postgres for snapshot '${MDS_SNAPNAME}'."
 	fi
