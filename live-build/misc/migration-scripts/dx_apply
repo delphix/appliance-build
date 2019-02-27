@@ -302,6 +302,8 @@ zfs umount "$RPOOL/ROOT/$FSNAME/root" ||
 zfs set mountpoint=/ "$RPOOL/ROOT/$FSNAME/root" ||
 	die "could not set mountpoint for linux dataset $RPOOL/ROOT/$FSNAME/root"
 
+rmdir "$TMPDIR"
+
 report_progress_inc 100
 
 exit 0
