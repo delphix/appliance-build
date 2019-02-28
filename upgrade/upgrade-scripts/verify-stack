@@ -27,7 +27,7 @@ function stack_startup_verify_cleanup() {
 			die "failed to stop postgres for snapshot '${STACK_STARTUP_MDS_SNAPNAME}'."
 	fi
 
-	if zfs list | grep -q ${STACK_STARTUP_MDS_SNAPNAME}; then
+	if zfs list "domain0/${STACK_STARTUP_MDS_SNAPNAME}" &>/dev/null; then
 		/opt/delphix/server/bin/dx_manage_pg cleanup -s "${STACK_STARTUP_MDS_SNAPNAME}" ||
 			die "failed to cleanup postgres for snapshot '${STACK_STARTUP_MDS_SNAPNAME}'."
 	fi
