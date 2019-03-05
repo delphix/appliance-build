@@ -88,6 +88,8 @@ LX_RDS="$LX_RDS_PARENT/root"
 #
 # Ensure that the expected bootloader fields are there.
 #
+[[ "$(grep -cF 'set lxcmdline' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no lxcmdline variable in the bootloader menu"
 [[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 1 ]] ||
 	die "there is no caption for the Linux option in the bootloader menu"
 [[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 1 ]] ||
