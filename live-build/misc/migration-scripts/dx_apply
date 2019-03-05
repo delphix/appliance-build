@@ -77,6 +77,9 @@ rm -f /boot/vmlinuz-* /boot/initrd.img-* ||
 zfs destroy -r "$RPOOL/ROOT" 2>/dev/null
 zfs list "$RPOOL/ROOT" 2>/dev/null &&
 	die "could not destroy linux root dataset from previous run"
+sed -i '/set lxcmdline/d' /boot/menu.rc.local
+[[ "$(grep -cF 'set lxcmdline' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup lxcmdline from previous run"
 sed -i '/set mainmenu_caption\[8\]/d' /boot/menu.rc.local
 [[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 0 ]] ||
 	die "failed to cleanup mainmenu_caption from previous run"
@@ -197,21 +200,33 @@ cp "$INITRD_IMG" /boot ||
 
 #
 # This command loads the Linux Kernel Compressed Executable in memory
-# from the OK prompt of the FreeBSD bootloader.
+# from the OK prompt of the FreeBSD bootloader. Note that we pass it the
+# lxcmdline variable, which will be parsed by the bootloader. The reason
+# why we create a separate variable for the cmdline arguments instead of
+# just adding them in-line is because otherwise the command would be
+# greater than 256 characters and fail to be parsed by the bootloader.
+# We have to be careful to escape ${lxcmdline} properly so that it is
+# not resolved by the current script.
+#
+LOAD_VMLINUZ_OK_CMD="load /boot/$(basename "$VMLINUZ") \${lxcmdline}"
+
+#
+# Essentially we want the command line to be as close as possible to
+# what is set by our grub configuration for fresh Linux installs. Our
+# customizations to the grub command line can be found in the
+# delphix-platform project at etc/default/grub.d/override.cfg.
+# Here is an overview:
 #
 # - We specify the root filesystem type to be ZFS and its root dataset
 #   the one that we just created for the migration image.
 #
-# - We set the console parameter during load twice. Once for each
-#   console technology:
-#      tty0 - Makes kernel messages appear in the first virtual
-#             terminal.
-#      ttyS0 - Makes kernel messages appear in the frst serial
-#             port. The 115200n8 part means the serial connection
-#             is made at 115200 baud 8n1.
+# - We carry-over the following settings from delphix-platform:
+#   console, ipv6 and crashkernel.
 #
 # - We specify zfsforce=1 because otherwise we would be failing at
-#   pool import because of ZFS's hostid check.
+#   pool import because of ZFS's hostid check. This argument is added
+#   specifically for the migration case and doesn't appear on a fresh
+#   Linux install.
 #
 # Note that we use an array of strings instead of one whole string
 # that we break to multiple lines in order to divide the arguments
@@ -221,13 +236,13 @@ cp "$INITRD_IMG" /boot ||
 # the rest of this file that have to do with adding commands in the
 # bootloader configuration.
 #
-LOAD_VMLINUZ_OK_ARG=(
-	"/boot/$(basename "$VMLINUZ")"
+LX_CMDLINE=(
 	"root=ZFS=$RPOOL/ROOT/$FSNAME/root"
 	'console=tty0 console=ttyS0,115200n8'
+	'ipv6.disable=1'
+	'crashkernel=1024M-:512M'
 	'zfsforce=1'
 )
-LOAD_VMLINUZ_OK_CMD="load ${LOAD_VMLINUZ_OK_ARG[*]}"
 
 #
 # This command loads the initial RAM disk as the initial root filesystem
@@ -257,6 +272,7 @@ MAIN_MENU_FICL=(
 # option below.
 #
 {
+	echo 'set lxcmdline="'"${LX_CMDLINE[*]}"'"'
 	#
 	# Add non-ansi and ansi version for the name of the option.
 	#
@@ -274,6 +290,13 @@ MAIN_MENU_FICL=(
 	echo 'set mainmenu_command[8]="'"${MAIN_MENU_FICL[*]}"'"'
 } >>/boot/menu.rc.local ||
 	die "failed to update /boot/menu.rc.local"
+
+#
+# Increase the automatic boot delay to 20 seconds. This would help debug
+# any potential boot issues.
+#
+sed -i '/set autoboot_delay/c\set autoboot_delay=20' /boot/menu.rc.local ||
+	die "failed to change the autoboot_delay"
 
 #
 # Note that the new /var/delphix should not contain any useful data as it will
@@ -302,7 +325,8 @@ zfs umount "$RPOOL/ROOT/$FSNAME/root" ||
 zfs set mountpoint=/ "$RPOOL/ROOT/$FSNAME/root" ||
 	die "could not set mountpoint for linux dataset $RPOOL/ROOT/$FSNAME/root"
 
-rmdir "$TMPDIR"
+rm -rf "$TMPDIR" ||
+	die "failed to destroy temporary directory $TMPDIR"
 
 report_progress_inc 100
 
