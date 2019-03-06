@@ -31,6 +31,17 @@ IMAGE_VERSION=$(get_image_version)
 [[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
 
 #
+# This variable is used to determine if a "dry run" of the upgrade
+# should be performed, as opposed to an actual upgrade of the system.
+# When performing a "dry run", the running system will not be modified.
+# The default value can be overridden by setting this environment
+# variable to "true", and/or passing the "-n" option to this script (see
+# the script's usage). If both, the environment variable and the "-n"
+# option are specified, the "-n" option takes precedence.
+#
+DLPX_UPGRADE_DRY_RUN=${DLPX_UPGRADE_DRY_RUN:-"false"}
+
+#
 # This variable is used to determine if the application verification
 # checks should be run as part of the upgrade. The default value can be
 # overridden by setting this environment variable to "true", and/or
@@ -47,8 +58,8 @@ function usage() {
 	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
 	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
 
-	echo "$PREFIX_STRING [-v] in-place"
-	echo "$PREFIX_SPACES [-v] not-in-place"
+	echo "$PREFIX_STRING [-n] [-v] in-place"
+	echo "$PREFIX_SPACES [-n] [-v] not-in-place"
 	echo "$PREFIX_SPACES rollback"
 
 	exit 2
@@ -77,7 +88,8 @@ function cleanup_in_place_upgrade() {
 	#
 	local rc="$?"
 
-	if [[ "$rc" == "0" || "$DLPX_DEBUG" != "true" ]]; then
+	if [[ "$rc" == "0" ]] ||
+		[[ "$rc" != "0" && "$DLPX_DEBUG" != "true" ]]; then
 		#
 		# On success, or on failure when DLPX_DEBUG is not true,
 		# we clean up the container previously created. When
@@ -120,6 +132,12 @@ function upgrade_in_place() {
 			die "'$IMAGE_PATH/verify-stack' '$*' failed in '$CONTAINER'"
 	fi
 
+	#
+	# When the "dry-run" option is set, we don't want to modify the
+	# running system, so we must stop here.
+	#
+	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] && return
+
 	"$IMAGE_PATH/execute" -p "$(get_platform)" ||
 		die "'$IMAGE_PATH/execute' failed in running appliance."
 }
@@ -131,7 +149,8 @@ function cleanup_not_in_place_upgrade() {
 	#
 	local rc="$?"
 
-	if [[ "$rc" != "0" && "$DLPX_DEBUG" != "true" ]]; then
+	if [[ "$rc" == "0" && "$DLPX_UPGRADE_DRY_RUN" == "true" ]] ||
+		[[ "$rc" != "0" && "$DLPX_DEBUG" != "true" ]]; then
 		#
 		# On failure and when DLPX_DEBUG is not true, we clean
 		# up the container previously created.
@@ -191,6 +210,12 @@ function upgrade_not_in_place() {
 		die "failed to stop '$CONTAINER'"
 
 	#
+	# When the "dry-run" option is set, we don't want to modify the
+	# running system, so we must stop here.
+	#
+	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] && return
+
+	#
 	# After this point, we no longer want to execute the normal cleanup
 	# handler on any failure. The following command will convert the
 	# container to be used as the next boot/root filesystem, and thus
@@ -229,6 +254,9 @@ function rollback() {
 	[[ -n "$ROLLBACK_CONTAINER" && "$ROLLBACK_CONTAINER" != "-" ]] ||
 		die "failed to determine rollback rootfs container"
 
+	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] &&
+		die "unable to perform a 'dry-run' of rollback"
+
 	#
 	# The "rollback" operation is nothing more than "set-bootfs" of
 	# a specific rootfs container. Now that we have the specific
@@ -240,8 +268,11 @@ function rollback() {
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
-while getopts ':v' c; do
+while getopts ':nv' c; do
 	case "$c" in
+	n)
+		DLPX_UPGRADE_DRY_RUN="true"
+		;;
 	v)
 		DLPX_UPGRADE_SKIP_VERIFY="true"
 		;;
