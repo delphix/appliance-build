@@ -92,44 +92,6 @@ function download_delphix_s3_debs() {
 	rm -rf "$tmp_directory"
 }
 
-function build_delphix_java8_debs() {
-	local pkg_directory="$1"
-
-	local url="http://artifactory.delphix.com/artifactory"
-	local tarfile="jdk-8u171-linux-x64.tar.gz"
-	local debfile="oracle-java8-jdk_8u171_amd64.deb"
-	local tmp_directory
-
-	tmp_directory=$(mktemp -d -p "$TOP/build" tmp.java.XXXXXXXXXX)
-	pushd "$tmp_directory" &>/dev/null
-
-	wget -nv "$url/java-binaries/linux/jdk/8/$tarfile" -O "$tarfile"
-
-	#
-	# We must run "make-jpkg" as a non-root user, and then use "fakeroot".
-	#
-	# If we "make-jpkg" it as the real root user, it will fail; and if we
-	# run it as a non-root user, it will also fail.
-	#
-	# make-jpkg uses the debhelper tool suite to generate the deb package.
-	# In order for java debugging tools (jstack, etc.) to work properly
-	# we need to have the debug symbols in the java libraries; however
-	# debhelper strips those symbols by default and it doesn't appear like
-	# make-jpkg provides any options to override this setting. We need to
-	# resort to a hack and pass DEB_BUILD_OPTIONS=nostrip as an
-	# environment variable, which is consumed by debhelper and overrides
-	# the dh_strip step.
-	#
-	chown -R nobody:nogroup .
-	runuser -u nobody -- env DEB_BUILD_OPTIONS=nostrip \
-		fakeroot make-jpkg "$tarfile" <<<y
-
-	cp "$debfile" "$pkg_directory"
-
-	popd &>/dev/null
-	rm -rf "$tmp_directory"
-}
-
 function build_ancillary_repository() {
 	local pkg_directory="$1"
 
@@ -216,14 +178,6 @@ download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_LINUX_PKG"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_ZFS"
-
-#
-# The Delphix Java 8 package is handled a little differently than the
-# rest. This package file must be dynamically generated on the fly, from
-# some input file stored in Artifactory. This function will do this, and
-# then place the generated package file in the specified directory.
-#
-build_delphix_java8_debs "$PKG_DIRECTORY"
 
 #
 # Now that our temporary package directory has been populated with all
