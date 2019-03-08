@@ -123,6 +123,15 @@ touch /var/delphix/migration/perform-migration ||
 	die "failed to create delphix-migration flag file"
 
 #
+# Workaround for LX-1779: Prevent analytics from launching Illumos-specific
+# collectors.
+#
+command="TRUNCATE dlpx_analytics_slice; TRUNCATE analytics_datapoint;"
+echo "Running MDS Command: '$command'"
+/opt/delphix/server/bin/mds_client -- -c "$command" ||
+	die "Failed mds_client command."
+
+#
 # Create linux /var/delphix dataset from a clone of the current
 # /var/delphix dataset.
 #
