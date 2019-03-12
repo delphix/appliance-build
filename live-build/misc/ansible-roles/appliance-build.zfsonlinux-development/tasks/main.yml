@@ -65,6 +65,39 @@
     accept_hostkey: yes
     update: no
 
+- shell: ls /lib/modules
+  register: kernel_versions
+
+- shell: |
+    CONFIG_OPTS=" \
+    --build=x86_64-linux-gnu \
+    --prefix=/usr \
+    --includedir=/usr/include \
+    --mandir=/usr/share/man \
+    --infodir=/usr/share/info \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --libdir=/usr/lib/x86_64-linux-gnu \
+    --libexecdir=/usr/lib/x86_64-linux-gnu \
+    --disable-maintainer-mode \
+    --bindir=/usr/bin \
+    --sbindir=/sbin \
+    --libdir=/lib \
+    --with-python=3 \
+    --with-udevdir=/lib/udev \
+    --with-systemdunitdir=/lib/systemd/system \
+    --with-systemdpresetdir=/lib/systemd/system-preset \
+    --with-linux=/lib/modules/{{ kernel_versions.stdout_lines[0] }}/build \
+    --with-linux-obj=/lib/modules/{{ kernel_versions.stdout_lines[0] }}/build"
+    cd /export/home/delphix/zfs
+    sh autogen.sh
+
+    ./configure $CONFIG_OPTS --enable-debug --enable-debuginfo
+
+    make -j$(nproc)
+  args:
+    executable: /bin/bash
+
 - file:
     path: "/export/home/delphix/zfs"
     owner: "delphix"

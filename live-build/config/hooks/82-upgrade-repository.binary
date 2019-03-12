@@ -24,6 +24,7 @@
 #
 
 set -o pipefail
+set +o nounset
 
 #
 # Sanity check to make sure we haven't installed multiple kernel versions.
