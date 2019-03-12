@@ -505,6 +505,64 @@ function migrate_configuration() {
 	EOF
 }
 
+function do_upgrade_container_in_place() {
+	run "$IMAGE_PATH/execute" -p "$(get_platform)" ||
+		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
+
+	run /bin/systemctl reload delphix-platform ||
+		die "'systemctl reload delphix-platform' failed in '$CONTAINER'"
+
+	run /bin/systemctl restart delphix-platform ||
+		die "'systemctl restart delphix-platform' failed in '$CONTAINER'"
+}
+
+function do_upgrade_container_not_in_place() {
+	run "$IMAGE_PATH/execute" -p "$(get_platform)" ||
+		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
+
+	run /bin/systemctl start delphix-platform ||
+		die "'systemctl start delphix-platform' failed in '$CONTAINER'"
+
+	migrate_configuration ||
+		die "failed to migrate configuration for '$CONTAINER'"
+}
+
+function get_type() {
+	local root origin
+
+	root=$(zfs list -Hpo name /var/lib/machines/"${CONTAINER}")
+	[[ -n "${root}" ]] || die "Failed to obtain root filesystem for container '${CONTAINER}'"
+	origin=$(zfs get -Hpo value origin "${root}")
+	[[ -n "${origin}" ]] || die "Failed to origin of the root filesystem '${root}' for container '${CONTAINER}'"
+
+	case "${origin}" in
+	-)
+		echo "not-in-place"
+		;;
+	*)
+		echo "in-place"
+		;;
+	esac
+}
+
+function do_upgrade_container() {
+	local type
+	type=$(get_type)
+	case $type in
+	in-place)
+		do_upgrade_container_in_place ||
+			die "failed to upgrade the in-place container"
+		;;
+	not-in-place)
+		do_upgrade_container_not_in_place ||
+			die "failed to upgrade the not-in-place container"
+		;;
+	*)
+		die "unsupported upgrade container type specified: '$type'"
+		;;
+	esac
+}
+
 function usage() {
 	echo "$(basename "$0"): $*" >&2
 
@@ -517,8 +575,9 @@ function usage() {
 	echo "$PREFIX_SPACES stop <container>"
 	echo "$PREFIX_SPACES destroy <container>"
 	echo "$PREFIX_SPACES run <container> <command>"
+	echo "$PREFIX_SPACES upgrade <container>"
 	echo "$PREFIX_SPACES convert-to-rootfs <container>"
-	echo "$PREFIX_SPACES migrate-configuration <container>"
+	echo "$PREFIX_SPACES get-type <container>"
 
 	exit 2
 }
@@ -564,17 +623,23 @@ run)
 	shift 2
 	run "$@"
 	;;
+upgrade)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	do_upgrade_container
+	;;
 convert-to-rootfs)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
 	[[ $# -gt 2 ]] && usage "too many arguments specified"
 	CONTAINER="$2"
 	convert_to_rootfs
 	;;
-migrate-configuration)
+get-type)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
 	[[ $# -gt 2 ]] && usage "too many arguments specified"
 	CONTAINER="$2"
-	migrate_configuration
+	get_type
 	;;
 *)
 	usage "invalid option specified: '$1'"

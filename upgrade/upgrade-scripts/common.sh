@@ -49,6 +49,13 @@ function compare_versions() {
 	dpkg --compare-versions "$@"
 }
 
+function report_progress() {
+	#
+	# Application stack depends on the format of the progress report for parsing.
+	#
+	echo "Progress increment: $(date +%T:%N%z), $1, $2"
+}
+
 function source_version_information() {
 	local IMAGE_PATH="${IMAGE_PATH:-$(get_image_path)}"
 	[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
@@ -81,16 +88,21 @@ function verify_upgrade_is_allowed() {
 			"($MINIMUM_VERSION)"
 }
 
-function verify_upgrade_in_place_is_allowed() {
+function is_upgrade_in_place_allowed() {
 	source_version_information
 
 	local INSTALLED_VERSION
 	INSTALLED_VERSION=$(get_installed_version)
 
 	compare_versions \
-		"$INSTALLED_VERSION" "ge" "$MINIMUM_REBOOT_OPTIONAL_VERSION" ||
-		die "upgrade in-place is not allowed;" \
+		"${INSTALLED_VERSION}" "ge" "${MINIMUM_REBOOT_OPTIONAL_VERSION}"
+}
+
+function verify_upgrade_in_place_is_allowed() {
+	if ! is_upgrade_in_place_allowed; then
+		die "upgrade in-place is not allowed for reboot required upgrade;" \
 			"installed version ($INSTALLED_VERSION)" \
 			"is less than minimum allowed version" \
 			"($MINIMUM_REBOOT_OPTIONAL_VERSION)"
+	fi
 }
