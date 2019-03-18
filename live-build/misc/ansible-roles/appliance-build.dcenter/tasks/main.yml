@@ -27,6 +27,7 @@
     - libldap2-dev
     - libsasl2-dev
     - nfs-kernel-server
+    - openjdk-8-jre-headless
     - python-ldap
     - python-paramiko
     - python-pip
