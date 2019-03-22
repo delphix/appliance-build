@@ -26,9 +26,9 @@ task ancillaryRepository(type: Exec) {
                     "AWS_S3_URI_MASKING",
                     "AWS_S3_URI_ZFS",
                     "AWS_S3_PREFIX_VIRTUALIZATION",
-                    "AWS_S3_PREFIX_USERLAND_PKGS",
                     "AWS_S3_PREFIX_MASKING",
-                    "AWS_S3_PREFIX_ZFS"]) {
+                    "AWS_S3_PREFIX_USERLAND_PKGS",
+                    "AWS_S3_PREFIX_KERNEL_PKGS"]) {
         inputs.property(envVar, System.getenv(envVar)).optional(true)
     }
 

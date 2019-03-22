@@ -149,20 +149,20 @@ AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
 	"$AWS_S3_PREFIX_VIRTUALIZATION" \
 	"dlpx-app-gate/${upstream_branch}/build-package/post-push/latest")
 
-AWS_S3_URI_USERLAND_PKGS=$(resolve_s3_uri \
-	"$AWS_S3_URI_USERLAND_PKGS" \
-	"$AWS_S3_PREFIX_USERLAND_PKGS" \
-	"devops-gate/master/linux-pkg-build/${upstream_branch}/userland/post-push/latest")
-
 AWS_S3_URI_MASKING=$(resolve_s3_uri \
 	"$AWS_S3_URI_MASKING" \
 	"$AWS_S3_PREFIX_MASKING" \
 	"dms-core-gate/${upstream_branch}/build-package/post-push/latest")
 
-AWS_S3_URI_ZFS=$(resolve_s3_uri \
-	"$AWS_S3_URI_ZFS" \
-	"$AWS_S3_PREFIX_ZFS" \
-	"devops-gate/${upstream_branch}/zfs-package-build/master/post-push/latest")
+AWS_S3_URI_USERLAND_PKGS=$(resolve_s3_uri \
+	"$AWS_S3_URI_USERLAND_PKGS" \
+	"$AWS_S3_PREFIX_USERLAND_PKGS" \
+	"devops-gate/master/linux-pkg-build/${upstream_branch}/userland/post-push/latest")
+
+AWS_S3_URI_KERNEL_PKGS=$(resolve_s3_uri \
+	"$AWS_S3_URI_KERNEL_PKGS" \
+	"$AWS_S3_PREFIX_KERNEL_PKGS" \
+	"devops-gate/master/linux-pkg-build/${upstream_branch}/kernel/post-push/latest")
 
 #
 # All package files will be placed into this temporary directory, such
@@ -177,9 +177,9 @@ PKG_DIRECTORY=$(mktemp -d -p "$TOP/build" tmp.pkgs.XXXXXXXXXX)
 # proceed to download these packages.
 #
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_USERLAND_PKGS"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_ZFS"
+download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_USERLAND_PKGS"
+download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_KERNEL_PKGS"
 
 #
 # Now that our temporary package directory has been populated with all
