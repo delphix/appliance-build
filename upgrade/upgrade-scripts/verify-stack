@@ -22,6 +22,7 @@ STACK_STARTUP_MDS_SNAPNAME="MDS-CLONE-stack-startup-verify"
 function stack_startup_verify_cleanup() {
 	local rc="$?"
 
+	report_progress 90 "Cleaning up stack startup verification"
 	if /opt/delphix/server/bin/dx_manage_pg isrunning -s ${STACK_STARTUP_MDS_SNAPNAME}; then
 		/opt/delphix/server/bin/dx_manage_pg stop -s "${STACK_STARTUP_MDS_SNAPNAME}" ||
 			die "failed to stop postgres for snapshot '${STACK_STARTUP_MDS_SNAPNAME}'."
@@ -32,14 +33,24 @@ function stack_startup_verify_cleanup() {
 			die "failed to cleanup postgres for snapshot '${STACK_STARTUP_MDS_SNAPNAME}'."
 	fi
 
+	[[ $rc -eq 0 ]] &&
+		# On success, we must report 100 progress. Java stack treats
+		# script execution a failure if non-zero status is reported or
+		# 100 progress is not reported.
+		report_progress 100 "Upgrade verification was successful"
 	return "$rc"
 }
+
+report_progress 10 "Started application startup upgrade verification"
+
+[[ "$EUID" -ne 0 ]] && die "must be run as root"
 
 trap stack_startup_verify_cleanup EXIT
 
 #
 # Make sure delphix-mgmt and delphix-postgres aren't running within container.
 #
+report_progress 15 "Checking verification preconditions"
 IS_ACTIVE_MGMT=$(systemctl is-active delphix-mgmt)
 [[ "${IS_ACTIVE_MGMT}" == "inactive" ]] ||
 	die "delphix-mgmt service expected to be 'inactive', found to be '${IS_ACTIVE_MGMT}'"
@@ -50,6 +61,7 @@ IS_ACTIVE_POSTGRES=$(systemctl is-active delphix-postgres@default)
 #
 # Create a copy of MDS and start the postgres service.
 #
+report_progress 20 "Creating verification dependencies"
 /opt/delphix/server/bin/dx_manage_pg clone -s "${STACK_STARTUP_MDS_SNAPNAME}" -l ||
 	die "failed to clone postgres"
 /opt/delphix/server/bin/dx_manage_pg start -s "${STACK_STARTUP_MDS_SNAPNAME}" -p 5432 ||
@@ -58,7 +70,11 @@ IS_ACTIVE_POSTGRES=$(systemctl is-active delphix-postgres@default)
 #
 # Start management stack up to post-upgrade logic.
 #
+report_progress 40 "Performing application startup upgrade verification"
 /opt/delphix/server/bin/start_mgmt_server_jvm -f /var/run/delphix-mgmt.pid ||
 	die "Stack startup verification failed."
 
-exit 0
+#
+# The cleanup logic will be run on EXIT, so rather than reporting 100
+# percent here, we use the cleanup logic to do the final reporting.
+#

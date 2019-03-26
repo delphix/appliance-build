@@ -111,17 +111,8 @@ function upgrade_in_place() {
 	"$IMAGE_PATH/upgrade-container" start "$CONTAINER" ||
 		die "failed to start '$CONTAINER'"
 
-	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-		"$IMAGE_PATH/execute" -p "$(get_platform)" ||
-		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
-
-	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-		/bin/systemctl reload delphix-platform ||
-		die "'systemctl reload delphix-platform' failed in '$CONTAINER'"
-
-	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-		/bin/systemctl restart delphix-platform ||
-		die "'systemctl restart delphix-platform' failed in '$CONTAINER'"
+	"$IMAGE_PATH/upgrade-container" upgrade "$CONTAINER" ||
+		die "Failed to do in-place upgrade on '$CONTAINER'"
 
 	if [[ "$DLPX_UPGRADE_SKIP_VERIFY" != "true" ]]; then
 		"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
@@ -189,21 +180,18 @@ function upgrade_not_in_place() {
 	"$IMAGE_PATH/upgrade-container" start "$CONTAINER" ||
 		die "failed to start upgrade '$CONTAINER'"
 
-	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-		"$IMAGE_PATH/execute" -p "$(get_platform)" ||
-		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
-
-	"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
-		/bin/systemctl start delphix-platform ||
-		die "'systemctl start delphix-platform' failed in '$CONTAINER'"
-
-	"$IMAGE_PATH/upgrade-container" migrate-configuration "$CONTAINER" ||
-		die "failed to migrate configuration for '$CONTAINER'"
+	"$IMAGE_PATH/upgrade-container" upgrade "$CONTAINER" ||
+		die "Failed to upgrade do not-in-place upgrade on '$CONTAINER'"
 
 	if [[ "$DLPX_UPGRADE_SKIP_VERIFY" != "true" ]]; then
 		"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
 			"$IMAGE_PATH/verify-jar" "$@" ||
 			die "'$IMAGE_PATH/verify-jar' '$*' failed in '$CONTAINER'"
+		if is_upgrade_in_place_allowed; then
+			"$IMAGE_PATH/upgrade-container" run "$CONTAINER" \
+				"$IMAGE_PATH/verify-stack" "$@" ||
+				die "'$IMAGE_PATH/verify-stack' '$*' failed in '$CONTAINER'"
+		fi
 	fi
 
 	"$IMAGE_PATH/upgrade-container" stop "$CONTAINER" ||

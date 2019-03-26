@@ -29,6 +29,8 @@ function usage() {
 function verify_jar_verify_cleanup() {
 	local rc="$?"
 
+	report_progress 90 "Cleaning up application upgrade verification"
+
 	#
 	# This name is used by the "upgrade-verify.jar" just executed, so we
 	# cannot change this value without also modifying that JAR.
@@ -44,17 +46,31 @@ function verify_jar_verify_cleanup() {
 		/opt/delphix/server/bin/dx_manage_pg cleanup -s "${MDS_SNAPNAME}" ||
 			die "failed to cleanup postgres for snapshot '${MDS_SNAPNAME}'."
 	fi
+
+	[[ $rc -eq 0 ]] &&
+		# On success, we must report 100 progress. Java stack treats
+		# script execution a failure if non-zero status is reported or
+		# 100 progress is not reported.
+		report_progress 100 "Upgrade verification was successful"
 	return "$rc"
 }
 
 opt_d=false
 while getopts ':df:l:o:' c; do
 	case "$c" in
-	f | l | o) eval "opt_$c=$OPTARG" ;;
-	d) eval "opt_$c=true" ;;
-	*) usage "illegal option -- $OPTARG" ;;
+	f | l | o)
+		eval "opt_$c=$OPTARG"
+		;;
+	d)
+		eval "opt_$c=true"
+		;;
+	*)
+		usage "illegal option -- $OPTARG"
+		;;
 	esac
 done
+
+report_progress 10 "Started application upgrade verification"
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
@@ -68,6 +84,8 @@ fi
 
 trap verify_jar_verify_cleanup EXIT
 
+report_progress 20 "Running application upgrade verification"
+
 /usr/bin/java \
 	-Dlog.dir=/var/delphix/server/upgrade-verify \
 	-Dmdsverify=true \
@@ -77,8 +95,11 @@ trap verify_jar_verify_cleanup EXIT
 	-f "${opt_f:-1}" \
 	-l "${opt_l:-en-US}" \
 	-v "$IMAGE_VERSION" \
-	-pl 60 -ph 80 \
+	-pl 25 -ph 80 \
 	$VERIFY_LIVE_MDS_OPT ||
 	die "'upgrade-verify.jar' failed in verification container"
 
-exit 0
+#
+# The cleanup logic will be run on EXIT, so rather than reporting 100
+# percent here, we use the cleanup logic to do the final reporting.
+#
