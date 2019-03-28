@@ -35,6 +35,13 @@ function apt_get() {
 		"$@"
 }
 
+function xargs_apt_get() {
+	DEBIAN_FRONTEND=noninteractive xargs apt-get \
+		-o Dpkg::Options::="--force-confdef" \
+		-o Dpkg::Options::="--force-confold" \
+		"$@"
+}
+
 while getopts ':rlBfsp:' c; do
 	case $c in
 	r | l | B | f | s) ;; # LX-72: For now, silently ignore these.
@@ -48,10 +55,11 @@ done
 [[ -z "$platform" ]] && usage "platform must be specified"
 
 #
-# It's possible for delphix-entire not to be already installed on the
-# root filesystem being upgraded when we're doing a not-in-place upgrade.
-# Thus, when we can't determine the installed version of delphix-entire,
-# we assume we're doing a not-in-place upgrade, and skip this check.
+# It's possible for the delphix-entire package not to be already
+# installed on the root filesystem being upgraded when we're doing a
+# not-in-place upgrade. Thus, when we can't determine the installed
+# version of delphix-entire, we assume we're doing a not-in-place
+# upgrade, and skip this check.
 #
 INSTALLED_VERSION=$(get_installed_version)
 [[ -n "$INSTALLED_VERSION" ]] && verify_upgrade_is_allowed
@@ -70,49 +78,48 @@ apt_get update || die "failed to update apt sources"
 
 #
 # First make sure delphix-platform-<platform> is installed. This package
-# is a dependency of delphix-entire-<platform> and would be installed
-# even if we just directly installed delphix-entire-<platform>. However,
+# is required by delphix-entire-<platform>, and would be installed even
+# if we just relied on the packages.list.gz file log below. However,
 # there are problems related to virtual packages that arise if we just
-# directly install delphix-entire-<platform>. In particular, if
-# delphix-entire is installed first, the following can happen (using
-# AWS as the example for the platform on which the upgrade is being
-# done):
+# did that. In particular, the following could happen (using AWS as the
+# example for the platform on which the upgrade is being done):
 #
-#  - We run 'apt-get install delphix-entire-aws'
+#  - We install the package requirements for "delphix-entire-aws" using
+#    the packages.list.gz file.
 #
-#  - Apt sees delphix-entire-aws relies on delphix-virtualization, so it
-#    marks that package and its dependencies for installation. One of
-#    its dependencies is the virtual package delphix-platform.
+#  - One of the packages in that list is the "delphix-virtualization"
+#    package, so it marks that package and its dependencies for
+#    installation. One of its dependencies is the virtual package
+#    "delphix-platform".
 #
-#  - Apt sees that there are multiple concrete packages which provide
-#    the delphix-platform virtual package. It chooses one of these
-#    arbitrarily, say delphix-platform-kvm.
+#  - Apt then sees that there are multiple concrete packages which
+#    provide the "delphix-platform" virtual package. It chooses one of
+#    these arbitrarily, say "delphix-platform-kvm".
 #
-#  - Apt marks all of the transitive dependencies of
-#    delphix-platform-kvm for installation, including, say,
-#    linux-image-4.15.0-1028-kvm.
+#  - Apt marks all transitive dependencies of "delphix-platform-kvm" for
+#    installation, including, say, "linux-image-4.15.0-1028-kvm".
 #
-#  - After finishing processing the dependencies of
-#    delphix-virtualization, Apt continues processing the other
-#    dependencies of delphix-entire-aws, including delphix-platform-aws.
+#  - After processing the dependencies of "delphix-virtualization", Apt
+#    continues to process the other dependencies of "delphix-entire-aws",
+#    including "delphix-platform-aws".
 #
-#  - Apt sees that delphix-platform-aws conflicts with
-#    delphix-platform-kvm, so it un-marks delphix-platform-kvm for
-#    installation, allowing delphix-platform-aws to satisfy
-#    virtualization's dependency on delphix-platform instead. However,
+#  - Apt then sees that "delphix-platform-aws" conflicts with
+#    "delphix-platform-kvm", so it un-marks "delphix-platform-kvm" for
+#    installation, allowing "delphix-platform-aws" to satisfy the
+#    "delphix-virtualization" dependency on "delphix-platform". However,
 #    it does _not_ unmark all of the dependencies of
-#    delphix-platform-kvm, so some unnecessary kvm-related packages end
-#    up being installed, such as linux-image-4.15.0-1028-kvm.
+#    "delphix-platform-kvm", so some unnecessary kvm-related packages
+#    end up being installed, such as "linux-image-4.15.0-1028-kvm"
 #
 # In short, we can end up with some unwanted packages installed because
 # Apt marked and then unmarked some package for installation while
 # trying to satisfy a dependency on a virtual package.
 #
 # To avoid this we install the delphix-platform-<platform> package that
-# we want before installing delphix-entire-<platform>. If some
-# delphix-platform package is already installed, that dependency is
-# already satisfied and Apt doesn't need to choose an arbitrary one to
-# satisfy the dependency.
+# we want before installing delphix-entire-<platform> and it's required
+# packages. If some delphix-platform package is already installed, that
+# dependency is already satisfied and Apt doesn't need to choose an
+# arbitrary one to satisfy the dependency.
 #
 # In general, we don't want upgrade to need know too much about the set
 # of packages to be installed. However, it seems reasonable to make an
@@ -125,36 +132,112 @@ apt_get install -y "delphix-platform-$platform" ||
 	die "failed to install delphix-platform"
 
 #
-# Now that we know we have a delphix-platform-<platform> packages
-# installed, go ahead and install delphix-entire-<platform>.
+# To enable the use of "autoremove" later in this script to remove all
+# packages that are no longer required after the upgrade, we need to
+# mark all packages currently installed as "auto" installed. This way,
+# after explicitly installing all packages for the new "delphix-entire"
+# version, the only "auto" installed packages still remaining on the
+# system will be ones that aren't required by the new "delphix-entire".
 #
-source_version_information
-apt_get install -y "delphix-entire-$platform=$VERSION" ||
-	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
+dpkg-query -Wf '${Package}\n' | xargs apt-mark auto ||
+	die "failed to mark packages as 'auto' installed"
 
 #
-# After we've successfully installed the new delphix-entire package, we
-# need to remove all packages that are no longer required. For example,
-# if the old version depended on a package, and the new version no
-# longer depends on that package, the upgrade performed above will not
-# remove this package. Thus, we need to run the "autoremove" to remove
-# these packages that are no longer required.
+# While we marked all packages to "auto" above, so they'd be removed
+# when they're no longer required, we want to prevent the removal of old
+# kernel packages. This is so that we can boot into the old kernel(s)
+# if we ever need to; e.g. after a failed kernel upgrade. We accomplish
+# this by marking all "delphix-kernel-*" packages as "manual"-ly
+# installed. The "delphix-kernel-*" package(s) will have package
+# dependencies on the linux kernel package(s), and all other kernel
+# packages that're required for that specific kernel (e.g. zfs kernel
+# module package, connstat kernel module package, etc.). Thus, as long
+# as the "delphix-kernel-*" package remains installed, all other
+# dependent packages should also remain installed.
+#
+dpkg-query -Wf '${Package}\n' "delphix-kernel-*" | xargs apt-mark manual ||
+	die "failed to mark 'delphix-kernel-*' packages as 'manual' installed"
+
+#
+# In order to perform an upgrade of the Delphix appliance, we must first
+# install the "delphix-entire" package. This package will contain a
+# "packages.list.gz" file, which has a (gzip compressed) list of all the
+# packages that need to be installed for that particular version of the
+# Delphix appliance. We then use that file to explicitly install all of
+# those packages.
+#
+# We use this file rather than package dependencies (e.g. having the
+# "delphix-entire" package "Depends" on all the packages) for a couple
+# of reasons:
+#
+# 1. When moving from one "delphix-entire" version to another, it's
+#    possible that we'll want to "downgrade" some package that the
+#    "delphix-entire" package would depend on. Unfortunately, if we
+#    simply used "apt-get install delphix-entire", this would not allow
+#    us to install the "downgraded" version of the package.
+#
+#    For example, consider the following situation:
+#
+#        - "delphix-entire" is currently installed at version 2.0
+#        - "zfs" is currently installed at version 2.0
+#        - "delphix-entire" version 3.0 depends on "zfs" version 1.0
+#
+#    If we tried to "apt-get install delphix-entire=3.0" it would fail
+#    because it could not install "zfs" version 1.0, since that'd be a
+#    downgrade of the "zfs" package. This is because "apt-get install"
+#    doesn't support downgrading dependent packages, only packages
+#    explicitly specified on the command line; e.g. we'd have to run the
+#    command "apt-get install delphix-entire=3.0 zfs=1.0" for this to
+#    work.
+#
+# 2. Often times, developers want to build and install upgraded packages
+#    that "delphix-entire" would depend on. Since the dependencies of
+#    the "delphix-entire" package would have to depend on explicit
+#    versions of each package, this would prevent packages from being
+#    upgraded without either:
+#
+#        a) also removing the "delphix-entire" package, or
+#        b) building and installing new "delphix-entire" package that
+#           depends on the new package being installed.
+#
+#    Both options, (a) and (b), are undesirable; by not using package
+#    dependencies we avoid having to deal with this problem.
+#
+
+source_version_information
+
+# shellcheck disable=SC2153
+apt_get install -y --allow-downgrades "delphix-entire-$platform=$VERSION" ||
+	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
+
+[[ -f "/usr/share/doc/delphix-entire-$platform/packages.list.gz" ]] ||
+	die "delphix-entire's packages.list.gz file is missing"
+
+zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
+	xargs_apt_get install -y --allow-downgrades ||
+	die "failed to install packages listed in packages.list.gz file"
+
+#
+# After we've successfully installed the new packages, we need to remove
+# all packages that are no longer required. For example, if the old
+# "delphix-entire" version required a package, and the new version no
+# longer requires that package, the commands run above will not remove
+# the package. Thus, we need to run "autoremove" to ensure all packages
+# that fall into this category are removed.
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
 
 #
-# Finally, for all of the packages that delphix-entire depends on, we
-# verify the package is installed and its version is correct; this is
-# simply to help us be confident that upgrade behaves as we expect.
+# Finally, for all of the packages listed in the "packages.list" file,
+# we verify the package is installed and its version is correct; this
+# is simply to help us be confident that upgrade behaves as we expect.
 #
-dpkg-query -Wf '${Depends}' "delphix-entire-$platform" |
-	sed 's/, /\n/g' |
-	sed 's/^\(.*\) (\(.*\) \(.*\))$/\1 \2 \3/g' |
-	while read -r package op dependency; do
-		installed=$(dpkg-query -Wf '${Version}' "$package")
-		compare_versions "$installed" "$op" "$dependency" ||
-			die "'$package' package version incompatible;" \
-				"'$installed' '$op' '$dependency'"
+zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" | sed 's/=/ /' |
+	while read -r name version; do
+		installed=$(dpkg-query -Wf '${Version}' "$name")
+		compare_versions "$installed" "=" "$version" ||
+			die "'$name' package version incompatible;" \
+				"'$installed' '=' '$version'"
 	done || die "verification of package versions failed"
 
 if [[ -f /etc/apt/sources.list.orig ]]; then
