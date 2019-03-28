@@ -132,8 +132,17 @@ echo "Running MDS Command: '$command'"
 	die "Failed mds_client command."
 
 #
+# Let the app-stack know that an "OS migration" upgrade is being performed.
+#
+cat <<-EOF >"/var/dlpx-update/upgrade.properties" ||
+	UPGRADE_TYPE=OS_MIGRATION
+EOF
+	die "failed to create upgrade.properties"
+
+#
 # Create linux /var/delphix dataset from a clone of the current
-# /var/delphix dataset.
+# /var/delphix dataset. We want to do this last as this will carry-over all
+# the logs and the /var/delphix/migration directory into Linux.
 #
 LX_VAR_DLPX="$LX_RDS_PARENT/data"
 CUR_VAR_DLPX=$(zfs list -Ho name /var/delphix)
