@@ -48,21 +48,68 @@ def artifactTypes = ["aws": "vmdk",
                      "gcp": "gcp.tar.gz",
                      "kvm": "qcow2"]
 
+def configTaskSuffix = "Configuration"
+def configRunType = "configuration"
+def upgradeArtifactsTaskSuffix = "UpgradeArtifacts"
+def upgradeArtifactsRunType = "upgrade-artifacts"
+def vmArtifactsTaskSuffix = "VmArtifacts"
+def vmArtifactsRunType = "vm-artifacts"
+
 /*
- * Create tasks to build VM artifacts. For instance, the task 'buildInternalDevEsx' will produce
- * an artifact 'internal-dev-esx.ova'.
+ * Create tasks for common configuration hooks.
  */
 for (variant in allVariants) {
     for (platform in allPlatforms) {
         def taskSuffix = "${toCamelCase(variant).capitalize()}${platform.capitalize()}"
-        def t = tasks.create("build${taskSuffix}", Exec) { task ->
+        def t = tasks.create("build${taskSuffix}${configTaskSuffix}", Exec) { task ->
             group = 'Build'
-            description = "Builds the ${variant} variant of the appliance for ${platform}"
+            description = "Runs the common configuration hooks for the live build"
             dependsOn ancillaryRepository
             dependsOn mkArtifactsDir
 
             inputs.dir "${projectDir}/auto"
-            inputs.dir "${projectDir}/config"
+            inputs.files fileTree("${projectDir}/config") {
+                exclude "hooks/"
+            }
+            inputs.dir "${projectDir}/config/hooks/${configRunType}"
+            inputs.dir "${projectDir}/misc"
+            inputs.dir "${projectDir}/variants"
+            inputs.file "${rootProject.projectDir}/scripts/run-live-build.sh"
+
+            for (envVar in ["APPLIANCE_PASSWORD",
+                            "DELPHIX_SIGNATURE_URL",
+                            "DELPHIX_SIGNATURE_TOKEN",
+                            "DELPHIX_APPLIANCE_VERSION"]) {
+                inputs.property(envVar, System.getenv(envVar)).optional(true)
+            }
+
+            commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform, configRunType
+        }
+
+        tasks.create("clean${taskSuffix}${configTaskSuffix}", Exec) {
+            commandLine "rm", "-rf", "${buildDir}/${variant}-${platform}"
+        }
+        tasks.clean.dependsOn "clean${taskSuffix}${configTaskSuffix}"
+    }
+}
+
+/*
+ * Create tasks to build upgrade image artifacts. For instance, the task 'buildInternalDevEsxUpgradeArtifacts' will produce
+ * an artifact 'internal-dev-esx.debs.tar.gz'. These tasks depend on their configuration task counterpart.
+ */
+for (variant in allVariants) {
+    for (platform in allPlatforms) {
+        def taskSuffix = "${toCamelCase(variant).capitalize()}${platform.capitalize()}"
+        def t = tasks.create("build${taskSuffix}${upgradeArtifactsTaskSuffix}", Exec) { task ->
+            group = 'Build'
+            description = "Builds the upgrade image artifacts for the ${variant} variant of the appliance for ${platform}"
+            dependsOn "build${taskSuffix}${configTaskSuffix}"
+
+            inputs.dir "${projectDir}/auto"
+            inputs.files fileTree("${projectDir}/config") {
+                exclude "hooks/"
+            }
+            inputs.dir "${projectDir}/config/hooks/${upgradeArtifactsRunType}"
             inputs.dir "${projectDir}/misc"
             inputs.dir "${projectDir}/variants"
             inputs.file "${rootProject.projectDir}/scripts/run-live-build.sh"
@@ -75,13 +122,72 @@ for (variant in allVariants) {
             }
 
             outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
+
+            commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform, upgradeArtifactsRunType
+        }
+
+        tasks.create("clean${taskSuffix}${upgradeArtifactsTaskSuffix}", Exec) {
+            commandLine "rm", "-rf", "${buildDir}/${variant}-${platform}"
+        }
+        tasks.clean.dependsOn "clean${taskSuffix}${upgradeArtifactsTaskSuffix}"
+    }
+}
+
+/*
+ * Create tasks to build VM artifacts. For instance, the task 'buildInternalDevEsxVmArtifacts' will produce
+ * an artifact 'internal-dev-esx.ova'. These tasks depend on their configuration task counterpart.
+ */
+for (variant in allVariants) {
+    for (platform in allPlatforms) {
+        def taskSuffix = "${toCamelCase(variant).capitalize()}${platform.capitalize()}"
+        def t = tasks.create("build${taskSuffix}${vmArtifactsTaskSuffix}", Exec) { task ->
+            group = 'Build'
+            description = "Builds the VM artifacts for the ${variant} variant of the appliance for ${platform}"
+            dependsOn "build${taskSuffix}${configTaskSuffix}"
+
+            inputs.dir "${projectDir}/auto"
+            inputs.files fileTree("${projectDir}/config") {
+                exclude "hooks/"
+            }
+            inputs.dir "${projectDir}/config/hooks/${vmArtifactsRunType}"
+            inputs.dir "${projectDir}/misc"
+            inputs.dir "${projectDir}/variants"
+            inputs.file "${rootProject.projectDir}/scripts/run-live-build.sh"
+
+            for (envVar in ["APPLIANCE_PASSWORD",
+                            "DELPHIX_SIGNATURE_URL",
+                            "DELPHIX_SIGNATURE_TOKEN",
+                            "DELPHIX_APPLIANCE_VERSION"]) {
+                inputs.property(envVar, System.getenv(envVar)).optional(true)
+            }
+
             if (variant != "internal-minimal") {
                 // We don't bother creating a migration image for internal-minimal
                 outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
             }
             outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
 
-            commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform
+            commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform, vmArtifactsRunType
+        }
+
+        tasks.create("clean${taskSuffix}${vmArtifactsTaskSuffix}", Exec) {
+            commandLine "rm", "-rf", "${buildDir}/${variant}-${platform}"
+        }
+        tasks.clean.dependsOn "clean${taskSuffix}${vmArtifactsTaskSuffix}"
+    }
+}
+
+/*
+ * Create tasks to build everything. These tasks simply run both upgrade and VM image tasks.
+ */
+for (variant in allVariants) {
+    for (platform in allPlatforms) {
+        def taskSuffix = "${toCamelCase(variant).capitalize()}${platform.capitalize()}"
+        def t = tasks.create("build${taskSuffix}", Exec) { task ->
+            group = 'Build'
+            description = "Builds all artifacts for the ${variant} variant of the appliance for ${platform}"
+            dependsOn "build${taskSuffix}${upgradeArtifactsTaskSuffix}"
+            dependsOn "build${taskSuffix}${vmArtifactsTaskSuffix}"
         }
 
         tasks.create("clean${taskSuffix}", Exec) {

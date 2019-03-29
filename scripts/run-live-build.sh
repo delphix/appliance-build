@@ -27,11 +27,26 @@ if [[ $EUID -ne 0 ]]; then
 	exit 1
 fi
 
-if [[ $# -ne 2 ]]; then
-	echo "Must specify a single variant and a single platfom " \
-		"(e.g. 'internal-minimal esx')." 1>&2
+if [[ $# -ne 3 ]]; then
+	echo "Must specify a single variant, a single platform, and a run " \
+		"type (e.g. 'internal-minimal esx upgrade')." 1>&2
 	exit 1
 fi
+
+# Verify a valid run type is given
+CONFIG_RUN_TYPE="configuration"
+UPGRADE_RUN_TYPE="upgrade-artifacts"
+VM_RUN_TYPE="vm-artifacts"
+RUN_TYPES="$CONFIG_RUN_TYPE|$UPGRADE_RUN_TYPE|$VM_RUN_TYPE"
+case "$3" in
+$CONFIG_RUN_TYPE) ;;
+$UPGRADE_RUN_TYPE) ;;
+$VM_RUN_TYPE) ;;
+*)
+	echo "Unknown run type '$3'. Must be one of <$RUN_TYPES>"
+	exit 1
+	;;
+esac
 
 set -o errexit
 set -o pipefail
@@ -51,6 +66,7 @@ set -o xtrace
 
 export APPLIANCE_VARIANT="$1"
 export APPLIANCE_PLATFORM="$2"
+export RUN_TYPE="$3"
 export ARTIFACT_NAME="$APPLIANCE_VARIANT-$APPLIANCE_PLATFORM"
 
 if [[ ! -d "$TOP/live-build/variants/$APPLIANCE_VARIANT" ]]; then
@@ -64,7 +80,11 @@ rm -rf "$build_dir"
 mkdir -p "$build_dir"
 
 cp -r "$TOP/live-build/auto" "$build_dir"
-cp -r "$TOP/live-build/config" "$build_dir"
+
+# We need to only copy over the hooks determined by the run type
+rsync -a --exclude="hooks" "$TOP/live-build/config" "$build_dir"
+cp -r "$TOP/live-build/config/hooks/$RUN_TYPE" "$build_dir/config/hooks"
+
 cp -r "$TOP/live-build/variants/$APPLIANCE_VARIANT/ansible" "$build_dir"
 cp -r "$TOP/live-build/misc/migration-scripts" "$build_dir"
 
