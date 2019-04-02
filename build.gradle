@@ -45,7 +45,8 @@ for (variant in allVariants) {
             for (platform in platforms.trim().split()) {
                 def dependentTask = "build" +
                                     toCamelCase(variant).capitalize() +
-                                    platform.capitalize()
+                                    platform.capitalize() +
+                                    "UpgradeArtifacts"
                 dependsOn ":live-build:${dependentTask}"
             }
         }

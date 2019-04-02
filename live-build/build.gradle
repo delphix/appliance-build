@@ -48,46 +48,99 @@ def artifactTypes = ["aws": "vmdk",
                      "gcp": "gcp.tar.gz",
                      "kvm": "qcow2"]
 
+def configDir = "configuration"
+
+def upgradeArtifactsRunType = "upgrade-artifacts"
+def vmArtifactsRunType = "vm-artifacts"
+def allRunType = "all"
+def runTypesAndSuffixes = [[upgradeArtifactsRunType, "UpgradeArtifacts"],
+                           [vmArtifactsRunType, "VmArtifacts"],
+                           [allRunType, ""]]
+
 /*
- * Create tasks to build VM artifacts. For instance, the task 'buildInternalDevEsx' will produce
- * an artifact 'internal-dev-esx.ova'.
+ * Create tasks to the upgrade artifacts only, VM artifacts only, or everything.
  */
 for (variant in allVariants) {
     for (platform in allPlatforms) {
-        def taskSuffix = "${toCamelCase(variant).capitalize()}${platform.capitalize()}"
-        def t = tasks.create("build${taskSuffix}", Exec) { task ->
-            group = 'Build'
-            description = "Builds the ${variant} variant of the appliance for ${platform}"
-            dependsOn ancillaryRepository
-            dependsOn mkArtifactsDir
+        runTypesAndSuffixes.each { runType, runSuffix ->
+            def taskSuffix = "${toCamelCase(variant).capitalize()}${platform.capitalize()}"
+            def t = tasks.create("build${taskSuffix}${runSuffix}", Exec) { task ->
+                group = 'Build'
 
-            inputs.dir "${projectDir}/auto"
-            inputs.dir "${projectDir}/config"
-            inputs.dir "${projectDir}/misc"
-            inputs.dir "${projectDir}/variants"
-            inputs.file "${rootProject.projectDir}/scripts/run-live-build.sh"
+                switch (runType) {
+                    case upgradeArtifactsRunType:
+                        description = "Builds the upgrade image artifacts for the ${variant} variant of the appliance for ${platform}"
+                        break
+                    case vmArtifactsRunType:
+                        description = "Builds the VM artifacts for the ${variant} variant of the appliance for ${platform}"
+                        break
+                    case allRunType:
+                        description = "Builds all artifacts for the ${variant} variant of the appliance for ${platform}"
+                        break
+                }
 
-            for (envVar in ["APPLIANCE_PASSWORD",
-                            "DELPHIX_SIGNATURE_URL",
-                            "DELPHIX_SIGNATURE_TOKEN",
-                            "DELPHIX_APPLIANCE_VERSION"]) {
-                inputs.property(envVar, System.getenv(envVar)).optional(true)
+                dependsOn ancillaryRepository
+                dependsOn mkArtifactsDir
+
+                inputs.dir "${projectDir}/auto"
+                inputs.files fileTree("${projectDir}/config") {
+                    exclude "hooks/"
+                }
+                inputs.dir "${projectDir}/config/hooks/${configDir}"
+
+                switch (runType) {
+                    case upgradeArtifactsRunType:
+                        inputs.dir "${projectDir}/config/hooks/${upgradeArtifactsRunType}"
+                        break
+                    case vmArtifactsRunType:
+                        inputs.dir "${projectDir}/config/hooks/${vmArtifactsRunType}"
+                        break
+                    case allRunType:
+                        inputs.dir "${projectDir}/config/hooks/${upgradeArtifactsRunType}"
+                        inputs.dir "${projectDir}/config/hooks/${vmArtifactsRunType}"
+                        break
+                }
+
+                inputs.dir "${projectDir}/misc"
+                inputs.dir "${projectDir}/variants"
+                inputs.file "${rootProject.projectDir}/scripts/run-live-build.sh"
+
+                for (envVar in ["APPLIANCE_PASSWORD",
+                                "DELPHIX_SIGNATURE_URL",
+                                "DELPHIX_SIGNATURE_TOKEN",
+                                "DELPHIX_APPLIANCE_VERSION"]) {
+                    inputs.property(envVar, System.getenv(envVar)).optional(true)
+                }
+
+                switch (runType) {
+                    case upgradeArtifactsRunType:
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
+                        break
+                    case vmArtifactsRunType:
+                        if (variant != "internal-minimal") {
+                            // We don't bother creating a migration image for internal-minimal
+                            outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
+                        }
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
+                        break
+                    case allRunType:
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
+                        if (variant != "internal-minimal") {
+                            // We don't bother creating a migration image for internal-minimal
+                            outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
+                        }
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
+                        break
+                }
+
+                commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform, runType
             }
 
-            outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
-            if (variant != "internal-minimal") {
-                // We don't bother creating a migration image for internal-minimal
-                outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
+            tasks.create("clean${taskSuffix}${runSuffix}", Exec) {
+                commandLine "rm", "-rf", "${buildDir}/${variant}-${platform}"
             }
-            outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
-
-            commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform
+            tasks.clean.dependsOn "clean${taskSuffix}${runSuffix}"
         }
-
-        tasks.create("clean${taskSuffix}", Exec) {
-            commandLine "rm", "-rf", "${buildDir}/${variant}-${platform}"
-        }
-        tasks.clean.dependsOn "clean${taskSuffix}"
     }
 }
 
