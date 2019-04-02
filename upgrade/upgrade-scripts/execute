@@ -55,14 +55,55 @@ done
 [[ -z "$platform" ]] && usage "platform must be specified"
 
 #
+# When upgrading the packages on with this script, we want to ensure
+# that only a single process is attempting to do this at any given time.
+# Thus, we add some locking in case multiple processes call this script
+# concurrently; to prevent accidental corruption and/or failures.
+#
+if [[ "$UPGRADE_EXECUTE_LOCKED" != "true" ]]; then
+	exec env UPGRADE_EXECUTE_LOCKED="true" \
+		flock -e "/var/run/delphix-upgrade-execute-lock" "$0" "$@"
+fi
+
+source_version_information
+
+INSTALLED_VERSION=$(get_installed_version)
+
+#
 # It's possible for the delphix-entire package not to be already
 # installed on the root filesystem being upgraded when we're doing a
 # not-in-place upgrade. Thus, when we can't determine the installed
 # version of delphix-entire, we assume we're doing a not-in-place
-# upgrade, and skip this check.
+# upgrade, and skip the version verification and snapshot generation.
 #
-INSTALLED_VERSION=$(get_installed_version)
-[[ -n "$INSTALLED_VERSION" ]] && verify_upgrade_is_allowed
+if [[ -n "$INSTALLED_VERSION" ]]; then
+	verify_upgrade_is_allowed
+
+	ROOTFS_CONTAINER="$(get_mounted_rootfs_container_dataset)"
+	[[ -n "$ROOTFS_CONTAINER" ]] ||
+		die "unable to determine currently mounted rootfs container"
+
+	#
+	# It's possible for this script to be run multiple times,
+	# and each time this script is run, we want to keep a
+	# unique snapshot for each invocation.
+	#
+	# shellcheck disable=SC2002
+	UNIQUE="$(cat /dev/urandom | tr -cd '[:alnum:]' | head -c 7)"
+	[[ -n "$UNIQUE" ]] ||
+		die "failed to generate unique snapshot name suffix"
+
+	#
+	# We need to keep the snapshot names used here in sync with the
+	# logic that retrieves the snapshot name during rollback. Thus,
+	# if we change the snapshot names here, we likely also need to
+	# modify "get_dataset_rollback_snapshot_name()" in "common.sh".
+	#
+	# shellcheck disable=SC2153
+	zfs snapshot -r \
+		"$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE" ||
+		die "failed to create recursive rootfs container snapshot"
+fi
 
 if [[ -f /etc/apt/sources.list ]]; then
 	mv /etc/apt/sources.list /etc/apt/sources.list.orig ||
@@ -203,8 +244,6 @@ dpkg-query -Wf '${Package}\n' "delphix-kernel-*" | xargs apt-mark manual ||
 #    Both options, (a) and (b), are undesirable; by not using package
 #    dependencies we avoid having to deal with this problem.
 #
-
-source_version_information
 
 # shellcheck disable=SC2153
 apt_get install -y --allow-downgrades "delphix-entire-$platform=$VERSION" ||

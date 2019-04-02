@@ -56,6 +56,14 @@ function create_upgrade_container() {
 	trap create_cleanup EXIT
 	local type="$1"
 
+	case "$type" in
+	in-place | not-in-place | rollback) ;;
+
+	*)
+		die "unsupported upgrade container type specified: '$1'"
+		;;
+	esac
+
 	#
 	# We want to use "/var/lib/machines" as the parent directory,
 	# since that directory is used by "systemd-nspawn" when looking
@@ -68,9 +76,9 @@ function create_upgrade_container() {
 	CONTAINER=$(basename "$DIRECTORY")
 	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
 
-	ROOTFS_PARENT=$(dirname "$(get_mounted_rootfs_name)")
-	zfs snapshot -r "$ROOTFS_PARENT@$CONTAINER" ||
-		die "failed to create recursive upgrade container snapshot"
+	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
+	[[ -n "$ROOTFS_DATASET" ]] ||
+		die "unable to determine mounted rootfs container dataset"
 
 	zfs create \
 		-o canmount=off \
@@ -79,12 +87,39 @@ function create_upgrade_container() {
 		die "failed to create upgrade filesystem"
 
 	case "$type" in
-	in-place)
+	in-place | not-in-place)
+		#
+		# When creating a new "in-place" or "not-in-place"
+		# upgrade container, we need to snapshot the currently
+		# mounted rootfs datasets, so these snapshots can be
+		# used to create the new container datasets below.
+		#
+		SNAPSHOT_NAME="container-$CONTAINER"
+		zfs snapshot -r "$ROOTFS_DATASET@$SNAPSHOT_NAME" ||
+			die "failed to create upgrade container snapshots"
+		;;
+	rollback)
+		#
+		# When the "execute" script is used to perform an
+		# in-place upgrade, it will create a snapshot on the
+		# rootfs container datasets that are upgraded. It's this
+		# snapshot name that we're attempting to find here, as
+		# these snapshots are used to create the new "rollback"
+		# upgrade container datasets below.
+		#
+		SNAPSHOT_NAME=$(get_dataset_rollback_snapshot_name "$ROOTFS_DATASET")
+		[[ -n "$SNAPSHOT_NAME" ]] ||
+			die "unable to determine rollback snapshot name"
+		;;
+	esac
+
+	case "$type" in
+	in-place | rollback)
 		zfs clone \
 			-o canmount=noauto \
 			-o compression=on \
 			-o mountpoint="$DIRECTORY" \
-			"$ROOTFS_PARENT/root@$CONTAINER" \
+			"$ROOTFS_DATASET/root@$SNAPSHOT_NAME" \
 			"rpool/ROOT/$CONTAINER/root" ||
 			die "failed to create upgrade / clone"
 
@@ -119,28 +154,19 @@ function create_upgrade_container() {
 			bionic "$DIRECTORY" "file://$IMAGE_PATH/public" 1>&2 ||
 			die "failed to debootstrap upgrade filesystem"
 		;;
-	*)
-		die "unsupported upgrade container type specified: '$1'"
-		;;
 	esac
 
-	#
-	# We require the contents of /export/home and /var/delphix to persist
-	# across an upgrade, so we always use a clone of these datasets,
-	# regardless of if we're creating an in-place or not-in-place upgrade
-	# container.
-	#
 	zfs clone \
 		-o compression=on \
 		-o mountpoint=legacy \
-		"$ROOTFS_PARENT/home@$CONTAINER" \
+		"$ROOTFS_DATASET/home@$SNAPSHOT_NAME" \
 		"rpool/ROOT/$CONTAINER/home" ||
 		die "failed to create upgrade /export/home clone"
 
 	zfs clone \
 		-o compression=on \
 		-o mountpoint=legacy \
-		"$ROOTFS_PARENT/data@$CONTAINER" \
+		"$ROOTFS_DATASET/data@$SNAPSHOT_NAME" \
 		"rpool/ROOT/$CONTAINER/data" ||
 		die "failed to create upgrade /var/delphix clone"
 
@@ -345,9 +371,12 @@ function destroy() {
 			die "failed to destroy container dataset: '$CONTAINER'"
 	fi
 
-	ROOTFS_PARENT=$(dirname "$(get_mounted_rootfs_name)")
-	if zfs list "$ROOTFS_PARENT@$CONTAINER" &>/dev/null; then
-		zfs destroy -r "$ROOTFS_PARENT@$CONTAINER" ||
+	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
+	[[ -n "$ROOTFS_DATASET" ]] ||
+		die "unable to determine mounted rootfs container dataset"
+
+	if zfs list "$ROOTFS_DATASET@container-$CONTAINER" &>/dev/null; then
+		zfs destroy -r "$ROOTFS_DATASET@container-$CONTAINER" ||
 			die "failed to destroy container snapshot: '$CONTAINER'"
 	fi
 
@@ -570,7 +599,7 @@ function usage() {
 	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
 	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
 
-	echo "$PREFIX_STRING create [in-place|not-in-place]"
+	echo "$PREFIX_STRING create [in-place|not-in-place|rollback]"
 	echo "$PREFIX_SPACES start <container>"
 	echo "$PREFIX_SPACES stop <container>"
 	echo "$PREFIX_SPACES destroy <container>"
@@ -590,7 +619,7 @@ create)
 	[[ $# -gt 2 ]] && usage "too many arguments specified"
 
 	case "$2" in
-	in-place | not-in-place)
+	in-place | not-in-place | rollback)
 		create_upgrade_container "$2"
 		;;
 	*)
