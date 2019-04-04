@@ -428,6 +428,15 @@ function migrate_file() {
 			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
 		cp "$path" "/var/lib/machines/${CONTAINER}${path}" ||
 			die "'cp $path' failed for '$CONTAINER'"
+	else
+		if [[ -f "/var/lib/machines/${CONTAINER}${path}" ]]; then
+			# If the target file doesn't exist in the host then
+			# we delete the file. This case could happen if the host
+			# configuration doesn't exist but a fresh install placed
+			# package default configuration.
+			rm "/var/lib/machines/${CONTAINER}${path}" ||
+				die "failed to remove '$path' in '$CONTAINER'"
+		fi
 	fi
 }
 
