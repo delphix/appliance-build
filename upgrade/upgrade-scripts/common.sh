@@ -36,6 +36,36 @@ function get_image_version() {
 	basename "$(get_image_path)"
 }
 
+function get_mounted_rootfs_container_dataset() {
+	dirname "$(zfs list -Hpo name /)"
+}
+
+function get_mounted_rootfs_container_name() {
+	basename "$(get_mounted_rootfs_container_dataset)"
+}
+
+function get_dataset_snapshots() {
+	zfs list -d 1 -rt snapshot -Hpo name -s creation "$1"
+}
+
+function get_dataset_rollback_snapshot_name() {
+	#
+	# When the "execute" script is used to perform an in-place
+	# upgrade, it will create a snapshot on all of the rootfs
+	# container datasets that are modified/upgraded. The snapshot
+	# name for all of these datasets should be the same, and it's
+	# this snapshot name that we're trying to determine here.
+	#
+	get_dataset_snapshots "$1" |
+		grep -E "^$1@execute-upgrade.[[:alnum:]]{7}$" |
+		cut -d @ -f 2- |
+		tail -n 1
+}
+
+function get_snapshot_clones() {
+	zfs get clones -Hpo value "$1"
+}
+
 function get_platform() {
 	dpkg-query -Wf '${Package}' 'delphix-platform-*' |
 		sed 's/delphix-platform-//'
@@ -82,7 +112,7 @@ function verify_upgrade_is_allowed() {
 
 	compare_versions \
 		"$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
-		die "upgrade in-place is not allowed;" \
+		die "upgrade is not allowed;" \
 			"installed version ($INSTALLED_VERSION)" \
 			"is less than minimum allowed version" \
 			"($MINIMUM_VERSION)"

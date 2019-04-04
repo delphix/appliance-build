@@ -157,10 +157,6 @@ function cleanup_not_in_place_upgrade() {
 	return "$rc"
 }
 
-function get_mounted_rootfs_container() {
-	basename "$(dirname "$(zfs list -Hpo name /)")"
-}
-
 function upgrade_not_in_place() {
 	trap cleanup_not_in_place_upgrade EXIT
 
@@ -170,7 +166,7 @@ function upgrade_not_in_place() {
 	# handle the error and abort; rather than having to handle this
 	# error later, when it might require more work to handle it.
 	#
-	MOUNTED_CONTAINER="$(get_mounted_rootfs_container)"
+	MOUNTED_CONTAINER="$(get_mounted_rootfs_container_name)"
 	[[ -n "$MOUNTED_CONTAINER" ]] ||
 		die "failed to determine mounted rootfs container"
 
@@ -233,25 +229,47 @@ function upgrade_not_in_place() {
 }
 
 function rollback() {
-	MOUNTED_CONTAINER="$(get_mounted_rootfs_container)"
-	[[ -n "$MOUNTED_CONTAINER" ]] ||
-		die "failed to determine mounted rootfs container"
-
-	ROLLBACK_CONTAINER="$(zfs get -Hpo value \
-		"$ROLLBACK_PROPERTY" "rpool/ROOT/$MOUNTED_CONTAINER")"
-	[[ -n "$ROLLBACK_CONTAINER" && "$ROLLBACK_CONTAINER" != "-" ]] ||
-		die "failed to determine rollback rootfs container"
-
 	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] &&
 		die "unable to perform a 'dry-run' of rollback"
 
-	#
-	# The "rollback" operation is nothing more than "set-bootfs" of
-	# a specific rootfs container. Now that we have the specific
-	# rootfs container that we want to use as the next bootfs.
-	#
-	"$IMAGE_PATH/rootfs-container" set-bootfs "$ROLLBACK_CONTAINER" ||
-		die "failed to set-bootfs '$ROLLBACK_CONTAINER'"
+	MOUNTED_ROOTFS_DATASET="$(get_mounted_rootfs_container_dataset)"
+	[[ -n "$MOUNTED_ROOTFS_DATASET" ]] ||
+		die "failed to determine mounted rootfs container"
+
+	if [[ -n "$(get_dataset_rollback_snapshot_name "$MOUNTED_ROOTFS_DATASET")" ]]; then
+		#
+		# If a rollback snapshot is found, assume we're rolling
+		# back after an in-place upgrade. Thus, we need to
+		# create a new "rollback" upgrade container, and then
+		# use this upgrade container as the new rootfs/bootfs
+		# container.
+		#
+
+		CONTAINER="$("$IMAGE_PATH/upgrade-container" create rollback)"
+		[[ -n "$CONTAINER" ]] ||
+			die "failed to create 'rollback' upgrade container"
+
+		"$IMAGE_PATH/upgrade-container" convert-to-rootfs "$CONTAINER" ||
+			die "failed to convert-to-rootfs '$CONTAINER'"
+
+		"$IMAGE_PATH/rootfs-container" set-bootfs "$CONTAINER" ||
+			die "failed to set-bootfs '$CONTAINER'"
+	else
+		#
+		# If a rollback snapshot isn't found, assume we're rolling
+		# back after a not-in-place upgrade (a snapshot is not
+		# generated when performing a not-in-place upgrade), and
+		# set the bootloader to use the previous rootfs container.
+		#
+
+		CONTAINER="$(zfs get -Hpo value \
+			"$ROLLBACK_PROPERTY" "$MOUNTED_ROOTFS_DATASET")"
+		[[ -n "$CONTAINER" && "$CONTAINER" != "-" ]] ||
+			die "failed to determine rollback rootfs container"
+
+		"$IMAGE_PATH/rootfs-container" set-bootfs "$CONTAINER" ||
+			die "failed to set-bootfs '$CONTAINER'"
+	fi
 }
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
