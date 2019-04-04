@@ -18,6 +18,7 @@ export MDS_SNAPNAME="MDS-CLONE-upgradeverify"
 
 DEBUG=false
 
+MDS_CLONE=domain0/$MDS_SNAPNAME
 UPGRADE_VERIFY_PATH=/opt/delphix/server/lib/exec/upgrade-verify
 UPGRADE_VERIFY_JAR=$UPGRADE_VERIFY_PATH/upgrade-verify.jar
 LOG_DIR=/var/delphix/server/upgrade-verify
@@ -37,16 +38,29 @@ function usage() {
 
 function cleanup() {
 	if ! $DEBUG; then
-		if [ -n "$root" ]; then
+		if [[ -n "$root" ]]; then
 			cleanup_postgres
 			cleanup_datasets
-			#TODO LX-1771 cleanup masking
+			cleanup_masking
 		fi
 	fi
 }
 
 function die() {
-	#TODO save MDS logs, if they exist
+	report "$(basename "$0"): $*" >&2
+
+	#
+	# If we have MDS postgres logs, save them before cleaning up so
+	# they can be analyzed later.
+	#
+	if [[ -f "/$MDS_CLONE/db/stdout.log" ]]; then
+		(
+			cd "/$MDS_CLONE/db" || exit 1
+			tar -cvf /var/delphix/server/db/pg_log.upgrade.$$.tar \
+				stdout.log pg_log
+		)
+	fi
+
 	cleanup
 	exit 1
 }
@@ -74,10 +88,24 @@ function mount_datasets() {
 	touch /var/dlpx-update/"$version"/etc_system_whitelist
 	touch /var/dlpx-update/"$version"/dx_upg_stress_options
 
-	#TODO LX-1771 setup datasets for masking check
+	#
+	# We need a clone of /var/delphix for masking migration scripts.
+	#
+	runningVar=$(mount | awk '/^\/var\/delphix /{ print $3 }')
+	zfs snapshot "$runningVar@$MDS_SNAPNAME" ||
+		die "unable to create snapshot $runningVar@$MDS_SNAPNAME"
+	zfs clone "$runningVar@$MDS_SNAPNAME" "$runningVar/$MDS_SNAPNAME" ||
+		die "unable to create $runningVar/$MDS_SNAPNAME"
+	zfs destroy -d "$runningVar@$MDS_SNAPNAME" ||
+		die "unable to defer destroy $runningVar@$MDS_SNAPNAME"
+	mount -F zfs "$runningVar/$MDS_SNAPNAME" "$root/var/delphix" ||
+		die "unable to mount $root/var/delphix"
 }
 
 function cleanup_datasets() {
+	if [[ -n "$runningVar" ]]; then
+		zfs destroy -f "$runningVar/$MDS_SNAPNAME"
+	fi
 	umount -f "$root"
 	rmdir "$root"
 }
@@ -87,6 +115,12 @@ function cleanup_postgres() {
 		echo "failed to stop postgres"
 	"$root$DX_MANAGE_PG" cleanup -s $MDS_SNAPNAME ||
 		echo "failed to clean up postgres"
+}
+
+function cleanup_masking() {
+	if [[ -n "$masking_temp_dir" ]]; then
+		rm -r "$masking_temp_dir"
+	fi
 }
 
 function run_upgrade_verify() {
@@ -102,14 +136,34 @@ function run_upgrade_verify() {
 	[[ $(svcprop -p delphix/debug $MGMT_FMRI) == "true" ]] &&
 		delphix_debug="-Ddelphix.debug=true"
 
-	java=/opt/jdk/bin/java
-	jar=$root$UPGRADE_VERIFY_JAR
-
+	local jar=$root$UPGRADE_VERIFY_JAR
 	$java -Dlog.dir=$LOG_DIR -Dmdsverify=true "$delphix_debug" \
 		-DosMigration=true -jar "$jar" -d "$output" -f "$format" \
 		-l "$locale" -v "$version" -root "$root" "$upgrade_verify_opts" \
 		-droot "$root" -pl "$progress_low" -ph "$progress_high" ||
 		die "upgrade verification failed"
+}
+
+function test_masking() {
+	masking_temp_dir=$(mktemp -d) ||
+		die "unable to make temporary directory"
+
+	tar xof "$root/opt/delphix/masking/resources/upgrade-verification.tar" \
+		-C "$masking_temp_dir" ||
+		die "failed to extract masking upgrade verification tool"
+
+	local verify_tool_dir=$masking_temp_dir/upgrade-verification
+	local new_conf=$root/opt/delphix/masking/conf/
+	local overrides=/var/delphix/dmsuite/overrides/
+
+	#
+	# Run the verification tool against the new version of the .properties
+	# files in conf/ and against override.properties, to ensure that
+	# override.properties only overrides supported properties.
+	#
+	local cp="$verify_tool_dir/*:$new_conf:$overrides"
+	$java -cp "$cp" com.dmsuite.VerifyProperties ||
+		die "verification of overrides failed"
 }
 
 disable_consistent_mds_zfs_data_util=false
@@ -128,13 +182,19 @@ done
 
 # Where root is or will be mounted. Set in mount_datasets.
 root=
+# The path of the running dataset mounted at /var/delphix. Set in mount_datasets.
+runningVar=
+# Temporary diresctory used by the masking checks. Set in test_masking.
+masking_temp_dir=
+# The installation of java to use when executing our jars.
+java=/opt/jdk/bin/java
 
 report_progress_inc 0 "preparing for verification"
 mount_datasets "$version"
 report_progress_inc 20 "running upgrade checks"
 run_upgrade_verify "$output" "$format" "$locale" 20 95
 #TODO LX-1808 stress options
-#TODO LX-1771 test_masking
+test_masking
 report_progress_inc 95 "cleaning up post-verification"
 cleanup
 report_progress_inc 100 "done"
