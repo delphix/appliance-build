@@ -136,3 +136,27 @@ function verify_upgrade_in_place_is_allowed() {
 			"($MINIMUM_REBOOT_OPTIONAL_VERSION)"
 	fi
 }
+
+function source_upgrade_properties() {
+	. "$UPDATE_DIR/upgrade.properties" ||
+		die "failed to source: '$UPDATE_DIR/upgrade.properties'"
+}
+
+function set_upgrade_property() {
+	[[ -n "$1" ]] || die "upgrade property key is missing"
+	[[ -n "$2" ]] || die "upgrade property value is missing"
+
+	sed -i "/^$1=.*$/d" "$UPDATE_DIR/upgrade.properties" ||
+		die "failed to delete upgrade property: '$1'"
+
+	echo "$1=$2" >>"$UPDATE_DIR/upgrade.properties" ||
+		die "failed to set upgrade property: '$1=$2'"
+
+	#
+	# After setting the upgrade property above, we immediately read
+	# in the file to ensure the new property didn't cause the file
+	# to become unreadable.
+	#
+	source_upgrade_properties ||
+		die "failed to read properties file after setting '$1=$2'"
+}

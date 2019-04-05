@@ -17,13 +17,6 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
-#
-# Any changes to this value needs to be careful to properly support
-# existing rootfs container datasets which may have this property
-# already set. Thus, changes here may require backwards compatibility.
-#
-ROLLBACK_PROPERTY="com.delphix:rollback-container"
-
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
@@ -129,8 +122,30 @@ function upgrade_in_place() {
 	#
 	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] && return
 
+	set_upgrade_property "UPGRADE_TYPE" "FULL" ||
+		die "failed to set upgrade property 'UPGRADE_TYPE'"
+
+	set_upgrade_property "UPGRADE_BASE_CONTAINER" \
+		"$(get_mounted_rootfs_container_name)" ||
+		die "failed to set upgrade property 'UPGRADE_BASE_CONTAINER'"
+
+	set_upgrade_property "UPGRADE_BASE_VERSION" \
+		"$(get_installed_version)" ||
+		die "failed to set upgrade property 'UPGRADE_BASE_VERSION'"
+
+	#
+	# Since we'll automatically trigger a reboot after successfully
+	# executing the upgrade below, we won't run the clean up logic
+	# below on success. Thus, we need to proactively run the clean
+	# up logic now, in order for the clean up to occur at all.
+	#
+	cleanup_in_place_upgrade
+	trap - EXIT
+
 	"$IMAGE_PATH/execute" -p "$(get_platform)" ||
 		die "'$IMAGE_PATH/execute' failed in running appliance."
+
+	systemctl reboot || die "'systemctl reboot' failed"
 }
 
 function cleanup_not_in_place_upgrade() {
@@ -209,40 +224,65 @@ function upgrade_not_in_place() {
 	#
 	trap - EXIT
 
+	set_upgrade_property "UPGRADE_TYPE" "FULL" ||
+		die "failed to set upgrade property 'UPGRADE_TYPE'"
+
+	set_upgrade_property "UPGRADE_BASE_CONTAINER" \
+		"$(get_mounted_rootfs_container_name)" ||
+		die "failed to set upgrade property 'UPGRADE_BASE_CONTAINER'"
+
+	set_upgrade_property "UPGRADE_BASE_VERSION" \
+		"$(get_installed_version)" ||
+		die "failed to set upgrade property 'UPGRADE_BASE_VERSION'"
+
 	"$IMAGE_PATH/upgrade-container" convert-to-rootfs "$CONTAINER" ||
 		die "failed to convert-to-rootfs '$CONTAINER'"
 
-	#
-	# In order for the "rollback" back command to work, we need to
-	# know which rootfs container to rollback to. Thus, we embed
-	# this information into the rootfs container using a ZFS
-	# property; rollback will read this information, to determine
-	# which rootfs container to rollback to.
-	#
-	zfs set \
-		"$ROLLBACK_PROPERTY=$MOUNTED_CONTAINER" \
-		"rpool/ROOT/$CONTAINER" ||
-		die "'zfs set com.delphix:rollback-container' failed"
-
 	"$IMAGE_PATH/rootfs-container" set-bootfs "$CONTAINER" ||
 		die "failed to set-bootfs '$CONTAINER'"
+
+	systemctl reboot || die "'systemctl reboot' failed"
 }
 
 function rollback() {
 	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] &&
 		die "unable to perform a 'dry-run' of rollback"
 
-	MOUNTED_ROOTFS_DATASET="$(get_mounted_rootfs_container_dataset)"
-	[[ -n "$MOUNTED_ROOTFS_DATASET" ]] ||
-		die "failed to determine mounted rootfs container"
+	source_upgrade_properties
 
-	if [[ -n "$(get_dataset_rollback_snapshot_name "$MOUNTED_ROOTFS_DATASET")" ]]; then
+	[[ -n "$UPGRADE_TYPE" ]] || die "variable UPGRADE_TYPE is not set"
+	[[ -n "$UPGRADE_BASE_CONTAINER" ]] ||
+		die "variable UPGRADE_BASE_CONTAINER is not set"
+	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
+		die "variable UPGRADE_BASE_VERSION is not set"
+
+	case "$UPGRADE_TYPE" in
+	FULL)
+		# rollback is only supported for "FULL" upgrades
+		;;
+	*)
+		die "rollback is not supported for upgrade type: '$UPGRADE_TYPE'"
+		;;
+	esac
+
+	ROLLBACK_BASE_CONTAINER="$(get_mounted_rootfs_container_name)"
+	[[ -n "$ROLLBACK_BASE_CONTAINER" ]] ||
+		die "unable to determine mounted rootfs container name"
+	ROLLBACK_BASE_VERSION="$(get_installed_version)"
+	[[ -n "$ROLLBACK_BASE_VERSION" ]] ||
+		die "unable to determine current appliance version"
+
+	set_upgrade_property "ROLLBACK_BASE_CONTAINER" "$ROLLBACK_BASE_CONTAINER" ||
+		die "failed setting 'ROLLBACK_BASE_CONTAINER' property"
+	set_upgrade_property "ROLLBACK_BASE_VERSION" "$ROLLBACK_BASE_VERSION" ||
+		die "failed setting 'ROLLBACK_BASE_VERSION' property"
+
+	if [[ "$UPGRADE_BASE_CONTAINER" == "$ROLLBACK_BASE_CONTAINER" ]]; then
 		#
-		# If a rollback snapshot is found, assume we're rolling
-		# back after an in-place upgrade. Thus, we need to
-		# create a new "rollback" upgrade container, and then
-		# use this upgrade container as the new rootfs/bootfs
-		# container.
+		# If UPGRADE_BASE_CONTAINER matches the currently
+		# mounted rootfs container, then it means an "in-place"
+		# upgrade was performed. Thus, we perform the rollback
+		# logic that's specific to an "in-place" upgrade"
 		#
 
 		CONTAINER="$("$IMAGE_PATH/upgrade-container" create rollback)"
@@ -256,20 +296,19 @@ function rollback() {
 			die "failed to set-bootfs '$CONTAINER'"
 	else
 		#
-		# If a rollback snapshot isn't found, assume we're rolling
-		# back after a not-in-place upgrade (a snapshot is not
-		# generated when performing a not-in-place upgrade), and
-		# set the bootloader to use the previous rootfs container.
+		# If the UPGRADE_BASE_CONTAINER variable does not match
+		# the currently mounted rootffs container, then it means
+		# a "not-in-place" upgrade was performed. Thus, we
+		# perform the rollback logic that's specific to a
+		# "not-in-place" upgrade.
 		#
 
-		CONTAINER="$(zfs get -Hpo value \
-			"$ROLLBACK_PROPERTY" "$MOUNTED_ROOTFS_DATASET")"
-		[[ -n "$CONTAINER" && "$CONTAINER" != "-" ]] ||
-			die "failed to determine rollback rootfs container"
-
-		"$IMAGE_PATH/rootfs-container" set-bootfs "$CONTAINER" ||
-			die "failed to set-bootfs '$CONTAINER'"
+		"$IMAGE_PATH/rootfs-container" \
+			set-bootfs "$UPGRADE_BASE_CONTAINER" ||
+			die "failed to set-bootfs '$UPGRADE_BASE_CONTAINER'"
 	fi
+
+	systemctl reboot || die "'systemctl reboot' failed"
 }
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
