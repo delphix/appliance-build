@@ -157,7 +157,7 @@ if [[ -n "${DELPHIX_SIGNATURE_TOKEN:-}" ]] && [[ -n "${DELPHIX_SIGNATURE_URL:-}"
 		echo "{\"data\": \"$(cat hashes64)\"}" >hashes64.payload
 
 		# Request signature
-		curl -s -f -H "Content-Type: application/json" \
+		curl -s -S -f -H "Content-Type: application/json" \
 			-u "$DELPHIX_SIGNATURE_TOKEN" "$SIGN_URL" -d @hashes64.payload >hashes.response
 
 		# Decode generated signature
