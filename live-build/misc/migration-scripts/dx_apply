@@ -292,13 +292,6 @@ MAIN_MENU_FICL=(
 	die "failed to update /boot/menu.rc.local"
 
 #
-# Increase the automatic boot delay to 20 seconds. This would help debug
-# any potential boot issues.
-#
-sed -i '/set autoboot_delay/c\set autoboot_delay=20' /boot/menu.rc.local ||
-	die "failed to change the autoboot_delay"
-
-#
 # Note that the new /var/delphix should not contain any useful data as it will
 # be replaced by a clone of the current /var/delphix dataset in dx_execute.
 # We do not clone the current /var/delphix right away as the clone will be
