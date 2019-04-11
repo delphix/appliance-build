@@ -154,6 +154,13 @@ zfs clone -o compression=on -o mountpoint=legacy \
 	"${CUR_VAR_DLPX}@${LX_CONTAINER}" "$LX_VAR_DLPX"
 
 #
+# Increase the boot delay to 20 seconds to ease bootloader access during
+# the migration for debugging purposes.
+#
+sed -i '/autoboot_delay/c\set autoboot_delay=20' /boot/menu.rc.local ||
+	die "Failed to set boot delay in bootloader"
+
+#
 # Read the command from option 8 which should be the one that boots
 # into Linux. Then make it so that the same command runs whenever we
 # hit the timer of the FreeBSD bootloader menu.
