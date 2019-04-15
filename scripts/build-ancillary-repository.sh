@@ -99,7 +99,7 @@ function build_ancillary_repository() {
 	aptly repo create \
 		-distribution=bionic -component=main ancillary-repository
 	aptly repo add ancillary-repository "$pkg_directory"
-	aptly publish repo -skip-signing ancillary-repository
+	aptly publish repo -skip-contents -skip-signing ancillary-repository
 
 	mkdir -p "$OUTPUT_DIR/.."
 	rm -rf "$OUTPUT_DIR"

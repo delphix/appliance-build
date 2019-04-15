@@ -65,7 +65,7 @@ done
 # Generate an Aptly/APT repository
 aptly repo create -distribution=bionic -component=delphix upgrade-repository
 aptly repo add upgrade-repository debs
-aptly publish repo -skip-signing upgrade-repository
+aptly publish repo -skip-contents -skip-signing upgrade-repository
 
 # Include version information about this image.
 VERSION=$(dpkg -f "$(find debs/ -name 'delphix-entire-*' | head -n 1)" version)
