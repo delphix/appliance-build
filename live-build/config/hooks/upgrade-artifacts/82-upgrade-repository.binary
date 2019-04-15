@@ -1,4 +1,4 @@
-#!/bin/bash -eux
+#!/bin/bash -ex
 #
 # Copyright 2018 Delphix
 #

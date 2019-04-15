@@ -1,4 +1,4 @@
-#!/bin/bash -eux
+#!/bin/bash -ex
 #
 # Copyright 2018 Delphix
 #
@@ -71,6 +71,44 @@ aptly publish repo -skip-contents -skip-signing upgrade-repository
 VERSION=$(dpkg -f "$(find debs/ -name 'delphix-entire-*' | head -n 1)" version)
 sed "s/@@VERSION@@/$VERSION/" <version.info.template >version.info
 
-tar -I pigz -cf "$APPLIANCE_VARIANT.upgrade.tar.gz" version.info -C upgrade-scripts . -C ~/.aptly .
+sha256sum version.info >SHA256SUMS
+for dir in upgrade-scripts ~/.aptly; do
+	find "$dir" -type f -printf "%P\n" |
+		(
+			cd "$dir"
+			xargs sha256sum
+		) >>SHA256SUMS
+done
+
+base64 -w 0 SHA256SUMS >SHA256SUMS.base64
+echo "{\"data\": \"$(cat SHA256SUMS.base64)\"}" >request.payload
+
+if [[ -n "${DELPHIX_SIGNATURE_TOKEN:-}" ]] && [[ -n "${DELPHIX_SIGNATURE_URL:-}" ]]; then
+	#
+	# Here, we need to generate signature files for all of the appliance
+	# versions that'll be allowed to upgrade from, using this upgrade
+	# image. For now, we hardcode this to simply generate a signature for
+	# the "5.3" release, but eventually we'll need to update this code to
+	# support more versions (as more linux-based versions are released).
+	#
+	for signature_version in "5.3"; do
+		curl -s -S -f -H "Content-Type: application/json" \
+			-u "$DELPHIX_SIGNATURE_TOKEN" -d @request.payload \
+			"$DELPHIX_SIGNATURE_URL/upgrade/keyVersion/${signature_version}/sign" \
+			>request.response
+
+		jq -r .signature <request.response >SHA256SUMS.sig.base64
+		base64 -d SHA256SUMS.sig.base64 >"SHA256SUMS.sig.${signature_version}"
+
+		rm request.response SHA256SUMS.sig.base64
+	done
+fi
+
+tar -I pigz -cf "$APPLIANCE_VARIANT.upgrade.tar.gz" \
+	"$(ls SHA256SUMS.sig.* 2>/dev/null)" \
+	SHA256SUMS \
+	version.info \
+	-C upgrade-scripts . \
+	-C ~/.aptly .
 
 mv "$APPLIANCE_VARIANT.upgrade.tar.gz" "$TOP/build/artifacts"
