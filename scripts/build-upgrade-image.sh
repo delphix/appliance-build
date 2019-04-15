@@ -71,6 +71,6 @@ aptly publish repo -skip-signing upgrade-repository
 VERSION=$(dpkg -f "$(find debs/ -name 'delphix-entire-*' | head -n 1)" version)
 sed "s/@@VERSION@@/$VERSION/" <version.info.template >version.info
 
-tar -czf "$APPLIANCE_VARIANT.upgrade.tar.gz" version.info -C upgrade-scripts . -C ~/.aptly .
+tar -I pigz -cf "$APPLIANCE_VARIANT.upgrade.tar.gz" version.info -C upgrade-scripts . -C ~/.aptly .
 
 mv "$APPLIANCE_VARIANT.upgrade.tar.gz" "$TOP/build/artifacts"
