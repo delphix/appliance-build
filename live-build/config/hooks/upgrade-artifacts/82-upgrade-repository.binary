@@ -133,6 +133,6 @@ rm -rf "binary/$DEBS_DIRECTORY"
 # This intermediate build artifact is eventually used to build an
 # upgrade image. See scripts/build-upgrade-image.sh for details.
 #
-tar -czf "$ARTIFACT_NAME.debs.tar.gz" ./*.deb -C binary/packages .
+tar -I pigz -cf "$ARTIFACT_NAME.debs.tar.gz" ./*.deb -C binary/packages .
 
 rm -rf binary/packages

@@ -28,5 +28,5 @@
 # Google cloud only accepts gzip-ed tarballs with a single "disk.raw"
 # physical image.
 #
-tar -z --transform "s/$ARTIFACT_NAME.img/disk.raw/r" \
+tar -I pigz --transform "s/$ARTIFACT_NAME.img/disk.raw/r" \
 	-cvf "$ARTIFACT_NAME.gcp.tar.gz" "$ARTIFACT_NAME.img"
