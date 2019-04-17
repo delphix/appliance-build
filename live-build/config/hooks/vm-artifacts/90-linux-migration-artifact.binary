@@ -120,6 +120,14 @@ cp migration-scripts/* $DEPOT_DIRECTORY
 	# shellcheck disable=SC2016
 	echo "DLPX_VERSION=$(chroot binary dpkg-query \
 		-Wf '${Version}' delphix-virtualization)"
+
+	#
+	# DLPX_PLATFORM is set to the type of platform this migration
+	# image was built for (i.e. internal-qa-esx). It will be used to
+	# check that we're using the correct image type for the engine
+	# being upgraded.
+	#
+	echo "DLPX_PLATFORM=$ARTIFACT_NAME"
 } >$DEPOT_DIRECTORY/version.info
 
 #
