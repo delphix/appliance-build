@@ -90,7 +90,7 @@ cp config/hooks/template.ctl delphix-entire.ctl
 # shellcheck disable=SC2016
 chroot binary dpkg-query -Wf '${Package}=${Version}\n' | sort >packages.list
 
-if [[ -n "$DELPHIX_APPLIANCE_VERSION" ]]; then
+if [[ -n "${DELPHIX_APPLIANCE_VERSION:-}" ]]; then
 	#
 	# If the build specified a version for the delphix-entire package,
 	# then use it.
