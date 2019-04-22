@@ -17,7 +17,7 @@
 
 # shellcheck disable=SC2034
 UPDATE_DIR="/var/dlpx-update"
-LOG_DIRECTORY="/var/log/delphix-upgrade"
+LOG_DIRECTORY="/var/tmp/delphix-upgrade"
 
 function die() {
 	echo "$(basename "$0"): $*" >&2

@@ -42,14 +42,17 @@ function create_cleanup() {
 	destroy "$CONTAINER"
 }
 
-function get_mounted_rootfs_name() {
-	local rootfs
+function mount_upgrade_container_dataset() {
+	[[ -n "$1" ]] || die "failed to provide dataset to mount"
+	[[ -n "$2" ]] || die "failed to provide directory for mount"
 
-	rootfs=$(zfs list -Ho name /)
-	[[ -n "$rootfs" ]] ||
-		die "failed to determine the mounted root filesystem name"
+	mkdir -p "$2" || die "failed to create directory '$2'"
+	mount -t zfs "$1" "$2" || die "failed to mount dataset '$1' to '$2'"
+}
 
-	echo "$rootfs"
+function unmount_upgrade_container_dataset() {
+	[[ -n "$1" ]] || die "failed to provide dataset to unmount"
+	umount "$1" || die "failed to unmount dataset '$1'"
 }
 
 function create_upgrade_container() {
@@ -136,23 +139,6 @@ function create_upgrade_container() {
 
 		zfs mount "rpool/ROOT/$CONTAINER/root" ||
 			die "failed to mount upgrade / filesystem"
-
-		#
-		# This function needs to return the container's name to stdout,
-		# so that consumers of this function/script can consume that
-		# name and then later start/stop/destroy the container. Thus, we
-		# have to redirect the output from debootstrap away from stdout.
-		#
-		# Also, we need to include the "systemd-container" package when
-		# installing the base systemd with debootstrap so that starting
-		# the container will work properly. Otherwise, after starting
-		# the container, we won't be able to communicate and later run
-		# commands in the container with "systemd-run".
-		#
-		debootstrap --no-check-gpg \
-			--components=delphix --include=systemd-container \
-			bionic "$DIRECTORY" "file://$IMAGE_PATH/public" 1>&2 ||
-			die "failed to debootstrap upgrade filesystem"
 		;;
 	esac
 
@@ -170,6 +156,59 @@ function create_upgrade_container() {
 		"rpool/ROOT/$CONTAINER/data" ||
 		die "failed to create upgrade /var/delphix clone"
 
+	zfs clone \
+		-o compression=on \
+		-o mountpoint=legacy \
+		"$ROOTFS_DATASET/log@$SNAPSHOT_NAME" \
+		"rpool/ROOT/$CONTAINER/log" ||
+		die "failed to create upgrade /var/log clone"
+
+	case "$type" in
+	not-in-place)
+		#
+		# We need to ensure all of the upgrade container's datasets
+		# are mounted before running "debootstrap". This way, if any
+		# packages installed by "debootstrap" happen to deliver
+		# files to any of these directories, they'll be propertly
+		# delivered to the correct dataset, rather than the root
+		# dataset.
+		#
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/home" "$DIRECTORY/export/home"
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/log" "$DIRECTORY/var/log"
+
+		#
+		# This function needs to return the container's name to
+		# stdout, so that consumers of this function/script can
+		# consume that name and then later start/stop/destroy the
+		# container. Thus, we have to redirect the output from
+		# debootstrap away from stdout.
+		#
+		# Also, we need to include the "systemd-container" package
+		# when installing the base systemd with debootstrap so that
+		# starting the container will work properly. Otherwise,
+		# after starting the container, we won't be able to
+		# communicate and later run commands in the container with
+		# "systemd-run".
+		#
+		debootstrap --no-check-gpg \
+			--components=delphix --include=systemd-container \
+			bionic "$DIRECTORY" "file://$IMAGE_PATH/public" 1>&2 ||
+			die "failed to debootstrap upgrade filesystem"
+
+		#
+		# Now that we've successfully run "deboostrap", we can
+		# unmount these datasets that were mounted above.
+		#
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/log"
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/data"
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/home"
+		;;
+	esac
+
 	#
 	# We rely on the "/etc/fstab" file to mount the non-root ZFS
 	# filesystems, so that when a specific rootfs dataset is booted,
@@ -179,6 +218,7 @@ function create_upgrade_container() {
 	cat <<-EOF >"$DIRECTORY/etc/fstab"
 		rpool/ROOT/$CONTAINER/home /export/home zfs defaults 0 0
 		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults 0 0
+		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults 0 0
 	EOF
 
 	mkdir -p "/etc/systemd/nspawn" ||
@@ -308,7 +348,8 @@ function start() {
 		! zfs list "rpool/ROOT/$CONTAINER" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/home" &>/dev/null ||
-		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null; then
+		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null; then
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
@@ -349,23 +390,24 @@ function destroy() {
 
 	if zfs list "rpool/ROOT/$CONTAINER" &>/dev/null; then
 		#
-		# In order to safely perform the recursive destroy
-		# below, we need to ensure the filesystems are unmounted
-		# in the correct order. Since the "data" and "home"
-		# datasets are mounted inside the "root" dataset, we
-		# need to unmount these two datasets before attempting
-		# to unmount (and/or destroy) the "root" dataset.
+		# In order to safely perform the recursive destroy below,
+		# we need to ensure the filesystems are unmounted in the
+		# correct order. Since the "log", "data", and "home"
+		# datasets are mounted inside the "root" dataset, we need
+		# to unmount these two datasets before attempting to
+		# unmount (and/or destroy) the "root" dataset.
 		#
 		# Further, we don't check the return value of these
-		# commands for simplicity's sake. If these fail, it
-		# could be because they aren't mounted, or due to an
-		# actual failure to unmount. If those datasets cannot be
+		# commands for simplicity's sake. If these fail, it could
+		# be because they aren't mounted, or due to an actual
+		# failure to unmount. If those datasets cannot be
 		# unmounted, this will cause the destroy to fail below,
 		# which we will catch, and then notify the user.
 		#
-		zfs unmount "rpool/ROOT/$CONTAINER/data" &>/dev/null
-		zfs unmount "rpool/ROOT/$CONTAINER/home" &>/dev/null
-		zfs unmount "rpool/ROOT/$CONTAINER/root" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/log" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/data" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/home" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/root" &>/dev/null
 
 		zfs destroy -r "rpool/ROOT/$CONTAINER" ||
 			die "failed to destroy container dataset: '$CONTAINER'"

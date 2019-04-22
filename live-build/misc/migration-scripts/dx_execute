@@ -79,7 +79,7 @@ RPOOL=${RDS%%/*}
 # Ensure that the expected Linux dataset layout exists.
 # Note that this excludes the "data" dataset which was destroyed in dx_apply.
 #
-[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 4 ]] ||
+[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 5 ]] ||
 	die "could not find the expected linux dataset layout"
 LX_RDS_PARENT=$(zfs list -o name -H -d 1 "$RPOOL/ROOT" | tail -n 1)
 [[ -n $LX_RDS_PARENT ]] || die "could not find Linux RDS parent dataset"
