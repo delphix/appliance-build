@@ -179,6 +179,7 @@ function create_upgrade_container() {
 	cat <<-EOF >"$DIRECTORY/etc/fstab"
 		rpool/ROOT/$CONTAINER/home /export/home zfs defaults 0 0
 		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults 0 0
+		rpool/crashdump            /var/crash   zfs defaults 0 0
 	EOF
 
 	mkdir -p "/etc/systemd/nspawn" ||

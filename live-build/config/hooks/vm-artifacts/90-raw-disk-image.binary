@@ -161,9 +161,8 @@ zfs create \
 # the rpool's size) to keep these from running the rpool out of space.
 #
 zfs create \
-	-o canmount=on \
 	-o compression=on \
-	-o mountpoint=/var/crash \
+	-o mountpoint=legacy \
 	-o quota="$(echo "$(zpool list -Hpo size rpool) / 4" | bc)b" \
 	rpool/crashdump
 
@@ -178,6 +177,9 @@ mount -t zfs "rpool/ROOT/$FSNAME/home" "$DIRECTORY/export/home"
 
 mkdir -p "$DIRECTORY/var/delphix"
 mount -t zfs "rpool/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
+
+mkdir -p "$DIRECTORY/var/crash"
+mount -t zfs "rpool/crashdump" "$DIRECTORY/var/crash"
 
 #
 # Populate the root filesystem with the contents of the "binary" directory
@@ -194,6 +196,7 @@ rsync --info=stats3 -Wa binary/* "$DIRECTORY/"
 cat <<-EOF >"$DIRECTORY/etc/fstab"
 	rpool/ROOT/$FSNAME/home /export/home zfs defaults 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults 0 0
+	rpool/crashdump         /var/crash   zfs defaults 0 0
 EOF
 
 #
@@ -222,9 +225,9 @@ for dir in /dev /proc /sys; do
 	umount -R "${DIRECTORY}${dir}"
 done
 
+umount "$DIRECTORY/var/crash"
 umount "$DIRECTORY/var/delphix"
 umount "$DIRECTORY/export/home"
-zfs umount rpool/crashdump
 zfs umount "rpool/ROOT/$FSNAME/root"
 zpool export rpool
 kpartx -d "$ARTIFACT_NAME.img"
