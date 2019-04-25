@@ -24,6 +24,15 @@
 
 set -o pipefail
 
+#
+# Reset the umask to the default value. When called from the app-stack the
+# umask is set to 0027. Since those scripts can be called manually, we want
+# to have a consistent result regardless of the caller. A umask of 0022
+# makes directories created by this script accessible by everyone by default,
+# which is important for directories such as /export/home.
+#
+umask 0022
+
 function die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1

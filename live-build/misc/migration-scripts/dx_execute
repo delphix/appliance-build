@@ -16,9 +16,19 @@
 #
 
 #
-# Sets up the FreeBSD bootloader to boot into that Linux image next time
-# we reboot.
+# Finalizes the Linux image in preparation for the reboot now that the app
+# stack is quiesced; sets up the FreeBSD bootloader to boot into that Linux
+# image next time we reboot; finally reboots the system.
 #
+
+#
+# Reset the umask to the default value. When called from the app-stack the
+# umask is set to 0027. Since those scripts can be called manually, we want
+# to have a consistent result regardless of the caller. A umask of 0022
+# makes directories created by this script accessible by everyone by default,
+# which is important for directories such as /export/home.
+#
+umask 0022
 
 set -o pipefail
 
