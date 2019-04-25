@@ -468,17 +468,39 @@ function migrate_file() {
 		parentdir="$(dirname "$path")"
 		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
 			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
-		cp "$path" "/var/lib/machines/${CONTAINER}${path}" ||
-			die "'cp $path' failed for '$CONTAINER'"
+		cp -p "$path" "/var/lib/machines/${CONTAINER}${path}" ||
+			die "'cp -p $path' failed for '$CONTAINER'"
 	else
-		if [[ -f "/var/lib/machines/${CONTAINER}${path}" ]]; then
-			# If the target file doesn't exist in the host then
-			# we delete the file. This case could happen if the host
-			# configuration doesn't exist but a fresh install placed
-			# package default configuration.
-			rm "/var/lib/machines/${CONTAINER}${path}" ||
-				die "failed to remove '$path' in '$CONTAINER'"
-		fi
+		#
+		# If the target file doesn't exist in the host then we
+		# delete the file. This case could happen if the host
+		# configuration doesn't exist but a fresh install placed
+		# package default configuration.
+		#
+		rm -f "/var/lib/machines/${CONTAINER}${path}" ||
+			die "failed to remove file '$path' in '$CONTAINER'"
+	fi
+}
+
+function migrate_dir() {
+	local path="$1"
+	local parentdir
+
+	if [[ -d "$path" ]]; then
+		parentdir="$(dirname "$path")"
+		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
+			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
+		cp -prT "$path" "/var/lib/machines/${CONTAINER}${path}" ||
+			die "'cp -prT $path' failed for '$CONTAINER'"
+	else
+		#
+		# If the target dir doesn't exist in the host then
+		# we delete the dir. This case could happen if the host
+		# configuration doesn't exist but a fresh install placed
+		# package default configuration.
+		#
+		rm -rf "/var/lib/machines/${CONTAINER}${path}" ||
+			die "failed to remove directory '$path' in '$CONTAINER'"
 	fi
 }
 
@@ -529,7 +551,7 @@ function migrate_configuration() {
 	EOF
 
 	#
-	# These files are specific to the delphix virtualization and/or
+	# These paths are specific to the delphix virtualization and/or
 	# masking application, and must be preserved across upgrades.
 	# Ideally this list would be provided by the applications
 	# themselves, rather than specified here, but the infrastructure
@@ -567,6 +589,13 @@ function migrate_configuration() {
 		/etc/snmp/snmpd.conf
 		/etc/rtslib-fb-target/saveconfig.json
 		/var/opt/delphix/server.conf
+	EOF
+
+	while read -r dir; do
+		migrate_dir "$dir"
+	done <<-EOF
+		/var/lib/nfs
+		/var/target/pr
 	EOF
 
 	#
