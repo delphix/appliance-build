@@ -250,6 +250,7 @@ function create_upgrade_container() {
 		PrivateUsers=no
 		[Network]
 		Private=yes
+		VirtualEthernet=yes
 		[Files]
 		PrivateUsersChown=no
 		Bind=/dev/zfs
