@@ -68,6 +68,15 @@ report_progress 20 "Creating verification dependencies"
 	die "failed to start postgres"
 
 #
+# The "start_mgmt_server_jvm" scripts relies on environment variables that
+# are exposed via the "/etc/environment" file. Normally, this file is
+# consumed by the "delphix-mgmt" service prior to running the script; since
+# we don't use that service here, we have to explicitly source this file
+# before executing the script.
+#
+. /etc/environment || die "failed to source /etc/environment"
+
+#
 # Start management stack up to post-upgrade logic.
 #
 report_progress 40 "Performing application startup upgrade verification"
