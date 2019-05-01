@@ -1,0 +1,91 @@
+#
+# Copyright 2019 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+- apt:
+    name:
+      - autoconf
+      - automake
+      - bison
+      - flex
+      - git
+      - liblzo2-dev
+      - libmpfr-dev
+      - libsnappy1v5
+      - libtool
+      - pkg-config
+      - python3-distutils
+      - python3-future
+      - python3-pyelftools
+      - python3.6-dev
+      - texinfo
+      - zlib1g-dev
+    state: present
+  register: result
+  until: result is not failed
+  retries: 3
+  delay: 60
+
+- git:
+    repo: "https://github.com/{{ item.user }}/{{ item.repo }}.git"
+    dest: "/export/home/delphix/{{ item.repo }}"
+    version: "{{ item.branch }}"
+    accept_hostkey: yes
+    update: no
+  with_items:
+    - { user: 'ptesarik', repo: 'libkdumpfile', branch: master }
+    - { user: 'jeffmahoney', repo: 'gdb-python', branch: master-suse-target }
+
+- git:
+    repo: "https://gitlab.delphix.com/os-platform/crash-python.git"
+    dest: "/export/home/delphix/crash-python"
+    version: "next"
+    accept_hostkey: yes
+    update: no
+
+- shell: |
+    autoreconf -fi
+    ./configure --with-python=/usr/bin/python3.6
+    make
+    make install
+  args:
+    chdir: /export/home/delphix/libkdumpfile
+  ignore_errors: yes
+
+- shell: |
+    ./configure --with-python=/usr/bin/python3.6
+    make
+    make install
+  args:
+    chdir: /export/home/delphix/gdb-python
+  ignore_errors: yes
+
+- shell: |
+    python3 setup.py install
+  args:
+    chdir: /export/home/delphix/crash-python
+  ignore_errors: yes
+
+- file:
+    path: "/export/home/delphix/{{ item }}"
+    owner: delphix
+    group: staff
+    state: directory
+    recurse: yes
+  with_items:
+    - libkdumpfile
+    - gdb-python
+    - crash-python
