@@ -505,6 +505,16 @@ function migrate_dir() {
 	fi
 }
 
+function migrate_svc() {
+	local svc="$1"
+
+	if systemctl is-enabled -q "$svc"; then
+		chroot "/var/lib/machines/$CONTAINER" systemctl enable "$svc"
+	else
+		chroot "/var/lib/machines/$CONTAINER" systemctl disable "$svc"
+	fi
+}
+
 function migrate_configuration() {
 	#
 	# When performing a not-in-place upgrade, the root and delphix
@@ -515,6 +525,21 @@ function migrate_configuration() {
 	#
 	migrate_password_for_user delphix
 	migrate_password_for_user root
+
+	#
+	# The services listed here can be dynamically modified by the
+	# application(s) running on the appliance, so we need to ensure
+	# we migrate the state of these services when performing a
+	# not-in-place upgrade. Otherwise, we'd wind up with the default
+	# state of these services after the upgrade, which could be
+	# different than the current state of these services.
+	#
+	while read -r svc; do
+		migrate_svc "$svc"
+	done <<-EOF
+		delphix-masking.service
+		ntp.service
+	EOF
 
 	#
 	# These files are generic OS files that are required for the
