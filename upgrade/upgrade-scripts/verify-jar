@@ -23,6 +23,7 @@ IMAGE_VERSION=$(get_image_version)
 function usage() {
 	echo "$(basename "$0"): $*" >&2
 	echo "Usage: $(basename "$0") [-d] [-f format] [-l locale] [-o path]"
+	echo " [-fsCheckStartTs ts] [-fsCheckEndTs ts] [-containerInitStartTs ts] [-containerInitEndTs]"
 	exit 2
 }
 
@@ -54,20 +55,29 @@ function verify_jar_verify_cleanup() {
 		report_progress 100 "Upgrade verification was successful"
 	return "$rc"
 }
+#
+# use command program because it supports long arguments
+#
+TEMP=`getopt -a -o :df:l:o: --long fsCheckStartTs:,fsCheckEndTs:,containerInitStartTs:,containerInitEndTs: -n 'verify-jar' -- "$@"`
+
+if [ $? != 0 ] ; then usage ; exit 1 ; fi
+
+# Note the quotes around `$TEMP': they are essential!
+eval set -- "$TEMP"
 
 opt_d=false
-while getopts ':df:l:o:' c; do
-	case "$c" in
-	f | l | o)
-		eval "opt_$c=$OPTARG"
-		;;
-	d)
-		eval "opt_$c=true"
-		;;
-	*)
-		usage "illegal option -- $OPTARG"
-		;;
-	esac
+while true; do
+  case "$1" in
+    -d ) opt_d=true; shift ;;
+    -f ) opt_f="$2"; shift 2 ;;
+    -l ) opt_l="$2"; shift 2 ;;
+    -o ) opt_o="$2"; shift 2 ;;
+    --fsCheckStartTs ) opt_fsStartTs="$2"; shift 2 ;;
+    --fsCheckEndTs ) opt_fsEndTs="$2"; shift 2 ;;
+    --containerInitStartTs ) opt_initStartTs="$2"; shift 2 ;;
+    --containerInitEndTs ) opt_initEndTs="$2"; shift 2 ;;
+    * ) break ;;
+  esac
 done
 
 report_progress 10 "Started application upgrade verification"
@@ -80,6 +90,16 @@ fi
 
 if $opt_d; then
 	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
+fi
+
+if [[ -n "$opt_fsStartTs" ]] && [[ -n "$opt_fsEndTs" ]]; then
+	VERIFY_TS_OPT=" -fsCheckStartTs \"$opt_fsStartTs\" \
+        -fsCheckEndTs \"$opt_fsEndTs\""
+fi
+
+if [[ -n "$opt_initStartTs" ]] && [[ -n "$opt_initEndTs" ]]; then
+	VERIFY_TS_OPT="$VERIFY_TS_OPT -containerInitStartTs \"$opt_initStartTs\" \
+        -containerInitEndTs \"$opt_initEndTs\""
 fi
 
 trap verify_jar_verify_cleanup EXIT
@@ -96,6 +116,7 @@ report_progress 20 "Running application upgrade verification"
 	-l "${opt_l:-en-US}" \
 	-v "$IMAGE_VERSION" \
 	-pl 25 -ph 80 \
+	$VERIFY_TS_OPT \
 	$VERIFY_LIVE_MDS_OPT ||
 	die "'upgrade-verify.jar' failed in verification container"
 
