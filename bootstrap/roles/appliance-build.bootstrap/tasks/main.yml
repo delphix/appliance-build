@@ -29,13 +29,12 @@
     upgrade: yes
 
 - apt:
-    name: "{{ item }}"
+    name:
+      - docker.io
+      - python3-docker
+      - qemu
+      - zfsutils-linux
     state: present
-  with_items:
-    - docker.io
-    - python3-docker
-    - qemu
-    - zfsutils-linux
 
 #
 # We can't use the docker_image module because it doesn't yet support passing

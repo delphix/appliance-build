@@ -18,10 +18,8 @@
 #
 
 - apt:
-    name: "{{ item }}"
+    name: nftables
     state: present
-  with_items:
-    - nftables
   register: result
   until: result is not failed
   retries: 3
@@ -39,21 +37,20 @@
 # "internal-dev" playbook.
 #
 - apt:
-    name: "{{ item }}"
+    name:
+      - ant
+      - awscli
+      - build-essential
+      - git
+      - libcrypt-blowfish-dev
+      - libcurl4-openssl-dev
+      - libnss3-dbg
+      - libnss3-dev
+      - libnss3-tools
+      - libpam0g-dev
+      - libssl-dev
+      - python-pip
     state: present
-  with_items:
-    - ant
-    - awscli
-    - build-essential
-    - git
-    - libcrypt-blowfish-dev
-    - libcurl4-openssl-dev
-    - libnss3-dbg
-    - libnss3-dev
-    - libnss3-tools
-    - libpam0g-dev
-    - libssl-dev
-    - python-pip
   register: result
   until: result is not failed
   retries: 3

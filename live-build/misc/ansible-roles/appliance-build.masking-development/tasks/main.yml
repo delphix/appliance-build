@@ -16,10 +16,8 @@
 
 ---
 - apt:
-    name: "{{ item }}"
+    name: git
     state: present
-  with_items:
-    - git
   register: result
   until: result is not failed
   retries: 3
