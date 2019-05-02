@@ -15,16 +15,11 @@
 # limitations under the License.
 #
 
+# shellcheck disable=SC1090
 . "${BASH_SOURCE%/*}/common.sh"
 
 IMAGE_VERSION=$(get_image_version)
 [[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
-
-function usage() {
-	echo "$(basename "$0"): $*" >&2
-	echo "Usage: $(basename "$0") [-d] [-f format] [-l locale] [-o path]"
-	exit 2
-}
 
 function verify_jar_verify_cleanup() {
 	local rc="$?"
@@ -55,18 +50,91 @@ function verify_jar_verify_cleanup() {
 	return "$rc"
 }
 
+function usage() {
+	echo "$(basename "$0"): $*" >&2
+
+	PREFIX_STRING="Usage: $(basename "$0")"
+	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
+	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
+
+	echo "$PREFIX_STRING [-d] [-f format] [-l locale] [-o path]"
+	echo "$PREFIX_SPACES [-fsCheckStartTs ts] [-fsCheckEndTs ts]"
+	echo "$PREFIX_SPACES [-containerInitStartTs ts] [-containerInitEndTs ts]"
+
+	exit 2
+}
+
+#
+# Optional timestamp parameters from managment stack. These timestamps
+# are for inclusion in the verification report output of the verify jar.
+#
+OPTIONS_LONG=(
+	"containerInitStartTs:"
+	"containerInitEndTs:"
+	"fsCheckStartTs:"
+	"fsCheckEndTs:"
+	"help"
+)
+
+OPTIONS_SHORT=(
+	"d"
+	"f:"
+	"h"
+	"l:"
+	"o:"
+)
+
+GETOPT=$(getopt --alternative \
+	--name "$(basename "$0")" \
+	--options "$(printf "%s," "${OPTIONS_SHORT[@]}")" \
+	--longoptions "$(printf "%s," "${OPTIONS_LONG[@]}")" \
+	-- "$@") || usage "$@"
+eval set -- "$GETOPT"
+
 opt_d=false
-while getopts ':df:l:o:' c; do
-	case "$c" in
-	f | l | o)
-		eval "opt_$c=$OPTARG"
+while true; do
+	case "$1" in
+	-d)
+		opt_d=true
+		shift
 		;;
-	d)
-		eval "opt_$c=true"
+	-f)
+		opt_f="$2"
+		shift 2
 		;;
-	*)
-		usage "illegal option -- $OPTARG"
+	-h)
+		usage "$@"
+		shift
 		;;
+	-l)
+		opt_l="$2"
+		shift 2
+		;;
+	-o)
+		opt_o="$2"
+		shift 2
+		;;
+	--containerInitStartTs)
+		opt_initStartTs="$2"
+		shift 2
+		;;
+	--containerInitEndTs)
+		opt_initEndTs="$2"
+		shift 2
+		;;
+	--fsCheckStartTs)
+		opt_fsStartTs="$2"
+		shift 2
+		;;
+	--fsCheckEndTs)
+		opt_fsEndTs="$2"
+		shift 2
+		;;
+	--help)
+		usage "$@"
+		shift
+		;;
+	*) break ;;
 	esac
 done
 
@@ -74,29 +142,56 @@ report_progress 10 "Started application upgrade verification"
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
+JAVA_PARAMETERS=(
+	"-Dlog.dir=/var/delphix/server/upgrade-verify"
+	"-Dmdsverify=true"
+	"-jar" "/opt/delphix/server/lib/exec/upgrade-verify/upgrade-verify.jar"
+)
+
 if [[ -n "$DLPX_DEBUG" ]] && $DLPX_DEBUG; then
-	VERIFY_DEBUG_OPT="-Ddelphix.debug=true"
+	JAVA_PARAMETERS=(
+		"${JAVA_PARAMETERS[@]}"
+		"-Ddelphix.debug=true"
+	)
+fi
+
+VERIFY_OPTIONS=(
+	"-d" "${opt_o:-${LOG_DIRECTORY}/${CONTAINER}/upgrade_verify.json}"
+	"-f" "${opt_f:-1}"
+	"-l" "${opt_l:-en-US}"
+	"-v" "$IMAGE_VERSION"
+	"-pl" "25"
+	"-ph" "80"
+)
+
+if [[ -n "$opt_fsStartTs" ]] && [[ -n "$opt_fsEndTs" ]]; then
+	VERIFY_OPTIONS=(
+		"${VERIFY_OPTIONS[@]}"
+		"-fsCheckStartTs" "$opt_fsStartTs"
+		"-fsCheckEndTs" "$opt_fsEndTs"
+	)
+fi
+
+if [[ -n "$opt_initStartTs" ]] && [[ -n "$opt_initEndTs" ]]; then
+	VERIFY_OPTIONS=(
+		"${VERIFY_OPTIONS[@]}"
+		"-containerInitStartTs" "$opt_initStartTs"
+		"-containerInitEndTs" "$opt_initEndTs"
+	)
 fi
 
 if $opt_d; then
-	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
+	VERIFY_OPTIONS=(
+		"${VERIFY_OPTIONS[@]}"
+		"-disableConsistentMdsZfsDataUtil"
+	)
 fi
 
 trap verify_jar_verify_cleanup EXIT
 
 report_progress 20 "Running application upgrade verification"
 
-/usr/bin/java \
-	-Dlog.dir=/var/delphix/server/upgrade-verify \
-	-Dmdsverify=true \
-	$VERIFY_DEBUG_OPT \
-	-jar /opt/delphix/server/lib/exec/upgrade-verify/upgrade-verify.jar \
-	-d "${opt_o:-${LOG_DIRECTORY}/${CONTAINER}/upgrade_verify.json}" \
-	-f "${opt_f:-1}" \
-	-l "${opt_l:-en-US}" \
-	-v "$IMAGE_VERSION" \
-	-pl 25 -ph 80 \
-	$VERIFY_LIVE_MDS_OPT ||
+/usr/bin/java "${JAVA_PARAMETERS[@]}" "${VERIFY_OPTIONS[@]}" ||
 	die "'upgrade-verify.jar' failed in verification container"
 
 #
