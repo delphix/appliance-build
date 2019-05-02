@@ -1,0 +1,166 @@
+/*
+ * Copyright 2019 Delphix
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+apply plugin: "base"
+
+apply from: "${rootProject.projectDir}/gradle-lib/util.gradle"
+
+task ancillaryRepository(type: Exec) {
+    inputs.file "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
+
+    for (envVar in ["AWS_S3_URI_VIRTUALIZATION",
+                    "AWS_S3_URI_USERLAND_PKGS",
+                    "AWS_S3_URI_MASKING",
+                    "AWS_S3_URI_ZFS",
+                    "AWS_S3_PREFIX_VIRTUALIZATION",
+                    "AWS_S3_PREFIX_MASKING",
+                    "AWS_S3_PREFIX_USERLAND_PKGS",
+                    "AWS_S3_PREFIX_KERNEL_PKGS"]) {
+        inputs.property(envVar, System.getenv(envVar)).optional(true)
+    }
+
+    outputs.files fileTree("${buildDir}/ancillary-repository") {
+        // Files that are modified when we serve from this apt repo
+        exclude "db/"
+    }
+
+    commandLine "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
+}
+
+createArtifactsDirTask(this)
+
+def artifactTypes = ["aws": "vmdk",
+                     "azure": "vhdx",
+                     "esx": "ova",
+                     "gcp": "gcp.tar.gz",
+                     "kvm": "qcow2"]
+
+def configDir = "configuration"
+
+def upgradeArtifactsRunType = "upgrade-artifacts"
+def vmArtifactsRunType = "vm-artifacts"
+def allRunType = "all"
+def runTypesAndSuffixes = [[upgradeArtifactsRunType, "UpgradeArtifacts"],
+                           [vmArtifactsRunType, "VmArtifacts"],
+                           [allRunType, ""]]
+
+/*
+ * Create tasks to the upgrade artifacts only, VM artifacts only, or everything.
+ */
+for (variant in allVariants) {
+    for (platform in allPlatforms) {
+        runTypesAndSuffixes.each { runType, runSuffix ->
+            def taskSuffix = "${toCamelCase(variant).capitalize()}${platform.capitalize()}"
+            def t = tasks.create("build${taskSuffix}${runSuffix}", Exec) { task ->
+                group = 'Build'
+
+                switch (runType) {
+                    case upgradeArtifactsRunType:
+                        description = "Builds the upgrade image artifacts for the ${variant} variant of the appliance for ${platform}"
+                        break
+                    case vmArtifactsRunType:
+                        description = "Builds the VM artifacts for the ${variant} variant of the appliance for ${platform}"
+                        break
+                    case allRunType:
+                        description = "Builds all artifacts for the ${variant} variant of the appliance for ${platform}"
+                        break
+                }
+
+                dependsOn ancillaryRepository
+                dependsOn mkArtifactsDir
+
+                inputs.dir "${projectDir}/auto"
+                inputs.files fileTree("${projectDir}/config") {
+                    exclude "hooks/"
+                }
+                inputs.dir "${projectDir}/config/hooks/${configDir}"
+
+                switch (runType) {
+                    case upgradeArtifactsRunType:
+                        inputs.dir "${projectDir}/config/hooks/${upgradeArtifactsRunType}"
+                        break
+                    case vmArtifactsRunType:
+                        inputs.dir "${projectDir}/config/hooks/${vmArtifactsRunType}"
+                        break
+                    case allRunType:
+                        inputs.dir "${projectDir}/config/hooks/${upgradeArtifactsRunType}"
+                        inputs.dir "${projectDir}/config/hooks/${vmArtifactsRunType}"
+                        break
+                }
+
+                inputs.dir "${projectDir}/misc"
+                inputs.dir "${projectDir}/variants"
+                inputs.file "${rootProject.projectDir}/scripts/run-live-build.sh"
+
+                for (envVar in ["APPLIANCE_PASSWORD",
+                                "DELPHIX_SIGNATURE_URL",
+                                "DELPHIX_SIGNATURE_TOKEN",
+                                "DELPHIX_APPLIANCE_VERSION"]) {
+                    inputs.property(envVar, System.getenv(envVar)).optional(true)
+                }
+
+                switch (runType) {
+                    case upgradeArtifactsRunType:
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
+                        break
+                    case vmArtifactsRunType:
+                        if (variant != "internal-minimal") {
+                            // We don't bother creating a migration image for internal-minimal
+                            outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
+                        }
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
+                        break
+                    case allRunType:
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
+                        if (variant != "internal-minimal") {
+                            // We don't bother creating a migration image for internal-minimal
+                            outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
+                        }
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
+                        break
+                }
+
+                commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform, runType
+            }
+
+            tasks.create("clean${taskSuffix}${runSuffix}", Exec) {
+                commandLine "rm", "-rf", "${buildDir}/${variant}-${platform}"
+            }
+            tasks.clean.dependsOn "clean${taskSuffix}${runSuffix}"
+        }
+    }
+}
+
+/*
+ * Fetch pre-built vm artifacts instead of building them. See fetch-livebuild-artifacts.sh for
+ * details.
+ */
+task fetchLiveBuildArtifacts(type: Exec) {
+    dependsOn mkArtifactsDir
+    outputs.dir "${buildDir}/artifacts"
+    inputs.property("AWS_S3_URI_LIVEBUILD_ARTIFACTS",
+                    System.getenv("AWS_S3_URI_LIVEBUILD_ARTIFACTS"))
+    commandLine "${rootProject.projectDir}/scripts/fetch-livebuild-artifacts.sh"
+}
+
+task cleanRpool(type: Exec) {
+    commandLine "bash", "-c", """
+	if zpool list rpool &>/dev/null; then \
+		zpool destroy -f rpool; \
+	fi
+        """
+}
+tasks.clean.dependsOn "cleanRpool"

@@ -37,10 +37,12 @@
     - qemu
     - zfsutils-linux
 
-- docker_image:
-    path: "{{ toplevel.stdout }}/docker"
-    name: appliance-build
-    force: true
+#
+# We can't use the docker_image module because it doesn't yet support passing
+# the 'network' parameter: https://github.com/ansible/ansible/pull/50313, which
+# we need to be able to fetch things from Artifactory.
+#
+- shell: docker build --network host --tag "appliance-build:latest" "{{ toplevel.stdout }}/docker"
 
 - modprobe:
     name: zfs

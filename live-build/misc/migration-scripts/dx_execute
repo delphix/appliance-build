@@ -1,0 +1,194 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Finalizes the Linux image in preparation for the reboot now that the app
+# stack is quiesced; sets up the FreeBSD bootloader to boot into that Linux
+# image next time we reboot; finally reboots the system.
+#
+
+#
+# Reset the umask to the default value. When called from the app-stack the
+# umask is set to 0027. Since those scripts can be called manually, we want
+# to have a consistent result regardless of the caller. A umask of 0022
+# makes directories created by this script accessible by everyone by default,
+# which is important for directories such as /export/home.
+#
+umask 0022
+
+set -o pipefail
+
+function die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+function usage() {
+	[[ -n "$1" ]] && echo "$1"
+	cat <<EOM
+Usage:
+  $(basename "$0") [-s]"
+    Reset system to the Linux version that has been previously installed using
+    dx_apply.
+      -s Shutdown (instead of reboot) after upgrade.
+EOM
+	exit 2
+}
+
+opt_s=false
+while getopts :hs c; do
+	case "$c" in
+	\?) usage "Invalid option: -$OPTARG." ;;
+	h) usage ;;
+	s) eval "opt_$c=true" ;;
+	esac
+done
+
+[[ "$(uname -s)" == "SunOS" ]] || die "script can only be used in illumos"
+
+#
+# Undo any existing default timeout commands in the bootloader's menu.
+#
+sed -i '/menu_timeout_command/d' /boot/menu.rc.local
+[[ "$(grep -cF 'menu_timeout_command' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup previous default command"
+
+#
+# Get the RDS and the current ZFS pool that we're currently using.
+#
+RDS=$(mount | awk '/^\/ /{ print $3 }')
+RPOOL=${RDS%%/*}
+
+#
+# Check that the version to which we are upgrading is compatible with the
+# currently installed version. (Look at version.info to see if we are
+# above the minimum version required. Since we are doing a migration the
+# minimum version should be the latest 5.3.
+#
+# CURRENT_DDS=$(dirname "$(mount | awk '/^\/opt\/delphix /{ print $3 }')")
+# CURRENT_VERSION=$(basename $current_dds)
+#
+# WIP: check if current version is 5.3, if not bail
+#
+
+#
+# Ensure that the expected Linux dataset layout exists.
+# Note that this excludes the "data" dataset which was destroyed in dx_apply.
+#
+[[ $(zfs list -o name -Hr "$RPOOL/ROOT" | wc -l) -eq 5 ]] ||
+	die "could not find the expected linux dataset layout"
+LX_RDS_PARENT=$(zfs list -o name -H -d 1 "$RPOOL/ROOT" | tail -n 1)
+[[ -n $LX_RDS_PARENT ]] || die "could not find Linux RDS parent dataset"
+LX_RDS="$LX_RDS_PARENT/root"
+
+#
+# Ensure that the expected bootloader fields are there.
+#
+[[ "$(grep -cF 'set lxcmdline' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no lxcmdline variable in the bootloader menu"
+[[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no caption for the Linux option in the bootloader menu"
+[[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no keycode for the Linux option in the bootloader menu"
+[[ "$(grep -cF 'mainmenu_command[8]' /boot/menu.rc.local)" -eq 1 ]] ||
+	die "there is no command for the Linux option in the bootloader menu"
+[[ "$(grep -c "$LX_RDS" /boot/menu.rc.local)" -eq 1 ]] ||
+	die "the expected Linux RDS ($LX_RDS) was either not found or has" \
+		"been specified more than once in the bootloader's menu file"
+
+#
+# Re-mount the root dataset and run the migration logic.
+#
+rm -rf /var/delphix/migration
+mkdir -p /var/delphix/migration ||
+	die "failed to create /var/delphix/migration"
+MIGRATION_SCRIPT="/opt/delphix/migration/migrate_config.py"
+LX_CONTAINER="${LX_RDS_PARENT##*/}"
+LX_RDS_MOUNT="/tmp/delphix.$LX_CONTAINER/root"
+mkdir -p "$LX_RDS_MOUNT"
+mount -F zfs -o ignoremountpoint "$LX_RDS" "$LX_RDS_MOUNT" ||
+	die "failed to mount the root Linux dataset"
+"${LX_RDS_MOUNT}${MIGRATION_SCRIPT}" pre-upgrade \
+	>>/var/delphix/migration/log 2>&1 || die "failed to run migration"
+#
+# Create a flag file that notifies the delphix-migration service that
+# post-reboot migration logic should be run. Note that the /var/delphix
+# dataset is carried over into Linux.
+#
+touch /var/delphix/migration/perform-migration ||
+	die "failed to create delphix-migration flag file"
+
+#
+# Workaround for LX-1779: Prevent analytics from launching Illumos-specific
+# collectors.
+#
+command="TRUNCATE dlpx_analytics_slice; TRUNCATE analytics_datapoint;"
+echo "Running MDS Command: '$command'"
+/opt/delphix/server/bin/mds_client -- -c "$command" ||
+	die "Failed mds_client command."
+
+#
+# Let the app-stack know that an "OS migration" upgrade is being performed.
+#
+cat <<-EOF >"/var/dlpx-update/upgrade.properties" ||
+	UPGRADE_TYPE=OS_MIGRATION
+EOF
+	die "failed to create upgrade.properties"
+
+#
+# Create linux /var/delphix dataset from a clone of the current
+# /var/delphix dataset. We want to do this last as this will carry-over all
+# the logs and the /var/delphix/migration directory into Linux.
+#
+LX_VAR_DLPX="$LX_RDS_PARENT/data"
+CUR_VAR_DLPX=$(zfs list -Ho name /var/delphix)
+[[ -n $CUR_VAR_DLPX ]] || die "could not determine current /var/delphix dataset"
+zfs list "$CUR_VAR_DLPX" >/dev/null 2>&1 ||
+	die "'$CUR_VAR_DLPX' is not a valid zfs dataset"
+zfs snapshot "${CUR_VAR_DLPX}@${LX_CONTAINER}"
+zfs clone -o compression=on -o mountpoint=legacy \
+	"${CUR_VAR_DLPX}@${LX_CONTAINER}" "$LX_VAR_DLPX"
+
+#
+# Increase the boot delay to 20 seconds to ease bootloader access during
+# the migration for debugging purposes.
+#
+sed -i '/autoboot_delay/c\set autoboot_delay=20' /boot/menu.rc.local ||
+	die "Failed to set boot delay in bootloader"
+
+#
+# Read the command from option 8 which should be the one that boots
+# into Linux. Then make it so that the same command runs whenever we
+# hit the timer of the FreeBSD bootloader menu.
+#
+MAIN_MENU_LINUX_CMD=$(grep -F 'mainmenu_command[8]' /boot/menu.rc.local |
+	cut -d = -f 2-)
+echo "set menu_timeout_command=$MAIN_MENU_LINUX_CMD" >>/boot/menu.rc.local
+
+# Constants used by the uadmin syscall.
+A_SHUTDOWN=2
+AD_POWEROFF=6
+AD_BOOT=1
+
+# reboot or shutdown
+if $opt_s; then
+	uadmin $A_SHUTDOWN $AD_POWEROFF
+else
+	uadmin $A_SHUTDOWN $AD_BOOT
+fi
+
+exit 0

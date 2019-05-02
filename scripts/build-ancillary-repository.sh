@@ -40,6 +40,8 @@ set -o xtrace
 set -o errexit
 set -o pipefail
 
+OUTPUT_DIR=$TOP/live-build/build/ancillary-repository
+
 function resolve_s3_uri() {
 	local pkg_uri="$1"
 	local pkg_prefix="$2"
@@ -78,51 +80,13 @@ function download_delphix_s3_debs() {
 	local S3_URI="$2"
 	local tmp_directory
 
-	tmp_directory=$(mktemp -d -p "$PWD" tmp.s3-debs.XXXXXXXXXX)
+	tmp_directory=$(mktemp -d -p "$TOP/build" tmp.s3-debs.XXXXXXXXXX)
 	pushd "$tmp_directory" &>/dev/null
 
 	aws s3 sync --only-show-errors "$S3_URI" .
 	sha256sum -c --strict SHA256SUMS
 
 	mv ./*.deb "$pkg_directory/"
-
-	popd &>/dev/null
-	rm -rf "$tmp_directory"
-}
-
-function build_delphix_java8_debs() {
-	local pkg_directory="$1"
-
-	local url="http://artifactory.delphix.com/artifactory"
-	local tarfile="jdk-8u171-linux-x64.tar.gz"
-	local debfile="oracle-java8-jdk_8u171_amd64.deb"
-	local tmp_directory
-
-	tmp_directory=$(mktemp -d -p "$PWD" tmp.java.XXXXXXXXXX)
-	pushd "$tmp_directory" &>/dev/null
-
-	wget -nv "$url/java-binaries/linux/jdk/8/$tarfile" -O "$tarfile"
-
-	#
-	# We must run "make-jpkg" as a non-root user, and then use "fakeroot".
-	#
-	# If we "make-jpkg" it as the real root user, it will fail; and if we
-	# run it as a non-root user, it will also fail.
-	#
-	# make-jpkg uses the debhelper tool suite to generate the deb package.
-	# In order for java debugging tools (jstack, etc.) to work properly
-	# we need to have the debug symbols in the java libraries; however
-	# debhelper strips those symbols by default and it doesn't appear like
-	# make-jpkg provides any options to override this setting. We need to
-	# resort to a hack and pass DEB_BUILD_OPTIONS=nostrip as an
-	# environment variable, which is consumed by debhelper and overrides
-	# the dh_strip step.
-	#
-	chown -R nobody:nogroup .
-	runuser -u nobody -- env DEB_BUILD_OPTIONS=nostrip \
-		fakeroot make-jpkg "$tarfile" <<<y
-
-	cp "$debfile" "$pkg_directory"
 
 	popd &>/dev/null
 	rm -rf "$tmp_directory"
@@ -135,13 +99,14 @@ function build_ancillary_repository() {
 	aptly repo create \
 		-distribution=bionic -component=main ancillary-repository
 	aptly repo add ancillary-repository "$pkg_directory"
-	aptly publish repo -skip-signing ancillary-repository
+	aptly publish repo -skip-contents -skip-signing ancillary-repository
 
-	rm -rf "$TOP/ancillary-repository"
-	mv "$HOME/.aptly" "$TOP/ancillary-repository"
-	cat >"$TOP/ancillary-repository/aptly.config" <<-EOF
+	mkdir -p "$OUTPUT_DIR/.."
+	rm -rf "$OUTPUT_DIR"
+	mv "$HOME/.aptly" "$OUTPUT_DIR"
+	cat >"$OUTPUT_DIR/aptly.config" <<-EOF
 		{
-		    "rootDir": "$TOP/ancillary-repository"
+		    "rootDir": "$OUTPUT_DIR"
 		}
 	EOF
 }
@@ -177,27 +142,35 @@ function build_ancillary_repository() {
 #    environment variables, and the script will work as expected.
 #
 
+upstream_branch="${UPSTREAM_PRODUCT_BRANCH:-master}"
+
 AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
 	"$AWS_S3_URI_VIRTUALIZATION" \
 	"$AWS_S3_PREFIX_VIRTUALIZATION" \
-	"dlpx-app-gate/master/build-package/post-push/latest")
+	"dlpx-app-gate/${upstream_branch}/build-package/post-push/latest")
 
 AWS_S3_URI_MASKING=$(resolve_s3_uri \
 	"$AWS_S3_URI_MASKING" \
 	"$AWS_S3_PREFIX_MASKING" \
-	"dms-core-gate/master/build-package/post-push/latest")
+	"dms-core-gate/${upstream_branch}/build-package/post-push/latest")
 
-AWS_S3_URI_ZFS=$(resolve_s3_uri \
-	"$AWS_S3_URI_ZFS" \
-	"$AWS_S3_PREFIX_ZFS" \
-	"devops-gate/master/zfs-package-build/master/post-push/latest")
+AWS_S3_URI_USERLAND_PKGS=$(resolve_s3_uri \
+	"$AWS_S3_URI_USERLAND_PKGS" \
+	"$AWS_S3_PREFIX_USERLAND_PKGS" \
+	"devops-gate/master/linux-pkg-build/${upstream_branch}/userland/post-push/latest")
+
+AWS_S3_URI_KERNEL_PKGS=$(resolve_s3_uri \
+	"$AWS_S3_URI_KERNEL_PKGS" \
+	"$AWS_S3_PREFIX_KERNEL_PKGS" \
+	"devops-gate/master/linux-pkg-build/${upstream_branch}/kernel/post-push/latest")
 
 #
 # All package files will be placed into this temporary directory, such
 # that we can later point Aptly at this directory to build the Aptly/APT
 # repository.
 #
-PKG_DIRECTORY=$(mktemp -d -p "$PWD" tmp.pkgs.XXXXXXXXXX)
+mkdir -p "$TOP/build"
+PKG_DIRECTORY=$(mktemp -d -p "$TOP/build" tmp.pkgs.XXXXXXXXXX)
 
 #
 # Now that we've determined the URI of all first-party packages, we can
@@ -205,15 +178,8 @@ PKG_DIRECTORY=$(mktemp -d -p "$PWD" tmp.pkgs.XXXXXXXXXX)
 #
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
 download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_ZFS"
-
-#
-# The Delphix Java 8 package is handled a little differently than the
-# rest. This package file must be dynamically generated on the fly, from
-# some input file stored in Artifactory. This function will do this, and
-# then place the generated package file in the specified directory.
-#
-build_delphix_java8_debs "$PKG_DIRECTORY"
+download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_USERLAND_PKGS"
+download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_KERNEL_PKGS"
 
 #
 # Now that our temporary package directory has been populated with all

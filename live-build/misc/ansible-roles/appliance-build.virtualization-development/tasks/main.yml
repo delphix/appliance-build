@@ -15,20 +15,6 @@
 #
 
 ---
-#
-# When using the APPLIANCE_PASSWORD variable, we have to be careful to
-# specify "no_log" to prevent it from being leaked to stdout (e.g. if
-# ansible is run with verbosity).
-#
-- fail:
-    msg: "Required environment variable 'APPLIANCE_PASSWORD' is empty."
-  when: lookup('env', 'APPLIANCE_PASSWORD') == ''
-  no_log: true
-
-- fail:
-    msg: "Required environment variable 'APPLIANCE_USERNAME' is empty."
-  when: lookup('env', 'APPLIANCE_USERNAME') == ''
-
 - file:
     path: "/etc/systemd/system/delphix-mgmt.service.d"
     owner: root
@@ -62,7 +48,7 @@
 - git:
     repo: "{{ item.repo }}"
     dest:
-      "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item.dest }}"
+      "/export/home/delphix/{{ item.dest }}"
     version: "{{ item.version }}"
     accept_hostkey: yes
     update: no
@@ -72,16 +58,17 @@
         dest: dlpx-app-gate }
 
 - file:
-    path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item }}"
-    owner: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+    path: "/export/home/delphix/{{ item }}"
+    owner: "delphix"
     group: staff
+    mode: "g+w"
     state: directory
     recurse: yes
   with_items:
     - dlpx-app-gate
 
 - authorized_key:
-    user: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+    user: "delphix"
     state: present
     key:
       "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAyvw2gQRkDqrRY5qxUn0VYAL6Rtt1/\
@@ -97,8 +84,3 @@
     line: "{{ item.key }}={{ item.value }}"
   with_items:
     - { key: "PermitRootLogin", value: "yes" }
-
-- user:
-    name: root
-    password:
-      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"

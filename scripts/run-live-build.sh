@@ -27,24 +27,35 @@ if [[ $EUID -ne 0 ]]; then
 	exit 1
 fi
 
-if [[ $# -ne 1 ]]; then
-	echo "Must specify a single live-build variant to run." 1>&2
+if [[ $# -ne 3 ]]; then
+	echo "Must specify a single variant, a single platform, and a run " \
+		"type (e.g. 'internal-minimal esx upgrade-artifacts')." 1>&2
 	exit 1
 fi
 
-if [[ "$1" != "base" ]] && [[ ! -d "live-build/variants/$1" ]]; then
-	echo "Invalid live-build variant specified: $1" 1>&2
+# Verify a valid run type is given
+UPGRADE_RUN_TYPE="upgrade-artifacts"
+VM_RUN_TYPE="vm-artifacts"
+ALL_RUN_TYPE="all"
+RUN_TYPES="$UPGRADE_RUN_TYPE|$VM_RUN_TYPE|$ALL_RUN_TYPE"
+
+case "$3" in
+$UPGRADE_RUN_TYPE) ;;
+$VM_RUN_TYPE) ;;
+$ALL_RUN_TYPE) ;;
+*)
+	echo "Unknown run type '$3'. Must be one of <$RUN_TYPES>"
 	exit 1
-fi
+	;;
+esac
 
 set -o errexit
 set -o pipefail
 
 #
-# Allow the appliance username and password to be configured via these
-# environment variables, but use sane defaults if they're missing.
+# Allow the appliance user's password to be configured via this
+# environment variable, but use a sane default if its missing.
 #
-export APPLIANCE_USERNAME="${APPLIANCE_USERNAME:-delphix}"
 export APPLIANCE_PASSWORD="${APPLIANCE_PASSWORD:-delphix}"
 
 #
@@ -54,20 +65,52 @@ export APPLIANCE_PASSWORD="${APPLIANCE_PASSWORD:-delphix}"
 #
 set -o xtrace
 
-if [[ "$1" == "base" ]]; then
-	export APPLIANCE_VARIANT="base"
-	cd "$TOP/live-build/base"
-else
-	export APPLIANCE_VARIANT="$1"
-	cd "$TOP/live-build/variants/$1"
+export APPLIANCE_VARIANT="$1"
+export APPLIANCE_PLATFORM="$2"
+export RUN_TYPE="$3"
+export ARTIFACT_NAME="$APPLIANCE_VARIANT-$APPLIANCE_PLATFORM"
+
+if [[ ! -d "$TOP/live-build/variants/$APPLIANCE_VARIANT" ]]; then
+	echo "Invalid live-build variant specified: $1" 1>&2
+	exit 1
 fi
+
+# Set up live-build environment
+build_dir="$TOP/live-build/build/$ARTIFACT_NAME"
+rm -rf "$build_dir"
+mkdir -p "$build_dir"
+
+cp -r "$TOP/live-build/auto" "$build_dir"
+
+#
+# Always copy over configuration hooks. If the run type is "all", then copy
+# over all run type hooks. Otherwise, copy only the specified run type.
+#
+rsync -a --exclude="hooks" "$TOP/live-build/config" "$build_dir"
+mkdir -p "$build_dir/config/hooks"
+cp -r "$TOP/live-build/config/hooks/configuration/." "$build_dir/config/hooks"
+if [[ "$RUN_TYPE" == "$ALL_RUN_TYPE" ]]; then
+	cp -r "$TOP/live-build/config/hooks/$UPGRADE_RUN_TYPE/." "$build_dir/config/hooks"
+	cp -r "$TOP/live-build/config/hooks/$VM_RUN_TYPE/." "$build_dir/config/hooks"
+else
+	cp -r "$TOP/live-build/config/hooks/$RUN_TYPE/." "$build_dir/config/hooks"
+fi
+
+cp -r "$TOP/live-build/variants/$APPLIANCE_VARIANT/ansible" "$build_dir"
+cp -r "$TOP/live-build/misc/migration-scripts" "$build_dir"
+
+cd "$build_dir"
+
+sed "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/" \
+	<config/package-lists/delphix-platform.list.chroot.in \
+	>config/package-lists/delphix-platform.list.chroot
 
 #
 # The ancillary repository contains all of the first-party Delphix
 # packages that are required for live-build to operate properly.
 #
 
-aptly serve -config="$TOP/ancillary-repository/aptly.config" &
+aptly serve -config="$TOP/live-build/build/ancillary-repository/aptly.config" &
 APTLY_SERVE_PID=$!
 
 #
@@ -108,13 +151,17 @@ if [[ ! -f binary/SHA256SUMS ]]; then
 	exit 1
 fi
 
-#
-# The base variant doesn't produce any virtual machine artifacts, so we
-# need to avoid the "mv" calls below.
-#
-if [[ "$APPLIANCE_VARIANT" == "base" ]]; then
-	exit 0
-fi
+case $APPLIANCE_PLATFORM in
+aws) vm_artifact_ext=vmdk ;;
+azure) vm_artifact_ext=vhdx ;;
+esx) vm_artifact_ext=ova ;;
+gcp) vm_artifact_ext=gcp.tar.gz ;;
+kvm) vm_artifact_ext=qcow2 ;;
+*)
+	echo "Invalid platform"
+	exit 1
+	;;
+esac
 
 #
 # After running the build successfully, it should have produced various
@@ -123,8 +170,8 @@ fi
 # user (e.g. other software); this is most useful when multiple variants
 # are built via a single call to "make" (e.g. using the "all" target).
 #
-for ext in ova qcow2 upgrade.tar.gz vhdx vmdk; do
-	if [[ -f "$APPLIANCE_VARIANT.$ext" ]]; then
-		mv "$APPLIANCE_VARIANT.$ext" "$TOP/live-build/artifacts"
+for ext in debs.tar.gz migration.tar.gz $vm_artifact_ext; do
+	if [[ -f "$ARTIFACT_NAME.$ext" ]]; then
+		mv "$ARTIFACT_NAME.$ext" "$TOP/live-build/build/artifacts/"
 	fi
 done

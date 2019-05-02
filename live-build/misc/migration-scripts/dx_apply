@@ -1,0 +1,347 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Creates the dataset layout/hierarchy expected by linux-upgrade for the
+# archive from the migration image to be unpacked. It also takes the
+# required steps and adds an entry to the FreeBSD bootloader so we can
+# optionally boot into Linux.
+#
+
+set -o pipefail
+
+#
+# Reset the umask to the default value. When called from the app-stack the
+# umask is set to 0027. Since those scripts can be called manually, we want
+# to have a consistent result regardless of the caller. A umask of 0022
+# makes directories created by this script accessible by everyone by default,
+# which is important for directories such as /export/home.
+#
+umask 0022
+
+function die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+function usage() {
+	echo "$(basename "$0"): $*" >&2
+	echo "Usage: $(basename "$0") <archive-directory>"
+	exit 2
+}
+
+function report_progress_inc() {
+	echo "Progress increment: $(date +%T:%N%z), $1, $2"
+}
+
+[[ "$(uname -s)" == "SunOS" ]] || die "script can only be used in illumos"
+
+while getopts ':h' opt; do
+	case $opt in
+	h) usage ;;
+	*) usage "Invalid option: -$OPTARG." ;;
+	esac
+done
+
+ARCHIVE_DIR="$1"
+[[ -n $ARCHIVE_DIR ]] || usage
+[[ -d $ARCHIVE_DIR ]] || die "$ARCHIVE_DIR is not a directory"
+[[ -f $ARCHIVE_DIR/version.info ]] ||
+	die "$ARCHIVE_DIR does not have a version.info file"
+. "$ARCHIVE_DIR/version.info"
+#
+# WIP: Assert MINIMUM VERSION field for migration.
+# The idea here is to ensure that we are running this script against
+# a migration archive, by ensuring that it has the right value for
+# the MINIMUM_VERSION field.
+#
+
+#
+# Get the root dataset and the current ZFS pool that we're currently using.
+#
+RDS=$(mount | awk '/^\/ /{ print $3 }')
+RPOOL=${RDS%%/*}
+
+#
+# Cleanup any previous intermediate state.
+#
+rm -rf /tmp/delphix.* ||
+	die "failed to destroy old delphix temporary directories"
+rm -f /boot/vmlinuz-* /boot/initrd.img-* ||
+	die "failed to destroy previously copied Linux kernel data"
+zfs destroy -r "$RPOOL/ROOT" 2>/dev/null
+zfs list "$RPOOL/ROOT" 2>/dev/null &&
+	die "could not destroy linux root dataset from previous run"
+sed -i '/set lxcmdline/d' /boot/menu.rc.local
+[[ "$(grep -cF 'set lxcmdline' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup lxcmdline from previous run"
+sed -i '/set mainmenu_caption\[8\]/d' /boot/menu.rc.local
+[[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup mainmenu_caption from previous run"
+sed -i '/set mainansi_caption\[8\]/d' /boot/menu.rc.local
+[[ "$(grep -cF 'mainansi_caption[8]' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup mainansi_caption from previous run"
+sed -i '/set mainmenu_keycode\[8\]/d' /boot/menu.rc.local
+[[ "$(grep -cF 'mainmenu_keycode[8]' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup mainmenu_keycode from previous run"
+sed -i '/set mainmenu_command\[8\]/d' /boot/menu.rc.local
+[[ "$(grep -cF 'mainmenu_command[8]' /boot/menu.rc.local)" -eq 0 ]] ||
+	die "failed to cleanup mainmenu_command from previous run"
+
+report_progress_inc 20
+
+#
+# Check that the version to which we are upgrading is compatible with the
+# currently installed version. (Look at version.info to see if we are
+# above the minimum version required. Since we are doing a migration
+# the minimum version should be the latest 5.3)
+#
+# CURRENT_DDS=$(dirname "$(mount | awk '/^\/opt\/delphix /{ print $3 }')")
+# CURRENT_VERSION=$(basename $current_dds)
+#
+# WIP: check if current version is 5.3, if not bail
+#
+
+#
+# Create dataset layout similar to the linux upgrade.
+#
+TMPDIR=$(mktemp -d -p "/tmp" -t delphix.XXXXXXX)
+FSNAME=$(basename "$TMPDIR")
+TMP_ROOT="$TMPDIR/root"
+
+zfs create \
+	-o canmount=off \
+	-o mountpoint=none \
+	"$RPOOL/ROOT" ||
+	die "failed to create linux dataset $RPOOL/ROOT"
+
+zfs create \
+	-o canmount=off \
+	-o mountpoint=none \
+	"$RPOOL/ROOT/$FSNAME" ||
+	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME"
+
+zfs create \
+	-o canmount=noauto \
+	-o compression=on \
+	-o mountpoint="$TMP_ROOT" \
+	"$RPOOL/ROOT/$FSNAME/root" ||
+	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/root"
+
+zfs mount "$RPOOL/ROOT/$FSNAME/root" ||
+	die "failed to mount $RPOOL/ROOT/$FSNAME/root in temporary dir $TMP_ROOT"
+
+zfs create \
+	-o compression=on \
+	-o mountpoint=legacy \
+	"$RPOOL/ROOT/$FSNAME/home" ||
+	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/home"
+
+zfs create \
+	-o compression=on \
+	-o mountpoint=legacy \
+	"$RPOOL/ROOT/$FSNAME/data" ||
+	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/data"
+
+zfs create \
+	-o compression=on \
+	-o mountpoint=legacy \
+	"$RPOOL/ROOT/$FSNAME/log" ||
+	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/log"
+
+mkdir -p "$TMP_ROOT/export/home"
+mount -F zfs "$RPOOL/ROOT/$FSNAME/home" "$TMP_ROOT/export/home"
+
+mkdir -p "$TMP_ROOT/var/delphix"
+mount -F zfs "$RPOOL/ROOT/$FSNAME/data" "$TMP_ROOT/var/delphix"
+
+mkdir -p "$TMP_ROOT/var/log"
+mount -F zfs "$RPOOL/ROOT/$FSNAME/log" "$TMP_ROOT/var/log"
+
+(
+	cd "$TMP_ROOT"
+	cpio -imu
+) <"$ARCHIVE_DIR/os-root.cpio" 2>&1 ||
+	die "failed to unpack os-root.cpio"
+
+#
+# /export/home and /var/delphix datasets are not mounted automatically.
+# On Illumos this kind of mounting logic was performed by dxinit and svc-boot.
+# On Linux /etc/fstab is used instead.
+#
+cat <<-EOF >"$TMP_ROOT/etc/fstab" || die "Failed to setup /etc/fstab"
+	$RPOOL/ROOT/$FSNAME/home /export/home zfs defaults 0 0
+	$RPOOL/ROOT/$FSNAME/data /var/delphix zfs defaults 0 0
+	$RPOOL/ROOT/$FSNAME/log  /var/log     zfs defaults 0 0
+EOF
+
+#
+# WIP: Add here any operations that generate files from illumos,
+#	that we may want to carry over and use in Linux. Examples
+#	include networking interface configuration.
+#
+
+#
+# Set things up for the FreeBSD bootloader to provide an option for
+# booting into the Linux environment This happens in two steps:
+# [1] We place vmlinuz and initrd from our migration image into
+#     the /boot directory of the current system, so the bootloader
+#     can load them.
+# [2] Add a new option in the bootloader's menu for Linux. This is
+#     done by appending the configuration of the new option in our
+#     current menu file.
+#
+# Note: We reverse sort below based on a vmlinuz & initrd's name
+# to get the latest version of them. In reality, there is always
+# only one version but in the case that there is an issue in
+# how we construct the images we always want to get the latest.
+#
+VMLINUZ=$(find "$TMP_ROOT/boot/vmlinuz-"* | sort -r | head -n 1)
+INITRD_IMG=$(find "$TMP_ROOT/boot/initrd.img-"* | sort -r | head -n 1)
+cp "$VMLINUZ" /boot ||
+	die "failed to copy $VMLINUZ to /boot"
+cp "$INITRD_IMG" /boot ||
+	die "faield to copy $INITRD_IMG to /boot"
+
+#
+# This command loads the Linux Kernel Compressed Executable in memory
+# from the OK prompt of the FreeBSD bootloader. Note that we pass it the
+# lxcmdline variable, which will be parsed by the bootloader. The reason
+# why we create a separate variable for the cmdline arguments instead of
+# just adding them in-line is because otherwise the command would be
+# greater than 256 characters and fail to be parsed by the bootloader.
+# We have to be careful to escape ${lxcmdline} properly so that it is
+# not resolved by the current script.
+#
+LOAD_VMLINUZ_OK_CMD="load /boot/$(basename "$VMLINUZ") \${lxcmdline}"
+
+#
+# Essentially we want the command line to be as close as possible to
+# what is set by our grub configuration for fresh Linux installs. Our
+# customizations to the grub command line can be found in the
+# delphix-platform project at etc/default/grub.d/override.cfg.
+# Here is an overview:
+#
+# - We specify the root filesystem type to be ZFS and its root dataset
+#   the one that we just created for the migration image.
+#
+# - We carry-over the following settings from delphix-platform:
+#   console, ipv6 and crashkernel.
+#
+# - We specify zfsforce=1 because otherwise we would be failing at
+#   pool import because of ZFS's hostid check. This argument is added
+#   specifically for the migration case and doesn't appear on a fresh
+#   Linux install.
+#
+# Note that we use an array of strings instead of one whole string
+# that we break to multiple lines in order to divide the arguments
+# in logical pieces while ensuring that their quotes are escaped
+# correctly and in accordance with our linters/checkstyles. This
+# should be taken into account for all cases of string arrays for
+# the rest of this file that have to do with adding commands in the
+# bootloader configuration.
+#
+LX_CMDLINE=(
+	"root=ZFS=$RPOOL/ROOT/$FSNAME/root"
+	'console=tty0 console=ttyS0,115200n8'
+	'ipv6.disable=1'
+	'crashkernel=1024M-:512M'
+	'zfsforce=1'
+)
+
+#
+# This command loads the initial RAM disk as the initial root filesystem
+# which is needed as part of the booting process.
+#
+LOAD_INITRD_OK_CMD="load -t rootfs /boot/$(basename "$INITRD_IMG")"
+
+#
+# This is the command to be issued whenever our new option in the
+# bootloader menu is chosen. It is FICL code (a Forth-inspired
+# command language) that is basically read as:
+# 	arg func; arg func; func.
+# In our case we:
+# [1] Evaluate the command to load vmlinuz
+# [2] Evaluate the command to load initrd
+# [3] boot (with the above two loaded)
+#
+MAIN_MENU_FICL=(
+	"s\\\" $LOAD_VMLINUZ_OK_CMD\\\" evaluate"
+	"s\\\" $LOAD_INITRD_OK_CMD\\\" evaluate"
+	boot
+)
+
+#
+# Note: We always have 7 options in our bootloader at any given time
+# in the latest 5.3 version, thus we use the index 8 for the new
+# option below.
+#
+{
+	echo 'set lxcmdline="'"${LX_CMDLINE[*]}"'"'
+	#
+	# Add non-ansi and ansi version for the name of the option.
+	#
+	echo 'set mainmenu_caption[8]="Boot Delphix on [L]inux"'
+	echo 'set mainansi_caption[8]="Boot Delphix on ^[1mL^[minux version"'
+
+	#
+	# 76 is ascii for capital 'L', see caption above
+	#
+	echo 'set mainmenu_keycode[8]=76'
+
+	#
+	# If someone selects our new option, boot into Linux.
+	#
+	echo 'set mainmenu_command[8]="'"${MAIN_MENU_FICL[*]}"'"'
+} >>/boot/menu.rc.local ||
+	die "failed to update /boot/menu.rc.local"
+
+#
+# Note that the new /var/delphix should not contain any useful data as it will
+# be replaced by a clone of the current /var/delphix dataset in dx_execute.
+# We do not clone the current /var/delphix right away as the clone will be
+# outdated by the time dx_execute is called. Before deleting the dataset we
+# first verify that it doesn't contain anything useful.
+#
+(
+	cd "$TMP_ROOT/var/delphix" || die "failed to cd into $TMP_ROOT/var/delphix"
+	# We only expect to find:
+	#  ./dropbox
+	[[ $(find . -mindepth 1 | wc -l) -eq 1 ]] ||
+		die "linux dataset for /var/delphix contains unexpected files"
+	[[ -d dropbox ]] ||
+		die "linux dataset for /var/delphix should contain directory dropbox"
+) || die "verification of /var/delphix failed"
+
+umount "$TMP_ROOT/var/log" ||
+	die "couldn't unmount linux dataset $TMP_ROOT/var/log"
+zfs destroy "$RPOOL/ROOT/$FSNAME/data" ||
+	die "failed to destroy linux dataset $RPOOL/ROOT/$FSNAME/data"
+umount "$TMP_ROOT/export/home" ||
+	die "couldn't unmount linux dataset $TMP_ROOT/export/home"
+
+zfs umount "$RPOOL/ROOT/$FSNAME/root" ||
+	die "couldn't unmount linux dataset $RPOOL/ROOT/$FSNAME/root"
+zfs set mountpoint=/ "$RPOOL/ROOT/$FSNAME/root" ||
+	die "could not set mountpoint for linux dataset $RPOOL/ROOT/$FSNAME/root"
+
+rm -rf "$TMPDIR" ||
+	die "failed to destroy temporary directory $TMPDIR"
+
+report_progress_inc 100
+
+exit 0

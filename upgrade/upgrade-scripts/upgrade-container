@@ -1,0 +1,782 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+. "${BASH_SOURCE%/*}/common.sh"
+
+IMAGE_PATH=$(get_image_path)
+[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
+
+CONTAINER=
+
+function create_cleanup() {
+	#
+	# Upon successful creation of the container, don't perform any
+	# cleanup logic. Rather, the consumer of the script should
+	# eventually "destroy" the container.
+	#
+	# shellcheck disable=SC2181
+	[[ "$?" -eq 0 ]] && return
+
+	#
+	# If the CONTAINER variable is empty, this means the create
+	# function failed before the container directory could be
+	# created. Thus, there's nothing to clean up, so we can
+	# immediately exit.
+	#
+	[[ -z "$CONTAINER" ]] && return
+
+	destroy "$CONTAINER"
+}
+
+function mount_upgrade_container_dataset() {
+	[[ -n "$1" ]] || die "failed to provide dataset to mount"
+	[[ -n "$2" ]] || die "failed to provide directory for mount"
+
+	mkdir -p "$2" || die "failed to create directory '$2'"
+	mount -t zfs "$1" "$2" || die "failed to mount dataset '$1' to '$2'"
+}
+
+function unmount_upgrade_container_dataset() {
+	[[ -n "$1" ]] || die "failed to provide dataset to unmount"
+	umount "$1" || die "failed to unmount dataset '$1'"
+}
+
+function create_upgrade_container() {
+	trap create_cleanup EXIT
+	local type="$1"
+
+	case "$type" in
+	in-place | not-in-place | rollback) ;;
+
+	*)
+		die "unsupported upgrade container type specified: '$1'"
+		;;
+	esac
+
+	#
+	# We want to use "/var/lib/machines" as the parent directory,
+	# since that directory is used by "systemd-nspawn" when looking
+	# for containers.  This way, we can create the directory and
+	# mount our rootfs clone here, and "systemd-nspawn" will
+	# automatically detect it.
+	#
+	DIRECTORY=$(mktemp -d -p "/var/lib/machines" -t delphix.XXXXXXX)
+	[[ -d "$DIRECTORY" ]] || die "failed to create upgrade directory"
+	CONTAINER=$(basename "$DIRECTORY")
+	[[ -n "$CONTAINER" ]] || die "failed to obtain upgrade name"
+
+	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
+	[[ -n "$ROOTFS_DATASET" ]] ||
+		die "unable to determine mounted rootfs container dataset"
+
+	zfs create \
+		-o canmount=off \
+		-o mountpoint=none \
+		"rpool/ROOT/$CONTAINER" ||
+		die "failed to create upgrade filesystem"
+
+	case "$type" in
+	in-place | not-in-place)
+		#
+		# When creating a new "in-place" or "not-in-place"
+		# upgrade container, we need to snapshot the currently
+		# mounted rootfs datasets, so these snapshots can be
+		# used to create the new container datasets below.
+		#
+		SNAPSHOT_NAME="container-$CONTAINER"
+		zfs snapshot -r "$ROOTFS_DATASET@$SNAPSHOT_NAME" ||
+			die "failed to create upgrade container snapshots"
+		;;
+	rollback)
+		#
+		# When the "execute" script is used to perform an
+		# in-place upgrade, it will create a snapshot on the
+		# rootfs container datasets that are upgraded. It's this
+		# snapshot name that we're attempting to find here, as
+		# these snapshots are used to create the new "rollback"
+		# upgrade container datasets below.
+		#
+		SNAPSHOT_NAME=$(get_dataset_rollback_snapshot_name "$ROOTFS_DATASET")
+		[[ -n "$SNAPSHOT_NAME" ]] ||
+			die "unable to determine rollback snapshot name"
+		;;
+	esac
+
+	case "$type" in
+	in-place | rollback)
+		zfs clone \
+			-o canmount=noauto \
+			-o compression=on \
+			-o mountpoint="$DIRECTORY" \
+			"$ROOTFS_DATASET/root@$SNAPSHOT_NAME" \
+			"rpool/ROOT/$CONTAINER/root" ||
+			die "failed to create upgrade / clone"
+
+		zfs mount "rpool/ROOT/$CONTAINER/root" ||
+			die "failed to mount upgrade / clone"
+		;;
+	not-in-place)
+		zfs create \
+			-o canmount=noauto \
+			-o compression=on \
+			-o mountpoint="$DIRECTORY" \
+			"rpool/ROOT/$CONTAINER/root" ||
+			die "failed to create upgrade / filesystem"
+
+		zfs mount "rpool/ROOT/$CONTAINER/root" ||
+			die "failed to mount upgrade / filesystem"
+		;;
+	esac
+
+	zfs clone \
+		-o compression=on \
+		-o mountpoint=legacy \
+		"$ROOTFS_DATASET/home@$SNAPSHOT_NAME" \
+		"rpool/ROOT/$CONTAINER/home" ||
+		die "failed to create upgrade /export/home clone"
+
+	zfs clone \
+		-o compression=on \
+		-o mountpoint=legacy \
+		"$ROOTFS_DATASET/data@$SNAPSHOT_NAME" \
+		"rpool/ROOT/$CONTAINER/data" ||
+		die "failed to create upgrade /var/delphix clone"
+
+	zfs clone \
+		-o compression=on \
+		-o mountpoint=legacy \
+		"$ROOTFS_DATASET/log@$SNAPSHOT_NAME" \
+		"rpool/ROOT/$CONTAINER/log" ||
+		die "failed to create upgrade /var/log clone"
+
+	case "$type" in
+	not-in-place)
+		#
+		# We need to ensure all of the upgrade container's datasets
+		# are mounted before running "debootstrap". This way, if any
+		# packages installed by "debootstrap" happen to deliver
+		# files to any of these directories, they'll be propertly
+		# delivered to the correct dataset, rather than the root
+		# dataset.
+		#
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/home" "$DIRECTORY/export/home"
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/log" "$DIRECTORY/var/log"
+
+		#
+		# This function needs to return the container's name to
+		# stdout, so that consumers of this function/script can
+		# consume that name and then later start/stop/destroy the
+		# container. Thus, we have to redirect the output from
+		# debootstrap away from stdout.
+		#
+		# Also, we need to include the "systemd-container" package
+		# when installing the base systemd with debootstrap so that
+		# starting the container will work properly. Otherwise,
+		# after starting the container, we won't be able to
+		# communicate and later run commands in the container with
+		# "systemd-run".
+		#
+		debootstrap --no-check-gpg \
+			--components=delphix --include=systemd-container \
+			bionic "$DIRECTORY" "file://$IMAGE_PATH/public" 1>&2 ||
+			die "failed to debootstrap upgrade filesystem"
+
+		#
+		# Now that we've successfully run "deboostrap", we can
+		# unmount these datasets that were mounted above.
+		#
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/log"
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/data"
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/home"
+		;;
+	esac
+
+	#
+	# We rely on the "/etc/fstab" file to mount the non-root ZFS
+	# filesystems, so that when a specific rootfs dataset is booted,
+	# it'll automatically mount the correct non-rootfs datasets
+	# associated with that rootfs dataset.
+	#
+	cat <<-EOF >"$DIRECTORY/etc/fstab"
+		rpool/ROOT/$CONTAINER/home /export/home zfs defaults 0 0
+		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults 0 0
+		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults 0 0
+	EOF
+
+	mkdir -p "/etc/systemd/nspawn" ||
+		die "failed to create directory: '/etc/systemd/nspawn'"
+
+	#
+	# We need to change some of the default configuration options
+	# for the container, in order for it to behave as we expected:
+	#
+	# * PrivateUsers: We want the UIDs in the container to match the
+	#   UIDs in the host. This way the container can execute commands
+	#   (e.g. zfs) as the normal root user.
+	#
+	# * PrivateUsersChown: Since we set PrivateUsers to "no", we
+	#   need to also ensure systemd-nspawn doesn't attempt to chown
+	#   the containers root filesystem. Normally, with PrivateUsers
+	#   set to "yes", the container's root filesystem would be
+	#   chowned to match the UID mapping used by the container.
+	#
+	# * Private: We set networking to "private" so that the
+	#   container can use ports without conflicting with ports that
+	#   are already in used by the host.
+	#
+	# * Bind=/dev/zfs: We set this so that zfs/zpool/libzpool/etc.
+	#   is usable from within the container.
+	#
+	cat >"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+		[Exec]
+		PrivateUsers=no
+		[Network]
+		Private=yes
+		VirtualEthernet=yes
+		[Files]
+		PrivateUsersChown=no
+		Bind=/dev/zfs
+	EOF
+		die "failed to create container configuration file"
+
+	#
+	# Certain software (e.g. update-grub) running in the container
+	# require access to the disk backing the root filesystem. Thus,
+	# we expose this device to the container here; we're careful to
+	# only expose it read-only, though, to prevent software in the
+	# container from inadvertently corrupting the device.
+	#
+	for device in $(grub-probe --target=device /); do
+		cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+			BindReadOnly=$device
+		EOF
+			die "failed to add '$device' to container config file"
+	done
+
+	#
+	# Since UPDATE_DIR is stored on a seperate ZFS filesystem than
+	# the root filesysytem, we need to explicitly make this
+	# directory available inside of the upgrade container,
+	# which is what we're doing here.
+	#
+	# We need UPDATE_DIR to be available inside of the container so
+	# that we can use the APT repository that it contains to upgrade
+	# the packages inside the container, and verify that process.
+	#
+	cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+		Bind=$UPDATE_DIR
+	EOF
+		die "failed to add '$UPDATE_DIR' to container config file"
+
+	#
+	# We also need to make "/domain0" available from within the
+	# container, since that's required by the "upgrade-verify" JAR
+	# that's run later. This allows the Virtualization upgrade
+	# verification to verify the contents of it's database (e.g. run
+	# flyway migration) is compatible with the new version of the
+	# Virtualization application.
+	#
+	if [[ -d "/domain0" ]]; then
+		cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+			Bind=/domain0
+		EOF
+			die "failed to add '/domain0' to container config file"
+	fi
+
+	#
+	# Lastly, we create the log directory and bind mount this into
+	# the container. This is meant as a way for software running in
+	# the container, to share files with software running on the
+	# host; e.g. during upgrade verify, this directory can be used
+	# to store logs, such that they persist after the container is
+	# destroyed.
+	#
+	mkdir -p "$LOG_DIRECTORY" ||
+		die "failed to create directory: '$LOG_DIRECTORY'"
+	cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+		Bind=$LOG_DIRECTORY
+	EOF
+		die "failed to add '$LOG_DIRECTORY' to container config file"
+
+	#
+	# We want to enable all available capabilities to the container
+	# that we will use to run the ugprade verification. Ideally, we
+	# would accomplish this by using "CAPABILITY=all" in the
+	# "nspawn" configuration file generated above, but that's not
+	# possible. The "CAPABILITY" field only understands actual
+	# capabilities (e.g. CAP_SYS_ADMIN), and fails to parse the
+	# special value "all".
+	#
+	# Thus, to workaround this limitation, we override the command
+	# that is executed by systemd when starting the container's
+	# service, such that it will pass the "--capability=all" option
+	# to "systemd-nspawn".
+	#
+	mkdir -p "/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d" ||
+		die "failed to create container service override directory"
+	cat >"/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d/override.conf" <<-EOF ||
+		[Service]
+		ExecStart=
+		ExecStart=/usr/bin/systemd-nspawn --quiet --boot --capability=all --machine=%i
+	EOF
+		die "failed to create container service override file"
+
+	echo "$CONTAINER"
+}
+
+function start() {
+	if [[ ! -d "/var/lib/machines/$CONTAINER" ]] ||
+		[[ ! -f "/etc/systemd/nspawn/$CONTAINER.nspawn" ]] ||
+		[[ ! -d "/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d" ]] ||
+		! zfs list "rpool/ROOT/$CONTAINER" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/home" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null; then
+		die "container '$CONTAINER' non-existent or mis-configured"
+	fi
+
+	systemctl start "systemd-nspawn@$CONTAINER" ||
+		die "failed to start container '$CONTAINER'"
+
+	#
+	# When starting the container above with "systemctl start", the
+	# command will return prior to the container having fully
+	# completed it's boot process. Thus, to ensure we don't attempt
+	# the verification steps prior to the container being ready, we
+	# first wait for the container to finish booting.
+	#
+	# shellcheck disable=SC2034
+	for i in {1..600}; do
+		if run /bin/systemctl is-active default.target &>/dev/null; then
+			break
+		fi
+
+		sleep 1
+	done
+
+	run /bin/systemctl is-active default.target &>/dev/null ||
+		die "'default.target' inactive in container '$CONTAINER'"
+}
+
+function stop() {
+	systemctl stop "systemd-nspawn@$CONTAINER" ||
+		die "failed to stop container: '$CONTAINER'"
+}
+
+function destroy() {
+	rm -f "/etc/systemd/nspawn/$CONTAINER.nspawn" ||
+		die "failed to remove file: '$CONTAINER.nspawn'"
+
+	rm -rf "/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d" ||
+		die "failed to remove directory: $CONTAINER.service.d"
+
+	if zfs list "rpool/ROOT/$CONTAINER" &>/dev/null; then
+		#
+		# In order to safely perform the recursive destroy below,
+		# we need to ensure the filesystems are unmounted in the
+		# correct order. Since the "log", "data", and "home"
+		# datasets are mounted inside the "root" dataset, we need
+		# to unmount these two datasets before attempting to
+		# unmount (and/or destroy) the "root" dataset.
+		#
+		# Further, we don't check the return value of these
+		# commands for simplicity's sake. If these fail, it could
+		# be because they aren't mounted, or due to an actual
+		# failure to unmount. If those datasets cannot be
+		# unmounted, this will cause the destroy to fail below,
+		# which we will catch, and then notify the user.
+		#
+		umount "rpool/ROOT/$CONTAINER/log" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/data" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/home" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/root" &>/dev/null
+
+		zfs destroy -r "rpool/ROOT/$CONTAINER" ||
+			die "failed to destroy container dataset: '$CONTAINER'"
+	fi
+
+	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
+	[[ -n "$ROOTFS_DATASET" ]] ||
+		die "unable to determine mounted rootfs container dataset"
+
+	if zfs list "$ROOTFS_DATASET@container-$CONTAINER" &>/dev/null; then
+		zfs destroy -r "$ROOTFS_DATASET@container-$CONTAINER" ||
+			die "failed to destroy container snapshot: '$CONTAINER'"
+	fi
+
+	if [[ -d "/var/lib/machines/$CONTAINER" ]]; then
+		rm -d "/var/lib/machines/$CONTAINER" ||
+			die "failed to remove container directory: '$CONTAINER'"
+	fi
+}
+
+function run() {
+	systemd-run \
+		--machine="$CONTAINER" \
+		--setenv=CONTAINER="$CONTAINER" \
+		--quiet --wait --pipe -- "$@"
+}
+
+function convert_to_rootfs() {
+	#
+	# We're relying on the "mountpoint" property for the "data" and
+	# "home" datasets already being set properly when those datasets
+	# are first created, so we don't explicitly set them here.
+	#
+	# Additionally, we're also relying on the "canmount" property of
+	# the "root" dataset already being set properly, so we don't
+	# explicitly set that here, either.
+	#
+	zfs umount "rpool/ROOT/$CONTAINER/root" ||
+		die "'zfs umount rpool/ROOT/$CONTAINER/root' failed"
+	zfs set mountpoint=/ "rpool/ROOT/$CONTAINER/root" ||
+		die "zfs set mountpoint rpool/ROOT/$CONTAINER/root' failed"
+}
+
+function migrate_password_for_user() {
+	local user="$1"
+	local password
+
+	password="$(awk -F: "\$1 == \"$user\" {print \$2}" /etc/shadow)"
+	chroot "/var/lib/machines/$CONTAINER" usermod -p "$password" "$user" ||
+		die "'usermod -p ... $user' failed for '$CONTAINER'"
+}
+
+function migrate_file() {
+	local path="$1"
+	local parentdir
+
+	if [[ -f "$path" ]]; then
+		parentdir="$(dirname "$path")"
+		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
+			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
+		cp -p "$path" "/var/lib/machines/${CONTAINER}${path}" ||
+			die "'cp -p $path' failed for '$CONTAINER'"
+	else
+		#
+		# If the target file doesn't exist in the host then we
+		# delete the file. This case could happen if the host
+		# configuration doesn't exist but a fresh install placed
+		# package default configuration.
+		#
+		rm -f "/var/lib/machines/${CONTAINER}${path}" ||
+			die "failed to remove file '$path' in '$CONTAINER'"
+	fi
+}
+
+function migrate_dir() {
+	local path="$1"
+	local parentdir
+
+	if [[ -d "$path" ]]; then
+		parentdir="$(dirname "$path")"
+		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
+			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
+		cp -prT "$path" "/var/lib/machines/${CONTAINER}${path}" ||
+			die "'cp -prT $path' failed for '$CONTAINER'"
+	else
+		#
+		# If the target dir doesn't exist in the host then
+		# we delete the dir. This case could happen if the host
+		# configuration doesn't exist but a fresh install placed
+		# package default configuration.
+		#
+		rm -rf "/var/lib/machines/${CONTAINER}${path}" ||
+			die "failed to remove directory '$path' in '$CONTAINER'"
+	fi
+}
+
+function migrate_svc() {
+	local svc="$1"
+
+	if systemctl is-enabled -q "$svc"; then
+		chroot "/var/lib/machines/$CONTAINER" systemctl enable "$svc"
+	else
+		chroot "/var/lib/machines/$CONTAINER" systemctl disable "$svc"
+	fi
+}
+
+function migrate_configuration() {
+	#
+	# When performing a not-in-place upgrade, the root and delphix
+	# users will not have any password by default. Thus, we need to
+	# explicitly configure the passwords on the new root filesystem.
+	# Here, we ensure the passwords for the root and delphix user on
+	# the new root filesystem match their current values.
+	#
+	migrate_password_for_user delphix
+	migrate_password_for_user root
+
+	#
+	# The services listed here can be dynamically modified by the
+	# application(s) running on the appliance, so we need to ensure
+	# we migrate the state of these services when performing a
+	# not-in-place upgrade. Otherwise, we'd wind up with the default
+	# state of these services after the upgrade, which could be
+	# different than the current state of these services.
+	#
+	while read -r svc; do
+		migrate_svc "$svc"
+	done <<-EOF
+		delphix-masking.service
+		ntp.service
+	EOF
+
+	#
+	# These files are generic OS files that are required for the
+	# system to properly operate; these must be preserved acorss
+	# upgrades.
+	#
+	# Note, the "/etc/resolv.conf" file is in this list, but the
+	# "migrate_file" function will only migrate this path if it
+	# points to a regular file. Often, this file will be a symlink,
+	# in which case it won't be migrated, and we don't want it to
+	# be. We only want to migrate this file if the admin (or some
+	# software on the system) has converted it to a regular file,
+	# and configured some host specific DNS settings, in which case
+	# we want these settings to persist across the upgrade.
+	#
+	while read -r file; do
+		migrate_file "$file"
+	done <<-EOF
+		/etc/hostid
+		/etc/hostname
+		/etc/hosts
+		/etc/machine-id
+		/etc/netplan/50-cloud-init.yaml
+		/etc/resolv.conf
+		/etc/ssh/ssh_host_dsa_key
+		/etc/ssh/ssh_host_dsa_key.pub
+		/etc/ssh/ssh_host_ecdsa_key
+		/etc/ssh/ssh_host_ecdsa_key.pub
+		/etc/ssh/ssh_host_ed25519_key
+		/etc/ssh/ssh_host_ed25519_key.pub
+		/etc/ssh/ssh_host_rsa_key
+		/etc/ssh/ssh_host_rsa_key.pub
+		/etc/sudoers.d/90-cloud-init-users
+		/etc/zfs/zpool.cache
+	EOF
+
+	#
+	# These paths are specific to the delphix virtualization and/or
+	# masking application, and must be preserved across upgrades.
+	# Ideally this list would be provided by the applications
+	# themselves, rather than specified here, but the infrastructure
+	# to enable the applications to do this doesn't yet exist. Thus,
+	# if the applications change in a way that requires changes to
+	# this list, we can it up with a flag-day situation.
+	#
+	# Note, we migrate the "/etc/modprobe.d/20-zfs.conf" file without
+	# verifying the tunables contained in that file make sense for the
+	# new rootfs. We're reliant on this file being verified by some
+	# other mechanism (e.g. the virtualization application's upgrade
+	# verification), and failing the upgrade if the file's contents is
+	# incompatible with the new appliance version. Without this
+	# verification, the file could contain tunables that are not
+	# appropriate for the new version, and could cause the appliance
+	# to mis-behave after booting to the new rootfs.
+	#
+	while read -r file; do
+		migrate_file "$file"
+	done <<-EOF
+		/etc/challenge_response.key
+		/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+		/etc/delphix-interface-names.yaml
+		/etc/default/locale
+		/etc/engine-code
+		/etc/engine-uuid
+		/etc/engine.install
+		/etc/fluent/fluent.conf
+		/etc/issue
+		/etc/krb5.conf
+		/etc/krb5.keytab
+		/etc/mds_upgrader
+		/etc/modprobe.d/20-zfs.conf
+		/etc/ntp.conf
+		/etc/snmp/snmpd.conf
+		/etc/rtslib-fb-target/saveconfig.json
+		/var/opt/delphix/server.conf
+	EOF
+
+	while read -r dir; do
+		migrate_dir "$dir"
+	done <<-EOF
+		/var/lib/nfs
+		/var/target/pr
+	EOF
+
+	#
+	# The files listed here are dynamically generated and/or
+	# modified by appliance-build.
+	#
+	while read -r file; do
+		migrate_file "$file"
+	done <<-EOF
+		/etc/cloud/cloud.cfg.d/99-delphix-development.cfg
+		/etc/cloud/cloud.cfg.d/99-delphix-internal.cfg
+		/etc/nftables.conf
+		/etc/systemd/system/delphix-masking.service.d/override.conf
+		/etc/systemd/system/delphix-mgmt.service.d/override.conf
+		/etc/systemd/system/delphix-postgres@.service.d/override.conf
+	EOF
+}
+
+function do_upgrade_container_in_place() {
+	run "$IMAGE_PATH/execute" -p "$(get_platform)" ||
+		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
+
+	run /bin/systemctl reload delphix-platform ||
+		die "'systemctl reload delphix-platform' failed in '$CONTAINER'"
+
+	run /bin/systemctl restart delphix-platform ||
+		die "'systemctl restart delphix-platform' failed in '$CONTAINER'"
+}
+
+function do_upgrade_container_not_in_place() {
+	run "$IMAGE_PATH/execute" -p "$(get_platform)" ||
+		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
+
+	run /bin/systemctl start delphix-platform ||
+		die "'systemctl start delphix-platform' failed in '$CONTAINER'"
+
+	migrate_configuration ||
+		die "failed to migrate configuration for '$CONTAINER'"
+}
+
+function get_type() {
+	local root origin
+
+	root=$(zfs list -Hpo name /var/lib/machines/"${CONTAINER}")
+	[[ -n "${root}" ]] || die "Failed to obtain root filesystem for container '${CONTAINER}'"
+	origin=$(zfs get -Hpo value origin "${root}")
+	[[ -n "${origin}" ]] || die "Failed to origin of the root filesystem '${root}' for container '${CONTAINER}'"
+
+	case "${origin}" in
+	-)
+		echo "not-in-place"
+		;;
+	*)
+		echo "in-place"
+		;;
+	esac
+}
+
+function do_upgrade_container() {
+	local type
+	type=$(get_type)
+	case $type in
+	in-place)
+		do_upgrade_container_in_place ||
+			die "failed to upgrade the in-place container"
+		;;
+	not-in-place)
+		do_upgrade_container_not_in_place ||
+			die "failed to upgrade the not-in-place container"
+		;;
+	*)
+		die "unsupported upgrade container type specified: '$type'"
+		;;
+	esac
+}
+
+function usage() {
+	echo "$(basename "$0"): $*" >&2
+
+	PREFIX_STRING="Usage: $(basename "$0")"
+	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
+	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
+
+	echo "$PREFIX_STRING create [in-place|not-in-place|rollback]"
+	echo "$PREFIX_SPACES start <container>"
+	echo "$PREFIX_SPACES stop <container>"
+	echo "$PREFIX_SPACES destroy <container>"
+	echo "$PREFIX_SPACES run <container> <command>"
+	echo "$PREFIX_SPACES upgrade <container>"
+	echo "$PREFIX_SPACES convert-to-rootfs <container>"
+	echo "$PREFIX_SPACES get-type <container>"
+
+	exit 2
+}
+
+[[ "$EUID" -ne 0 ]] && die "must be run as root"
+
+case "$1" in
+create)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+
+	case "$2" in
+	in-place | not-in-place | rollback)
+		create_upgrade_container "$2"
+		;;
+	*)
+		usage "invalid create type specified: '$2'"
+		;;
+	esac
+
+	;;
+start)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	start
+	;;
+stop)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	stop
+	;;
+destroy)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	destroy
+	;;
+run)
+	[[ $# -lt 3 ]] && usage "too few arguments specified"
+	CONTAINER="$2"
+	shift 2
+	run "$@"
+	;;
+upgrade)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	do_upgrade_container
+	;;
+convert-to-rootfs)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	convert_to_rootfs
+	;;
+get-type)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	[[ $# -gt 2 ]] && usage "too many arguments specified"
+	CONTAINER="$2"
+	get_type
+	;;
+*)
+	usage "invalid option specified: '$1'"
+	;;
+esac

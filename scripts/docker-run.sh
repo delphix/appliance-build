@@ -43,16 +43,22 @@ $DOCKER_RUN --rm \
 	--network host \
 	--ipc "none" \
 	--volume /dev:/dev \
-	--env AWS_S3_PREFIX_MASKING \
 	--env AWS_S3_PREFIX_VIRTUALIZATION \
-	--env AWS_S3_PREFIX_ZFS \
-	--env AWS_S3_URI_MASKING \
+	--env AWS_S3_PREFIX_MASKING \
+	--env AWS_S3_PREFIX_USERLAND_PKGS \
+	--env AWS_S3_PREFIX_KERNEL_PKGS \
 	--env AWS_S3_URI_VIRTUALIZATION \
-	--env AWS_S3_URI_ZFS \
+	--env AWS_S3_URI_MASKING \
+	--env AWS_S3_URI_USERLAND_PKGS \
+	--env AWS_S3_URI_KERNEL_PKGS \
+	--env AWS_S3_URI_LIVEBUILD_ARTIFACTS \
 	--env APPLIANCE_PASSWORD \
-	--env APPLIANCE_USERNAME \
 	--env AWS_ACCESS_KEY_ID \
 	--env AWS_SECRET_ACCESS_KEY \
+	--env DELPHIX_SIGNATURE_URL \
+	--env DELPHIX_SIGNATURE_TOKEN \
+	--env DELPHIX_PLATFORMS \
+	--env DELPHIX_APPLIANCE_VERSION \
 	--volume "$TOP:/opt/appliance-build" \
 	--workdir "/opt/appliance-build" \
 	appliance-build "$@"

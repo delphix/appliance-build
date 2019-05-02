@@ -11,12 +11,12 @@ services:
   - docker
 
 env:
-  - TARGET=ansiblecheck
-  - TARGET=shellcheck
-  - TARGET=shfmtcheck
+  - TARGET=ansibleCheck
+  - TARGET=shellCheck
+  - TARGET=shfmtCheck
 
 install:
  - docker build -qt appliance-build:latest docker
 
 script:
- - ./scripts/docker-run.sh make $TARGET
+ - ./scripts/docker-run.sh gradle $TARGET

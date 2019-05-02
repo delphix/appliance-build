@@ -50,16 +50,7 @@ set -o xtrace
 
 mkdir -p "$TOP/live-build/variants/$1"
 mkdir -p "$TOP/live-build/variants/$1/ansible"
-mkdir -p "$TOP/live-build/variants/$1/config"
 
 ln -s ../../../misc/ansible-roles "$TOP/live-build/variants/$1/ansible/roles"
-cp "$TOP/live-build/variants/$EXAMPLE_VARIANT/.gitignore" \
-	"$TOP/live-build/variants/$1/"
 cp "$TOP/live-build/variants/$EXAMPLE_VARIANT/ansible/playbook.yml" \
 	"$TOP/live-build/variants/$1/ansible"
-
-ln -s ../../../misc/live-build-hooks \
-	"$TOP/live-build/variants/$1/config/hooks"
-
-ln -s ../../misc/upgrade-scripts \
-	"$TOP/live-build/variants/$1/upgrade-scripts"

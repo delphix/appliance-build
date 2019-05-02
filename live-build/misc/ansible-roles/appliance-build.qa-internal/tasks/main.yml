@@ -53,6 +53,7 @@
     - libnss3-tools
     - libpam0g-dev
     - libssl-dev
+    - python-pip
   register: result
   until: result is not failed
   retries: 3

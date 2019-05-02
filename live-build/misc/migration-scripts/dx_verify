@@ -1,0 +1,210 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Reset the umask to the default value. When called from the app-stack the
+# umask is set to 0027. Since those scripts can be called manually, we want
+# to have a consistent result regardless of the caller. A umask of 0022
+# makes directories created by this script accessible by everyone by default.
+#
+umask 0022
+
+export MDS_SNAPNAME="MDS-CLONE-upgradeverify"
+
+DEBUG=false
+
+MDS_CLONE=domain0/$MDS_SNAPNAME
+UPGRADE_VERIFY_PATH=/opt/delphix/server/lib/exec/upgrade-verify
+UPGRADE_VERIFY_JAR=$UPGRADE_VERIFY_PATH/upgrade-verify.jar
+LOG_DIR=/var/delphix/server/upgrade-verify
+MGMT_FMRI=svc:/system/delphix/mgmt:default
+BINDIR=/opt/delphix/server/bin
+DX_MANAGE_PG=$BINDIR/dx_manage_pg
+
+function usage() {
+	echo "usage: $(basename "$0") -v <version> -o <report file> -f <report file format> -l <report file locale>"
+	echo "  -v <version>: The Delphix version number we're upgrading to"
+	echo "  -o <report file>: The output file verification should generate containing an upgrade verification report"
+	echo "  -f <report file format>: The format of the upgrade verification report to generate"
+	echo "  -l <report file locale>: The locale the upgrade verification report should target"
+	echo "  -d: Disable Consistent MDS ZFS Data Utility feature"
+	exit 1
+}
+
+function cleanup() {
+	if ! $DEBUG; then
+		if [[ -n "$root" ]]; then
+			cleanup_postgres
+			cleanup_datasets
+			cleanup_masking
+		fi
+	fi
+}
+
+function die() {
+	report "$(basename "$0"): $*" >&2
+
+	#
+	# If we have MDS postgres logs, save them before cleaning up so
+	# they can be analyzed later.
+	#
+	if [[ -f "/$MDS_CLONE/db/stdout.log" ]]; then
+		(
+			cd "/$MDS_CLONE/db" || exit 1
+			tar -cvf /var/delphix/server/db/pg_log.upgrade.$$.tar \
+				stdout.log pg_log
+		)
+	fi
+
+	cleanup
+	exit 1
+}
+
+function report() {
+	echo "$(date +%T:%N:%z): $1"
+}
+
+function report_progress_inc() {
+	echo "Progress increment: $(date +%T:%N%z), $1, $2"
+}
+
+function mount_datasets() {
+	local version=$1
+	local rds
+
+	rds=$(zfs list -o name -H -d3 rpool/ROOT | grep "delphix.*/root")
+	[[ -n $rds ]] || die "could not find migration dataset for version $version"
+
+	root=$(mktemp -d) || die "unable to create temporary directory"
+	chmod 755 "$root" || die "unable to set permissions for $root"
+	mount -F zfs -o ignoremountpoint "$rds" "$root" || die "unable to mount $rds"
+
+	#TODO dummy files for UpgradeVerify, see LX-1817 and LX-1808
+	touch /var/dlpx-update/"$version"/etc_system_whitelist
+	touch /var/dlpx-update/"$version"/dx_upg_stress_options
+
+	#
+	# We need a clone of /var/delphix for masking migration scripts.
+	#
+	runningVar=$(mount | awk '/^\/var\/delphix /{ print $3 }')
+	zfs snapshot "$runningVar@$MDS_SNAPNAME" ||
+		die "unable to create snapshot $runningVar@$MDS_SNAPNAME"
+	zfs clone "$runningVar@$MDS_SNAPNAME" "$runningVar/$MDS_SNAPNAME" ||
+		die "unable to create $runningVar/$MDS_SNAPNAME"
+	zfs destroy -d "$runningVar@$MDS_SNAPNAME" ||
+		die "unable to defer destroy $runningVar@$MDS_SNAPNAME"
+	mount -F zfs "$runningVar/$MDS_SNAPNAME" "$root/var/delphix" ||
+		die "unable to mount $root/var/delphix"
+}
+
+function cleanup_datasets() {
+	if [[ -n "$runningVar" ]]; then
+		zfs destroy -f "$runningVar/$MDS_SNAPNAME"
+	fi
+	umount -f "$root"
+	rmdir "$root"
+}
+
+function cleanup_postgres() {
+	"$root$DX_MANAGE_PG" stop -s $MDS_SNAPNAME ||
+		echo "failed to stop postgres"
+	"$root$DX_MANAGE_PG" cleanup -s $MDS_SNAPNAME ||
+		echo "failed to clean up postgres"
+}
+
+function cleanup_masking() {
+	if [[ -n "$masking_temp_dir" ]]; then
+		rm -r "$masking_temp_dir"
+	fi
+}
+
+function run_upgrade_verify() {
+	local output=$1
+	local format=$2
+	local locale=$3
+	local upgrade_verify_opts
+	$disable_consistent_mds_zfs_data_util &&
+		upgrade_verify_opts="-disableConsistentMdsZfsDataUtil"
+	local progress_low=$4
+	local progress_high=$5
+
+	[[ $(svcprop -p delphix/debug $MGMT_FMRI) == "true" ]] &&
+		delphix_debug="-Ddelphix.debug=true"
+
+	local jar=$root$UPGRADE_VERIFY_JAR
+	$java -Dlog.dir=$LOG_DIR -Dmdsverify=true "$delphix_debug" \
+		-DosMigration=true -jar "$jar" -d "$output" -f "$format" \
+		-l "$locale" -v "$version" -root "$root" "$upgrade_verify_opts" \
+		-droot "$root" -pl "$progress_low" -ph "$progress_high" ||
+		die "upgrade verification failed"
+}
+
+function test_masking() {
+	masking_temp_dir=$(mktemp -d) ||
+		die "unable to make temporary directory"
+
+	tar xof "$root/opt/delphix/masking/resources/upgrade-verification.tar" \
+		-C "$masking_temp_dir" ||
+		die "failed to extract masking upgrade verification tool"
+
+	local verify_tool_dir=$masking_temp_dir/upgrade-verification
+	local new_conf=$root/opt/delphix/masking/conf/
+	local overrides=/var/delphix/dmsuite/overrides/
+
+	#
+	# Run the verification tool against the new version of the .properties
+	# files in conf/ and against override.properties, to ensure that
+	# override.properties only overrides supported properties.
+	#
+	local cp="$verify_tool_dir/*:$new_conf:$overrides"
+	$java -cp "$cp" com.dmsuite.VerifyProperties ||
+		die "verification of overrides failed"
+}
+
+disable_consistent_mds_zfs_data_util=false
+while getopts ':v:o:l:f:d' c; do
+	case "$c" in
+	f) format=$OPTARG ;;
+	l) locale=$OPTARG ;;
+	o) output=$OPTARG ;;
+	v) version=$OPTARG ;;
+	d) disable_consistent_mds_zfs_data_util=true ;;
+	*) usage ;;
+	esac
+done
+
+[[ -n $version ]] || usage
+
+# Where root is or will be mounted. Set in mount_datasets.
+root=
+# The path of the running dataset mounted at /var/delphix. Set in mount_datasets.
+runningVar=
+# Temporary diresctory used by the masking checks. Set in test_masking.
+masking_temp_dir=
+# The installation of java to use when executing our jars.
+java=/opt/jdk/bin/java
+
+report_progress_inc 0 "preparing for verification"
+mount_datasets "$version"
+report_progress_inc 20 "running upgrade checks"
+run_upgrade_verify "$output" "$format" "$locale" 20 95
+#TODO LX-1808 stress options
+test_masking
+report_progress_inc 95 "cleaning up post-verification"
+cleanup
+report_progress_inc 100 "done"
+exit 0

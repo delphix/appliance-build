@@ -16,7 +16,6 @@
 
 ---
 - hosts: all
-  connection: chroot
   gather_facts: no
   vars:
     ansible_python_interpreter: /usr/bin/python3

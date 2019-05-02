@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+. "${BASH_SOURCE%/*}/common.sh"
+
+IMAGE_VERSION=$(get_image_version)
+[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+
+function usage() {
+	echo "$(basename "$0"): $*" >&2
+	echo "Usage: $(basename "$0") [-d] [-f format] [-l locale] [-o path]"
+	exit 2
+}
+
+function verify_jar_verify_cleanup() {
+	local rc="$?"
+
+	report_progress 90 "Cleaning up application upgrade verification"
+
+	#
+	# This name is used by the "upgrade-verify.jar" just executed, so we
+	# cannot change this value without also modifying that JAR.
+	#
+	MDS_SNAPNAME="MDS-CLONE-upgradeverify"
+
+	if /opt/delphix/server/bin/dx_manage_pg isrunning -s ${MDS_SNAPNAME}; then
+		/opt/delphix/server/bin/dx_manage_pg stop -s "${MDS_SNAPNAME}" ||
+			die "failed to stop postgres for snapshot '${MDS_SNAPNAME}'."
+	fi
+
+	if zfs list "domain0/${MDS_SNAPNAME}" &>/dev/null; then
+		/opt/delphix/server/bin/dx_manage_pg cleanup -s "${MDS_SNAPNAME}" ||
+			die "failed to cleanup postgres for snapshot '${MDS_SNAPNAME}'."
+	fi
+
+	[[ $rc -eq 0 ]] &&
+		# On success, we must report 100 progress. Java stack treats
+		# script execution a failure if non-zero status is reported or
+		# 100 progress is not reported.
+		report_progress 100 "Upgrade verification was successful"
+	return "$rc"
+}
+
+opt_d=false
+while getopts ':df:l:o:' c; do
+	case "$c" in
+	f | l | o)
+		eval "opt_$c=$OPTARG"
+		;;
+	d)
+		eval "opt_$c=true"
+		;;
+	*)
+		usage "illegal option -- $OPTARG"
+		;;
+	esac
+done
+
+report_progress 10 "Started application upgrade verification"
+
+[[ "$EUID" -ne 0 ]] && die "must be run as root"
+
+if [[ -n "$DLPX_DEBUG" ]] && $DLPX_DEBUG; then
+	VERIFY_DEBUG_OPT="-Ddelphix.debug=true"
+fi
+
+if $opt_d; then
+	VERIFY_LIVE_MDS_OPT="-disableConsistentMdsZfsDataUtil"
+fi
+
+trap verify_jar_verify_cleanup EXIT
+
+report_progress 20 "Running application upgrade verification"
+
+/usr/bin/java \
+	-Dlog.dir=/var/delphix/server/upgrade-verify \
+	-Dmdsverify=true \
+	$VERIFY_DEBUG_OPT \
+	-jar /opt/delphix/server/lib/exec/upgrade-verify/upgrade-verify.jar \
+	-d "${opt_o:-${LOG_DIRECTORY}/${CONTAINER}/upgrade_verify.json}" \
+	-f "${opt_f:-1}" \
+	-l "${opt_l:-en-US}" \
+	-v "$IMAGE_VERSION" \
+	-pl 25 -ph 80 \
+	$VERIFY_LIVE_MDS_OPT ||
+	die "'upgrade-verify.jar' failed in verification container"
+
+#
+# The cleanup logic will be run on EXIT, so rather than reporting 100
+# percent here, we use the cleanup logic to do the final reporting.
+#

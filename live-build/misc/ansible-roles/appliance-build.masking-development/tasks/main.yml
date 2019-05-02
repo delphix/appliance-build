@@ -15,10 +15,6 @@
 #
 
 ---
-- fail:
-    msg: "Required environment variable 'APPLIANCE_USERNAME' is empty."
-  when: lookup('env', 'APPLIANCE_USERNAME') == ''
-
 - apt:
     name: "{{ item }}"
     state: present
@@ -32,7 +28,7 @@
 - git:
     repo: "{{ item.repo }}"
     dest:
-      "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item.dest }}"
+      "/export/home/delphix/{{ item.dest }}"
     version: "{{ item.version }}"
     accept_hostkey: yes
     update: no
@@ -42,9 +38,10 @@
         dest: dms-core-gate }
 
 - file:
-    path: "/export/home/{{ lookup('env', 'APPLIANCE_USERNAME') }}/{{ item }}"
-    owner: "{{ lookup('env', 'APPLIANCE_USERNAME') }}"
+    path: "/export/home/delphix/{{ item }}"
+    owner: "delphix"
     group: staff
+    mode: "g+w"
     state: directory
     recurse: yes
   with_items:

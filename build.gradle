@@ -1,0 +1,111 @@
+/*
+ * Copyright 2019 Delphix
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+apply plugin: 'base'
+
+apply from: "${rootProject.projectDir}/gradle-lib/util.gradle"
+
+// Build upgrade images for KVM if no platforms are specified via an environment variable
+def DEFAULT_PLATFORMS = 'kvm'
+
+createArtifactsDirTask(this)
+
+for (variant in allVariants) {
+    def taskName = "buildUpgradeImage${toCamelCase(variant).capitalize()}"
+    tasks.create(taskName, Exec) { task ->
+        group = 'Build'
+        description = "Builds an upgrade image for the ${variant} variant of the appliance"
+        dependsOn mkArtifactsDir
+
+        /*
+         * When building an upgrade image, there are two ways to get the *.debs.tar.gz artifacts
+         * that are produced by live build and consumed by the build-upgrade-image.sh script. We
+         * can directly run live build for the appropriate platforms for this variant, or we can
+         * fetch from S3 the artifacts from previous runs of live-build. Which strategy we use is
+         * controlled by the AWS_S3_URI_LIVEBUILD_ARTIFACTS and DELPHIX_PLATFORMS env variables,
+         * so check them and set the appropriate task dependencies.
+         */
+        if (System.getenv("AWS_S3_URI_LIVEBUILD_ARTIFACTS") != null) {
+            dependsOn ":live-build:fetchLiveBuildArtifacts"
+        } else {
+            def platforms = System.getenv("DELPHIX_PLATFORMS") ?: DEFAULT_PLATFORMS
+            for (platform in platforms.trim().split()) {
+                def dependentTask = "build" +
+                                    toCamelCase(variant).capitalize() +
+                                    platform.capitalize() +
+                                    "UpgradeArtifacts"
+                dependsOn ":live-build:${dependentTask}"
+            }
+        }
+
+        for (envVar in ["DELPHIX_PLATFORMS", "AWS_S3_URI_LIVEBUILD_ARTIFACTS"]) {
+            inputs.property(envVar, System.getenv(envVar)).optional(true)
+        }
+
+        doFirst {
+            if (System.getenv("AWS_S3_URI_LIVEBUILD_ARTIFACTS") == null &&
+                System.getenv("DELPHIX_PLATFORMS") == null) {
+
+                logger.quiet("""
+                Neither 'AWS_S3_URI_LIVEBUILD_ARTIFACTS' nor 'DELPHIX_PLATFORMS' is defined as an
+                environment variable, so this upgrade image will be built for the default platform
+                ('${DEFAULT_PLATFORMS}'). To change which platforms are included in the image,
+                re-run with DELPHIX_PLATFORMS set to a space-delimited list of platforms for which
+                to build (e.g 'DELPHIX_PLATFORMS="esx aws kvm" gradle ...') or with
+                AWS_S3_URI_LIVEBUILD_ARTIFACTS set to a space-delimited set of S3 URIs from which
+                to fetch previously built live-build artifacts.
+                """.stripIndent())
+            }
+        }
+
+        commandLine "${rootProject.projectDir}/scripts/build-upgrade-image.sh", "${variant}"
+    }
+}
+
+def shellScripts = fileTree("scripts") +
+                   fileTree("live-build/config/hooks").include({ details ->
+                        details.file.canExecute()
+                   }) +
+                   fileTree("live-build/misc/migration-scripts") +
+                   fileTree("upgrade/upgrade-scripts", {
+                       exclude "README.md"
+                   })
+
+task shfmt(type: Exec) {
+    commandLine(["shfmt", "-w"] + shellScripts.getFiles())
+}
+
+task shfmtCheck(type: Exec) {
+    commandLine(["shfmt", "-d"] + shellScripts.getFiles())
+}
+
+task shellCheck(type: Exec) {
+    commandLine(["shellcheck", "--exclude=SC1090,SC1091"] + shellScripts.getFiles())
+}
+
+task ansibleCheck(type: Exec) {
+    def ansibleFiles = fileTree("bootstrap").include("**/playbook.yml") +
+                       fileTree("live-build/variants").include("**/playbook.yml")
+    commandLine(["ansible-lint", "--exclude=SC1090,SC1091"] + ansibleFiles.getFiles())
+}
+
+tasks.check.dependsOn shellCheck, shfmtCheck, ansibleCheck
+
+task format() {
+    dependsOn shfmt
+    group = "Formatting"
+    description "Runs all auto-formatting tasks"
+}
