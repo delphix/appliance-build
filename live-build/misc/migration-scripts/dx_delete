@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Copyright 2018 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Reset the umask to the default value. When called from the app-stack the
+# umask is set to 0027. Since those scripts can be called manually, we want
+# to have a consistent result regardless of the caller. A umask of 0022
+# makes directories created by this script accessible by everyone by default,
+# which is important for directories such as /export/home.
+#
+umask 0022
+
+set -o pipefail
+
+function die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+#
+# Here, we assume Linux dataset names starts with "rpool/ROOT", and also
+# assume that there can be at most one migration dataset applied in current OS
+# since migration is only supported from *fixed* 5.3.X version to 6.0.X version.
+# Also, it is not possible to get a version from dataset name in Linux since
+# names are randomly generated.
+#
+
+linux_dataset="rpool/ROOT"
+if ! zfs list ${linux_dataset} &>/dev/null; then
+	echo "Linux dataset '${linux_dataset}' is not installed."
+	exit 0
+fi
+
+zfs destroy -r ${linux_dataset} || die "Failed to destroy Linux dataset '${linux_dataset}'"
