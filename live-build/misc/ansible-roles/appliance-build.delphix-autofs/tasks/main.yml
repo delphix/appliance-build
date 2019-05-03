@@ -17,10 +17,8 @@
 ---
 
 - apt:
-    name: "{{ item }}"
+    name: autofs
     state: present
-  with_items:
-    - autofs
 
 # Enable automounting under /net
 - copy:

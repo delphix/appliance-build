@@ -17,22 +17,21 @@
 ---
 
 - apt:
-    name: "{{ item }}"
+    name:
+      - bind9
+      - dnsutils
+      - git
+      - isc-dhcp-server
+      - libldap2-dev
+      - libsasl2-dev
+      - nfs-kernel-server
+      - python-ldap
+      - python-paramiko
+      - python-pip
+      - python-requests
+      - python2.7
+      - telnet
     state: present
-  with_items:
-    - bind9
-    - dnsutils
-    - git
-    - isc-dhcp-server
-    - libldap2-dev
-    - libsasl2-dev
-    - nfs-kernel-server
-    - python-ldap
-    - python-paramiko
-    - python-pip
-    - python-requests
-    - python2.7
-    - telnet
   register: result
   until: result is not failed
   retries: 3

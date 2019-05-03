@@ -21,14 +21,13 @@
 #   * https://www.digitalocean.com/community/tutorials/how-to-authenticate-client-computers-using-ldap-on-an-ubuntu-12-04-vps
 
 - apt:
-    name: "{{ item }}"
+    name:
+      - autofs-ldap
+      - ldap-utils
+      - libpam-ldap
+      - nfs-common
+      - nscd
     state: present
-  with_items:
-    - autofs-ldap
-    - ldap-utils
-    - libpam-ldap
-    - nfs-common
-    - nscd
 
 - copy:
     src: etc/

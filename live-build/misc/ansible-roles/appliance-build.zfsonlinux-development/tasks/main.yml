@@ -19,39 +19,38 @@
 #
 ---
 - apt:
-    name: "{{ item }}"
+    name:
+      - alien
+      - autoconf
+      - build-essential
+      - cppcheck
+      - curl
+      - emacs-nox
+      - fakeroot
+      - flake8
+      - gdebi
+      - git
+      - gawk
+      - ksh
+      - libattr1-dev
+      - libblkid-dev
+      - libelf-dev
+      - libselinux-dev
+      - libssl-dev
+      - libtool
+      - libudev-dev
+      - lsscsi
+      - mandoc
+      - nfs-kernel-server
+      - parted
+      - python-minimal
+      - shellcheck
+      - targetcli-fb
+      - unzip
+      - uuid-dev
+      - wget
+      - zlib1g-dev
     state: present
-  with_items:
-    - alien
-    - autoconf
-    - build-essential
-    - cppcheck
-    - curl
-    - emacs-nox
-    - fakeroot
-    - flake8
-    - gdebi
-    - git
-    - gawk
-    - ksh
-    - libattr1-dev
-    - libblkid-dev
-    - libelf-dev
-    - libselinux-dev
-    - libssl-dev
-    - libtool
-    - libudev-dev
-    - lsscsi
-    - mandoc
-    - nfs-kernel-server
-    - parted
-    - python-minimal
-    - shellcheck
-    - targetcli-fb
-    - unzip
-    - uuid-dev
-    - wget
-    - zlib1g-dev
   register: result
   until: result is not failed
   retries: 3
