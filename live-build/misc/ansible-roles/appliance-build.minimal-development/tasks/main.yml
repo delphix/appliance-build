@@ -21,6 +21,12 @@
     content: |
       apt:
         preserve_sources_list: false
+        sources:
+          ddebs:
+            source: |
+              deb http://ddebs.ubuntu.com $RELEASE main restricted universe multiverse
+              deb http://ddebs.ubuntu.com $RELEASE-updates main restricted universe multiverse
+              deb http://ddebs.ubuntu.com $RELEASE-proposed main restricted universe multiverse
 
 #
 # We use "no_log" here to ensure we don't accidentally leak the contents
