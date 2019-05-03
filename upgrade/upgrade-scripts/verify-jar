@@ -56,7 +56,7 @@ function verify_jar_verify_cleanup() {
 	return "$rc"
 }
 #
-# use command program because it supports long arguments
+# use command program because it supports long arguments.
 #
 TEMP=`getopt -a -o :df:l:o: --long fsCheckStartTs:,fsCheckEndTs:,containerInitStartTs:,containerInitEndTs: -n 'verify-jar' -- "$@"`
 
@@ -64,6 +64,11 @@ if [ $? != 0 ] ; then usage ; exit 1 ; fi
 
 # Note the quotes around `$TEMP': they are essential!
 eval set -- "$TEMP"
+
+#
+# Add support for optional timestamp parameters from managment stack. These timestamps
+# are for inclusion in the verification report output of the verify jar.
+#
 
 opt_d=false
 while true; do
