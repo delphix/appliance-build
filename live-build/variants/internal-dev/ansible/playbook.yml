@@ -21,7 +21,6 @@
     ansible_python_interpreter: /usr/bin/python3
     passwordless_ldap_sudo: true
   roles:
-    - appliance-build.crash-python-development
     #
     # In order for LDAP to work properly, we need a specific ordering of the
     # values contained in the "passwd" line of the "/etc/nsswitch.conf" file.
