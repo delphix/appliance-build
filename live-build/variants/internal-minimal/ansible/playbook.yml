@@ -22,3 +22,4 @@
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
+    - appliance-build.minimal-development
