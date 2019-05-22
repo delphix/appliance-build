@@ -160,19 +160,6 @@ zfs create \
 	rpool/grub
 
 #
-# Initialize the crashdump dataset. This is used to store core files
-# from processes that have crashed. Since we don't have control on how
-# many of these core files accumulate, we set a reasonable quota (25% of
-# the rpool's size) to keep these from running the rpool out of space.
-#
-zfs create \
-	-o canmount=on \
-	-o compression=on \
-	-o mountpoint=/var/crash \
-	-o quota="$(echo "$(zpool list -Hpo size rpool) / 4" | bc)b" \
-	rpool/crashdump
-
-#
 # Since these datasets use "legacy" for their mountpoints, we need to
 # explicitly mount them now, before we rsync over the "binary" directory
 # contents. During normal boot up, we'll rely on "/etc/fstab" to handle
@@ -234,7 +221,6 @@ done
 umount "$DIRECTORY/var/log"
 umount "$DIRECTORY/var/delphix"
 umount "$DIRECTORY/export/home"
-zfs umount rpool/crashdump
 zfs umount "rpool/ROOT/$FSNAME/root"
 zpool export rpool
 kpartx -d "$ARTIFACT_NAME.img"
