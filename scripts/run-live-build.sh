@@ -89,11 +89,8 @@ cp -r "$TOP/live-build/auto" "$build_dir"
 rsync -a --exclude="hooks" "$TOP/live-build/config" "$build_dir"
 mkdir -p "$build_dir/config/hooks"
 cp -r "$TOP/live-build/config/hooks/configuration/." "$build_dir/config/hooks"
-if [[ "$RUN_TYPE" == "$ALL_RUN_TYPE" ]]; then
-	cp -r "$TOP/live-build/config/hooks/$UPGRADE_RUN_TYPE/." "$build_dir/config/hooks"
+if [[ "$RUN_TYPE" == "$ALL_RUN_TYPE" || "$RUN_TYPE" == "$VM_RUN_TYPE" ]]; then
 	cp -r "$TOP/live-build/config/hooks/$VM_RUN_TYPE/." "$build_dir/config/hooks"
-else
-	cp -r "$TOP/live-build/config/hooks/$RUN_TYPE/." "$build_dir/config/hooks"
 fi
 
 cp -r "$TOP/live-build/variants/$APPLIANCE_VARIANT/ansible" "$build_dir"

@@ -90,13 +90,12 @@ for (variant in allVariants) {
 
                 switch (runType) {
                     case upgradeArtifactsRunType:
-                        inputs.dir "${projectDir}/config/hooks/${upgradeArtifactsRunType}"
+                        // No specific inputs
                         break
                     case vmArtifactsRunType:
                         inputs.dir "${projectDir}/config/hooks/${vmArtifactsRunType}"
                         break
                     case allRunType:
-                        inputs.dir "${projectDir}/config/hooks/${upgradeArtifactsRunType}"
                         inputs.dir "${projectDir}/config/hooks/${vmArtifactsRunType}"
                         break
                 }
