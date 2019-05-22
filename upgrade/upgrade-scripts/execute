@@ -284,4 +284,10 @@ if [[ -f /etc/apt/sources.list.orig ]]; then
 		die "failed to restore /etc/apt/sources.list"
 fi
 
+#
+# Before we exit, we want to ensure all of the changes made to the root
+# pool via the packaging operations above have made it to disk.
+#
+zpool sync rpool || die "'zpool sync rpool' failed"
+
 exit 0

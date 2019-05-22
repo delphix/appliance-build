@@ -220,6 +220,12 @@ function set_bootfs() {
 		die "'zfs get mounted' returned unexpected value: '$MOUNTED'"
 		;;
 	esac
+
+	#
+	# Before we return, we want to ensure all of the changes made to
+	# the root pool (i.e. the rpool/grub dataset) are safe on disk.
+	#
+	zpool sync rpool || die "'zpool sync rpool' failed."
 }
 
 function usage() {
