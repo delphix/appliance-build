@@ -696,6 +696,12 @@ function do_upgrade_container() {
 		die "unsupported upgrade container type specified: '$type'"
 		;;
 	esac
+
+	#
+	# Before we return, we ensure all of that changes made to the
+	# root pool, as part of upgrading the container, are on disk.
+	#
+	zpool sync rpool || die "'zpool sync rpool' failed"
 }
 
 function usage() {
