@@ -213,12 +213,13 @@ function create_upgrade_container() {
 	# We rely on the "/etc/fstab" file to mount the non-root ZFS
 	# filesystems, so that when a specific rootfs dataset is booted,
 	# it'll automatically mount the correct non-rootfs datasets
-	# associated with that rootfs dataset.
+	# associated with that rootfs dataset. The mounts need to happen
+	# before the zfs-import service is run.
 	#
 	cat <<-EOF >"$DIRECTORY/etc/fstab"
-		rpool/ROOT/$CONTAINER/home /export/home zfs defaults 0 0
-		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults 0 0
-		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults 0 0
+		rpool/ROOT/$CONTAINER/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	EOF
 
 	mkdir -p "/etc/systemd/nspawn" ||
