@@ -181,12 +181,13 @@ mount -F zfs "$RPOOL/ROOT/$FSNAME/log" "$TMP_ROOT/var/log"
 #
 # /export/home and /var/delphix datasets are not mounted automatically.
 # On Illumos this kind of mounting logic was performed by dxinit and svc-boot.
-# On Linux /etc/fstab is used instead.
+# On Linux /etc/fstab is used instead. These mounts need to happen before
+# the zfs-import service runs.
 #
 cat <<-EOF >"$TMP_ROOT/etc/fstab" || die "Failed to setup /etc/fstab"
-	$RPOOL/ROOT/$FSNAME/home /export/home zfs defaults 0 0
-	$RPOOL/ROOT/$FSNAME/data /var/delphix zfs defaults 0 0
-	$RPOOL/ROOT/$FSNAME/log  /var/log     zfs defaults 0 0
+	$RPOOL/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	$RPOOL/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	$RPOOL/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 EOF
 
 #

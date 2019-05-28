@@ -197,12 +197,14 @@ rsync --info=stats3 -Wa binary/* "$DIRECTORY/"
 # We rely on the "/etc/fstab" file to mount the non-root ZFS
 # filesystems, so that when a specific rootfs dataset is booted, it'll
 # automatically mount the correct non-rootfs datasets associated with
-# that rootfs dataset.
+# that rootfs dataset. We make sure that local mounts run before the
+# zfs-import service since that service can hold the 'spa_namespace_lock'
+# preventing legacy zfs mounts from completing.
 #
 cat <<-EOF >"$DIRECTORY/etc/fstab"
-	rpool/ROOT/$FSNAME/home /export/home zfs defaults 0 0
-	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults 0 0
-	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults 0 0
+	rpool/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 EOF
 
 #
