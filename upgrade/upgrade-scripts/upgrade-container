@@ -563,7 +563,7 @@ function migrate_configuration() {
 		/etc/hostname
 		/etc/hosts
 		/etc/machine-id
-		/etc/netplan/50-cloud-init.yaml
+		/etc/netplan/10-delphix.yaml
 		/etc/resolv.conf
 		/etc/ssh/ssh_host_dsa_key
 		/etc/ssh/ssh_host_dsa_key.pub
