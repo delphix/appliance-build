@@ -3,9 +3,7 @@ sudo: required
 
 branches:
   only:
-   - staging
-   - trying
-   - master
+   - 6.0/alpha
 
 services:
   - docker
