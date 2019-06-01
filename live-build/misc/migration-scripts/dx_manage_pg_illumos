@@ -1,0 +1,356 @@
+#!/bin/bash
+#
+# Copyright (c) 2015, 2019 by Delphix. All rights reserved.
+#
+
+#
+# Provides management of snapshots and clones of mds, ability to start up a
+# postgres instance on an empty port, and cleaning up after.
+# The postgres SVC name will always be:
+#     svc:/system/delphix/postgres:$snapshot_name
+#
+
+. ${BASH_SOURCE%/*}/../lib/common.sh
+
+DEFAULT_START_TIMEOUT=2100
+DEFAULT_RESTARTER_TIMEOUT=1200
+DEFAULT_QUERY_TIMEOUT=900
+START_TIMEOUT=start/timeout_seconds
+RESTARTER_TIMEOUT=postgres/restarter_timeout_seconds
+QUERY_TIMEOUT=postgres/query_timeout_seconds
+DB_FS=domain0/mds
+SYMLINKS_REPLACED=/var/delphix/server/symlinks_replaced
+DELPHIX_SERVER_DIR=/var/delphix/server
+PG_SVC=svc:/system/delphix/postgres
+
+function die() {
+	echo -e "\n$(basename $0): $*" >&2
+	exit 1
+}
+
+function usage() {
+	[[ -n $1 ]] && echo $1
+	cat <<EOM
+Usage: $(basename $0) <subcommand> <args> ...
+    clone -s <snapshot-name> [-n <skip taking a MDS snapshot>]
+                             [-l <replace app-stack symlinks with snapshot files>]
+    start -s <snapshot-name> [-p <port>] [-r <alt root>] [-d <alt dlpx root>]
+    stop -s <snapshot-name>
+    isrunning -s <snapshot-name>
+    cleanup -s <snapshot-name>
+EOM
+	exit 2
+}
+
+function create_clone() {
+	local skip_snapshot=false
+	local replace_symlinks=false
+
+	local mds_clone_root="/domain0/${snapshot_name}"
+	local mds_clone_db="${mds_clone_root}/db/"
+	local mds_clone_mds_external="${mds_clone_root}/mds_external/"
+
+	OPTIND=1
+	while getopts ':nl' c; do
+		case $c in
+		n) skip_snapshot=true ;;
+		l) replace_symlinks=true ;;
+		\?) usage "Invalid option: -$OPTARG." ;;
+		esac
+	done
+
+	#
+	# We remove any clone (if it exists due to a previous failure)
+	#
+	if zfs list $mds_clone &>/dev/null; then
+		echo -e "Removing existing clones... \c"
+		#
+		# Ensure the database is stopped before deleting its storage
+		#
+		stop_postgres
+		zfs destroy -f $mds_clone >/dev/null 2>&1 ||
+			die "failed to destroy MDS clone $mds_clone"
+		echo "done."
+	fi
+
+	if $skip_snapshot; then
+		zfs list $DB_FS@$snapshot_name &>/dev/null ||
+			die "failed to find MDS snapshot $DB_FS@$snapshot_name"
+	else
+		#
+		# We remove any snapshot (if it exists due to a previous failure)
+		#
+		if zfs list $DB_FS@$snapshot_name &>/dev/null; then
+			zfs destroy $DB_FS@$snapshot_name >/dev/null 2>&1 ||
+				die "failed to destroy MDS snapshot $DB_FS@$snapshot_name"
+		fi
+		zfs snapshot $DB_FS@$snapshot_name &>/dev/null ||
+			die "failed to create MDS snapshot $snapshot_name"
+	fi
+
+	echo -e "Cloning dataset..."
+	zfs clone $DB_FS@$snapshot_name $mds_clone ||
+		die "failed to clone $DB_FS@$snapshot_name"
+
+	if $replace_symlinks; then
+		#
+		# Modify application stack files to point to copy of MDS.
+		#
+		touch ${SYMLINKS_REPLACED}
+		echo "Creating symlinks to use snapshot '${snapshot_name}'."
+		ln -sf "${mds_clone_db}" "${DELPHIX_SERVER_DIR}/db" ||
+			die "Failed to create '${mds_clone_db}' symlink to ${DELPHIX_SERVER_DIR}/db."
+		ln -sf "${mds_clone_mds_external}" "${DELPHIX_SERVER_DIR}/mds_external" ||
+			die "Failed to create '${mds_clone_mds_external}' symlink to ${DELPHIX_SERVER_DIR}/mds_external."
+	fi
+
+	echo "done."
+}
+
+function start_postgres_impl_illumos() {
+	local start_timeout restarter_timeout
+
+	/usr/sbin/svccfg -s $PG_SVC add $snapshot_name ||
+		die "failed to create $svc_inst SMF service instance"
+
+	instcfg="addpg postgres application
+	    setprop postgres/data=$1
+	    setprop postgres/port=$2
+	    setprop postgres/root=astring: $3"
+	if [[ -n $droot ]]; then
+		start="$droot/opt/delphix/server/svc/method/svc-postgres %m %s"
+		stopf="$droot/opt/delphix/server/svc/method/svc-postgres %m %{restarter/contract}"
+		start_timeout=$(svcprop -p $START_TIMEOUT $PG_SVC 2>/dev/null)
+		if [[ $start_timeout -lt $DEFAULT_START_TIMEOUT ]]; then
+			start_timeout=$DEFAULT_START_TIMEOUT
+		fi
+		echo "start timeout set : $start_timeout"
+		instcfg+="
+		    setprop postgres/dlpx_root=astring: $droot
+		    addpg start method
+		    setprop start/exec=\"$start\"
+		    setprop start/timeout_seconds=$start_timeout
+		    addpg stop method
+		    setprop stop/exec=\"$stopf\""
+	fi
+
+	echo "$instcfg" | /usr/sbin/svccfg -s $svc_inst ||
+		die "failed to set service properties on $svc_inst"
+
+	#
+	# Finally, enable the service. It can take some time for the restarter
+	# to asynchronously create the restarter property group on a new
+	# service instance. We may have to try a few times.
+	#
+	restarter_timeout=$(svcprop -p $RESTARTER_TIMEOUT $PG_SVC 2>/dev/null)
+	if [[ $restarter_timeout -lt $DEFAULT_RESTARTER_TIMEOUT ]]; then
+		restarter_timeout=$DEFAULT_RESTARTER_TIMEOUT
+	fi
+	echo "restarter timeout set : $restarter_timeout"
+	/usr/sbin/svcadm refresh $svc_inst || die "cannot refresh $svc_inst"
+	svcenabled=false
+	echo "waiting $restarter_timeout seconds for service to enable."
+	for i in $(seq "$restarter_timeout"); do
+		/usr/sbin/svcadm enable -st $svc_inst &>/dev/null
+		if [[ $? -eq 0 ]]; then
+			svcenabled=true
+			break
+		fi
+		sleep 1
+	done
+	$svcenabled ||
+		die "couldn't enable $svc_inst within $restarter_timeout seconds"
+}
+
+function start_postgres() {
+	local pgroot pgport root droot start
+	local query_timeout mds_client_opts
+
+	#
+	# Read OS version from zfs mount to determine which PG_ROOT to use.
+	# We do not support upgrade from 5.0, so we check for 5.1.
+	#
+	pgroot=$(get_pg_root)
+
+	OPTIND=1
+	while getopts ':p:d:r:' c; do
+		case $c in
+		d) droot=$OPTARG ;;
+		r) root=$OPTARG ;;
+		p) pgport=$OPTARG ;;
+		\?) usage "Invalid option: -$OPTARG." ;;
+		esac
+	done
+
+	#
+	# Set owner to postgres user
+	#
+	chown -R postgres:staff $pgdata || die "unable to change ownership of $pgdata"
+	chmod a+r $pgdata || die "unable to chmod $pgdata"
+
+	#
+	# mds_client options vary depending on if we have -r (root) parameter
+	# this also impacts the postgres binaries location.
+	#
+	if [[ -n $root ]]; then
+		#
+		# If we detect that the version of Postgres hasn't changed, then we
+		# should run the currently installed version of Postgres instead.
+		#
+		# This is a useful precaution that may come in handy if we change the
+		# underlying OS version without changing the postgres version.
+		# (in that case, the new postgres binaries may not be compatible with
+		# the old OS)
+		#
+		if [[ -d $pgroot ]]; then
+			echo "Ignoring -r argument since $pgroot already exists in \
+			    current version of Delphix."
+		else
+			pgroot=$root/$pgroot
+			echo "Using Postgres binaries located here: $pgroot"
+		fi
+		mds_client_opts="-d $pgdata -r $root"
+	else
+		mds_client_opts="-d $pgdata"
+	fi
+
+	if [[ -z $pgport ]]; then
+		pgport=$(get_port)
+	fi
+	[[ -n $pgport ]] || die "unable to allocate a port for postgres."
+
+	echo -e "Starting postgres on $pgport..."
+
+	#
+	# Create an instance of the delphix/postgres service using the
+	# snapshot name as the instance name. If one already exists
+	# (perhaps from a previous catastrophic failure), remove it.
+	#
+	stop_postgres
+
+	start_postgres_impl_illumos "$pgdata" "$pgport" "$pgroot"
+	query_timeout=$(svcprop -p $QUERY_TIMEOUT $PG_SVC 2>/dev/null)
+
+	#
+	# Return only when we're able to run a query against mds. Postgres can
+	# take some time to become ready to accept working connections.
+	#
+	if [[ $query_timeout -lt $DEFAULT_QUERY_TIMEOUT ]]; then
+		query_timeout=$DEFAULT_QUERY_TIMEOUT
+	fi
+	echo "query timeout set : $query_timeout"
+	echo "waiting $query_timeout seconds for mds to respond."
+	pgstarted=false
+	for i in $(seq "$query_timeout"); do
+		echo 'select * from dlpx_domain;' |
+			${droot}/opt/delphix/server/bin/mds_client $mds_client_opts |
+			grep domain0 &>/dev/null
+		if [[ $? -eq 0 ]]; then
+			pgstarted=true
+			break
+		fi
+		sleep 1
+	done
+	$pgstarted ||
+		die "couldn't connect to mds within $query_timeout seconds"
+	echo "done."
+}
+
+function stop_postgres() {
+	local sta=$(svcs -Ho sta "$svc_inst")
+	if [[ -n "$sta" && ("$sta" = ON || "$sta" = DGD) ]]; then
+		/usr/sbin/svcadm disable -st "$svc_inst" ||
+			die "unable to disable service: $svc_inst"
+
+		/usr/sbin/svccfg delete -f $svc_inst ||
+			die "unable to delete SMF service: $svc_inst"
+	fi
+
+	#
+	# Clean up the postmaster.pid leftover from the main MDS in the
+	# snapshot. This needs to be done after disabling the SMF service in
+	# case the postmaster.pid was instead from the active clone.
+	#
+	if [[ -e $pgdata/postmaster.pid ]]; then
+		echo "renaming $pgdata/postmaster.pid to $pgdata/postmaster.pid.original"
+		mv $pgdata/postmaster.pid $pgdata/postmaster.pid.original ||
+			echo "failed to move postmaster.pid file"
+	fi
+}
+
+function is_running() {
+	local sta=$(svcs -Ho sta ${svc_inst})
+	if [[ -n "$sta" && ("$sta" = ON || "$sta" = DGD) ]]; then
+		exit 0
+	else
+		exit 1
+	fi
+}
+
+function cleanup() {
+	#
+	# Destroy the clone and the snapshot.
+	#
+	zfs destroy -f $mds_clone &>/dev/null || echo \
+		"failed to destroy MDS clone $mds_clone"
+	zfs destroy $DB_FS@$snapshot_name \
+		>/dev/null 2>&1 || echo \
+		"failed to destroy MDS snapshot $snapshot_name"
+	if [[ -f ${SYMLINKS_REPLACED} ]]; then
+		echo "Reverting DB symlinks back to /mds/*"
+		rm -f ${DELPHIX_SERVER_DIR}/db ${DELPHIX_SERVER_DIR}/mds_external ||
+			die "Failed to remove symlinks to mds clone"
+		ln -s /mds/db ${DELPHIX_SERVER_DIR}/db ||
+			die "Failed to recreate /mds/db symlink"
+		ln -s /mds/mds_external ${DELPHIX_SERVER_DIR}/mds_external ||
+			die "Failed to recreate /mds/external symlink"
+		rm ${SYMLINKS_REPLACED} ||
+			die "Failed to remove marker file"
+	fi
+}
+
+subcmd=$1
+shift
+
+while getopts ':s:' c; do
+	case $c in
+	s) snapshot_name=$OPTARG ;;
+	\?) break ;;
+	esac
+done
+
+shift $((OPTIND - 2))
+
+[[ -n $snapshot_name ]] || usage
+
+mds_clone=domain0/$snapshot_name
+pgdata=/$mds_clone/db
+
+svc_inst=$PG_SVC:$snapshot_name
+
+case $subcmd in
+clone)
+
+	create_clone "$@"
+	;;
+
+start)
+
+	start_postgres "$@"
+	;;
+
+stop)
+	stop_postgres
+	;;
+
+isrunning)
+	is_running
+	;;
+
+cleanup)
+	cleanup
+	;;
+*)
+	usage
+	;;
+esac

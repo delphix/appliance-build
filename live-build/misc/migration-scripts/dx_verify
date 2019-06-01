@@ -33,7 +33,7 @@ UPGRADE_VERIFY_JAR=$UPGRADE_VERIFY_PATH/upgrade-verify.jar
 LOG_DIR=/var/delphix/server/upgrade-verify
 MGMT_FMRI=svc:/system/delphix/mgmt:default
 BINDIR=/opt/delphix/server/bin
-DX_MANAGE_PG=$BINDIR/dx_manage_pg
+DX_MANAGE_PG=$BINDIR/dx_manage_pg_illumos
 
 function usage() {
 	echo "usage: $(basename "$0") -v <version> -o <report file> -f <report file format> -l <report file locale>"

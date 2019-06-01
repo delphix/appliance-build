@@ -76,6 +76,10 @@ mkdir $DEPOT_DIRECTORY
 #
 (
 	cd binary
+
+	# Copy an illumos version of dx_manage_pg for migration purposes.
+	cp ../migration-scripts/dx_manage_pg_illumos opt/delphix/server/bin/
+
 	find . -print | cpio -oc
 ) >$DEPOT_DIRECTORY/os-root.cpio
 
@@ -84,6 +88,7 @@ mkdir $DEPOT_DIRECTORY
 # dx_unpack.
 #
 cp migration-scripts/* $DEPOT_DIRECTORY
+rm $DEPOT_DIRECTORY/dx_manage_pg_illumos
 
 #
 # There may be a version.info file in the current directory already.
