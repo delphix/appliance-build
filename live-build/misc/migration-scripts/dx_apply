@@ -188,6 +188,7 @@ cat <<-EOF >"$TMP_ROOT/etc/fstab" || die "Failed to setup /etc/fstab"
 	$RPOOL/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	$RPOOL/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	$RPOOL/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	$RPOOL/crashdump          /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 EOF
 
 #
