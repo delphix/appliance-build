@@ -321,12 +321,9 @@ MAIN_MENU_FICL=(
 #
 (
 	cd "$TMP_ROOT/var/delphix" || die "failed to cd into $TMP_ROOT/var/delphix"
-	# We only expect to find:
-	#  ./dropbox
-	[[ $(find . -mindepth 1 | wc -l) -eq 1 ]] ||
+	# /var/delphix should be empty
+	[[ $(find . -mindepth 1 | wc -l) -eq 0 ]] ||
 		die "linux dataset for /var/delphix contains unexpected files"
-	[[ -d dropbox ]] ||
-		die "linux dataset for /var/delphix should contain directory dropbox"
 ) || die "verification of /var/delphix failed"
 
 umount "$TMP_ROOT/var/log" ||
