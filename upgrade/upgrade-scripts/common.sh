@@ -146,8 +146,10 @@ function set_upgrade_property() {
 	[[ -n "$1" ]] || die "upgrade property key is missing"
 	[[ -n "$2" ]] || die "upgrade property value is missing"
 
-	sed -i "/^$1=.*$/d" "$UPDATE_DIR/upgrade.properties" ||
-		die "failed to delete upgrade property: '$1'"
+	if [[ -f "$UPDATE_DIR/upgrade.properties" ]]; then
+		sed -i "/^$1=.*$/d" "$UPDATE_DIR/upgrade.properties" ||
+			die "failed to delete upgrade property: '$1'"
+	fi
 
 	echo "$1=$2" >>"$UPDATE_DIR/upgrade.properties" ||
 		die "failed to set upgrade property: '$1=$2'"
