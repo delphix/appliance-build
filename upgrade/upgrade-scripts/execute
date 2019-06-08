@@ -28,35 +28,7 @@ function usage() {
 	exit 2
 }
 
-function wait_for_apt_lock() {
-	# The 'apt' package manager commands will fail if other package manager
-	# already holds the lock. This can fail upgrade workflow, so we try to
-	# mitigate by waiting up to a set timeout and fail only if timeout is reached.
-	local now
-	local timeout
-	now=$(date +%s)
-	timeout=$((now + 300)) # Set timeout to 5 min
-
-	while [[ $(date +%s) -lt $timeout ]]; do
-		output=$(fuser /var/lib/dpkg/{lock,lock-frontend} 2>&1)
-		if [[ -n "$output" ]]; then
-			echo "Waiting for other package manager to release lock. Timeout in $((timeout - $(date +%s))) seconds. Process tree for locked files are:"
-			while read -r line; do
-				pstree -p "$(echo "$line" | tr -s ' ' | cut -d ' ' -f 2)"
-			done <<<"${output}"
-			sleep 1
-		else
-			echo "No lock detected. Continuing with the normal workflow."
-			return
-		fi
-	done
-
-	die "Timeout reached aborting."
-}
-
 function apt_get() {
-	wait_for_apt_lock
-
 	DEBIAN_FRONTEND=noninteractive apt-get \
 		-o Dpkg::Options::="--force-confdef" \
 		-o Dpkg::Options::="--force-confold" \
