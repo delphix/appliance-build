@@ -79,8 +79,8 @@ RPOOL=${RDS%%/*}
 # above the minimum version required. Since we are doing a migration the
 # minimum version should be the latest 5.3.
 #
-# CURRENT_DDS=$(dirname "$(mount | awk '/^\/opt\/delphix /{ print $3 }')")
-# CURRENT_VERSION=$(basename $current_dds)
+CURRENT_DDS=$(dirname "$(mount | awk '/^\/opt\/delphix /{ print $3 }')")
+CURRENT_VERSION=$(basename "$CURRENT_DDS")
 #
 # WIP: check if current version is 5.3, if not bail
 #
@@ -146,6 +146,7 @@ echo "Running MDS Command: '$command'"
 #
 cat <<-EOF >"/var/dlpx-update/upgrade.properties" ||
 	UPGRADE_TYPE=OS_MIGRATION
+	UPGRADE_BASE_VERSION=$CURRENT_VERSION
 EOF
 	die "failed to create upgrade.properties"
 
