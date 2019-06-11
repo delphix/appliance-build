@@ -108,7 +108,7 @@ cp migration-scripts/* $DEPOT_DIRECTORY
 	# DLPX_MIN_VERSION is specified for ensuring that we are
 	# migrating from the right version.
 	#
-	echo "DLPX_MIN_VERSION=5.3.0.0"
+	echo "DLPX_MIN_VERSION=5.3.5.0"
 
 	#
 	# DLPX_VERSION is set explicitly to match the version of the
