@@ -263,6 +263,7 @@ LX_CMDLINE=(
 	'ipv6.disable=1'
 	'crashkernel=1024M-:512M'
 	'zfsforce=1'
+	'mitigations=off'
 )
 
 #
