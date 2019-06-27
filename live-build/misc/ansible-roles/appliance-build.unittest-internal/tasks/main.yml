@@ -20,6 +20,7 @@
       - adoptopenjdk-java8-jdk
       - ant
       - bash
+      - build-essential
       - docker.io
       - git
       - python-minimal
