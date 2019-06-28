@@ -91,7 +91,7 @@ tar -I pigz -cf "payload.tar.gz" -C upgrade-scripts . -C ~/.aptly .
 VERSION=$(dpkg -f "$(find debs/ -name 'delphix-entire-*' | head -n 1)" version)
 sed "s/@@VERSION@@/$VERSION/" <version.info.template >version.info
 
-sha256sum payload.tar.gz version.info >SHA256SUMS
+sha256sum payload.tar.gz version.info prepare >SHA256SUMS
 
 #
 # As a precaution, we disable "xtrace" so that we avoid exposing the
@@ -127,6 +127,7 @@ tar -I pigz -cf "$APPLIANCE_VARIANT.upgrade.tar.gz" \
 	$(ls SHA256SUMS.sig.* 2>/dev/null) \
 	SHA256SUMS \
 	version.info \
+	prepare \
 	payload.tar.gz
 
 mv "$APPLIANCE_VARIANT.upgrade.tar.gz" "$TOP/build/artifacts"

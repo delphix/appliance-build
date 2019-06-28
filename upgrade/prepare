@@ -1,0 +1,115 @@
+#!/bin/bash
+#
+# Copyright 2018, 2019 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
+
+function die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+function usage() {
+	echo "$(basename "$0"): $*" >&2
+	echo "Usage: $(basename "$0") [-f] [-s] [-x] <image>"
+	exit 2
+}
+
+function report_progress_inc() {
+	echo "Progress increment: $(date +%T:%N%z), $1, $2"
+}
+
+function cleanup() {
+	[[ -d "$UNPACK_DIR" ]] && rm -rf "$UNPACK_DIR"
+}
+
+#
+# This script is called from unpack-image from lower version in order
+# to complete the unpack process. unpack-image passes in all parameters
+# used in that version. Some of these may be ignored by this script.
+# For example, opt_s is passed in by unpack-image which is not used
+# in this script but the script should not throw an error for this
+# case. The parameter could be required when SUV project replaces
+# this prepare script with one that can handle an upgrade image with
+# additional artifacts such as a verification package.
+#
+opt_f=false
+opt_x=false
+
+while getopts ':fsx' c; do
+	case "$c" in
+	f | s | x) eval "opt_$c=true" ;;
+	*) usage "illegal option -- $OPTARG" ;;
+	esac
+done
+shift $((OPTIND - 1))
+
+[[ $# -gt 1 ]] && usage "too many arguments specified"
+[[ $# -eq 0 ]] && usage "too few arguments specified"
+
+[[ "$EUID" -ne 0 ]] && die "must be run as root"
+[[ -d "$UPDATE_DIR" ]] || die "$UPDATE_DIR does not exist"
+
+UNPACK_DIR="$1"
+[[ -d "$UNPACK_DIR" ]] || die "upgrade image unpack path is invalid"
+
+trap cleanup EXIT
+pushd "$UNPACK_DIR" &>/dev/null || die "'pushd $UNPACK_DIR' failed"
+
+for file in payload.tar.gz version.info; do
+	[[ -f "$file" ]] || die "image is corrupt; missing '$file' file"
+done
+
+tar -xzf payload.tar.gz || die "failed to extract payload.tar.gz"
+rm payload.tar.gz || die "failed to remove payload.tar.gz"
+
+#
+# We need to be careful when sourcing this file, since it can conflict
+# with (and clobber) functions and/or variables previously defined.
+#
+# shellcheck disable=SC1091
+. version.info || die "sourcing version.info file failed"
+
+[[ -n "$VERSION" ]] || die "VERSION variable is empty"
+[[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION variable is empty"
+[[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
+	die "MINIMUM_REBOOT_OPTIONAL_VERSION variable is empty"
+
+if $opt_x; then
+	sed -i \
+		"s/^\(MINIMUM_REBOOT_OPTIONAL_VERSION\)=.*$/\1=$VERSION/" \
+		version.info ||
+		die "'sed -i ... version.info' failed"
+
+	# shellcheck disable=SC1091
+	. version.info || die "sourcing version.info file failed"
+fi
+
+popd &>/dev/null || die "'popd' failed"
+
+$opt_f && rm -rf "${UPDATE_DIR:?}/$VERSION" >/dev/null 2>&1
+
+[[ -d "$UPDATE_DIR/$VERSION" ]] && die "version $VERSION already exists"
+
+mv "$UNPACK_DIR" "$UPDATE_DIR/$VERSION" ||
+	die "failed to move unpacked upgrade image to $UPDATE_DIR/$VERSION"
+
+rm -f "$UPDATE_DIR/latest" || die "failed to remove 'latest' symlink"
+ln -s "$VERSION" "$UPDATE_DIR/latest" || die "failed to create 'latest' symlink"
+
+report_progress_inc 90 "Prepare completed successfully."
+
+exit 0

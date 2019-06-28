@@ -80,6 +80,9 @@ def shellScripts = fileTree("scripts") +
                         details.file.canExecute()
                    }) +
                    fileTree("live-build/misc/migration-scripts") +
+                   fileTree("upgrade", {
+                       include "prepare"
+                   }) +
                    fileTree("upgrade/upgrade-scripts", {
                        exclude "README.md"
                    })
