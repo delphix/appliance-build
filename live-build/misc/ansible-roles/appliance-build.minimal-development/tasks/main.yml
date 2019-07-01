@@ -41,3 +41,16 @@
     - lookup('env', 'AWS_ACCESS_KEY_ID') != ''
     - lookup('env', 'AWS_SECRET_ACCESS_KEY') != ''
   no_log: true
+
+#
+# The delphix-platform package will configure these SSH tunables so that
+# idle connections will timeout. While this configuration is required
+# for customer systems, it is undesirable for development systems.
+#
+- lineinfile:
+    path: /etc/ssh/sshd_config
+    regex: "^{{ item }} "
+    line: "#{{ item }} "
+  with_items:
+    - "ClientAliveInterval"
+    - "ClientAliveCountMax"
