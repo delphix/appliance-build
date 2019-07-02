@@ -62,13 +62,28 @@ ARCHIVE_DIR="$1"
 [[ -d $ARCHIVE_DIR ]] || die "$ARCHIVE_DIR is not a directory"
 [[ -f $ARCHIVE_DIR/version.info ]] ||
 	die "$ARCHIVE_DIR does not have a version.info file"
+
 . "$ARCHIVE_DIR/version.info"
+[[ "$DLPX_MIN_VERSION" == "5.3.5.0" ]] ||
+	die "expected DLPX_MIN_VERSION for migration to be 5.3.5.0"
+
 #
-# WIP: Assert MINIMUM VERSION field for migration.
-# The idea here is to ensure that we are running this script against
-# a migration archive, by ensuring that it has the right value for
-# the MINIMUM_VERSION field.
+# Ensure that this VM is version 5.3.5.X or greater (but not 5.4 or 6.X).
 #
+CURRENT_DDS=$(dirname "$(mount | awk '/^\/opt\/delphix /{ print $3 }')")
+CURRENT_VERSION=$(basename "$CURRENT_DDS")
+MAJOR_VERSION_0=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+MAJOR_VERSION_1=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+[[ $MAJOR_VERSION_0 -eq 5 ]] ||
+	die "expected version 5.3.5 or greater but found" \
+		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
+[[ $MAJOR_VERSION_1 -eq 3 ]] ||
+	die "expected version 5.3.5 or greater but found" \
+		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
+MINOR_VERSION=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+[[ $MINOR_VERSION -ge 3 ]] ||
+	die "expected version 5.3.5 or greater but found" \
+		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
 
 #
 # Get the root dataset and the current ZFS pool that we're currently using.
@@ -103,18 +118,6 @@ sed -i '/set mainmenu_command\[8\]/d' /boot/menu.rc.local
 	die "failed to cleanup mainmenu_command from previous run"
 
 report_progress_inc 20
-
-#
-# Check that the version to which we are upgrading is compatible with the
-# currently installed version. (Look at version.info to see if we are
-# above the minimum version required. Since we are doing a migration
-# the minimum version should be the latest 5.3)
-#
-# CURRENT_DDS=$(dirname "$(mount | awk '/^\/opt\/delphix /{ print $3 }')")
-# CURRENT_VERSION=$(basename $current_dds)
-#
-# WIP: check if current version is 5.3, if not bail
-#
 
 #
 # Create dataset layout similar to the linux upgrade.
@@ -190,12 +193,6 @@ cat <<-EOF >"$TMP_ROOT/etc/fstab" || die "Failed to setup /etc/fstab"
 	$RPOOL/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	$RPOOL/crashdump          /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 EOF
-
-#
-# WIP: Add here any operations that generate files from illumos,
-#	that we may want to carry over and use in Linux. Examples
-#	include networking interface configuration.
-#
 
 #
 # Set things up for the FreeBSD bootloader to provide an option for
