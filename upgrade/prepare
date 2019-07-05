@@ -90,7 +90,7 @@ rm payload.tar.gz || die "failed to remove payload.tar.gz"
 
 if $opt_x; then
 	sed -i \
-		"s/^\(MINIMUM_REBOOT_OPTIONAL_VERSION\)=.*$/\1=$VERSION/" \
+		"s/^\\(MINIMUM_REBOOT_OPTIONAL_VERSION\\)=.*$/\\1=$VERSION/" \
 		version.info ||
 		die "'sed -i ... version.info' failed"
 
