@@ -471,8 +471,8 @@ function migrate_file() {
 		parentdir="$(dirname "$path")"
 		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
 			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
-		cp -p "$path" "/var/lib/machines/${CONTAINER}${path}" ||
-			die "'cp -p $path' failed for '$CONTAINER'"
+		cp -Pp "$path" "/var/lib/machines/${CONTAINER}${path}" ||
+			die "'cp -Pp $path' failed for '$CONTAINER'"
 	else
 		#
 		# If the target file doesn't exist in the host then we
@@ -507,13 +507,30 @@ function migrate_dir() {
 	fi
 }
 
+#
+# Preserve the persistent service state of the service named as an argument.
+#
 function migrate_svc() {
 	local svc="$1"
+	local state
+	state=$(systemctl is-enabled "$svc")
 
-	if systemctl is-enabled -q "$svc"; then
-		chroot "/var/lib/machines/$CONTAINER" systemctl enable "$svc"
+	if [[ $state == "masked" ]]; then
+		chroot "/var/lib/machines/$CONTAINER" systemctl mask "$svc"
 	else
-		chroot "/var/lib/machines/$CONTAINER" systemctl disable "$svc"
+		#
+		# The service may be masked by default, so always unmask before
+		# doing anything else. Otherwise, systemctl will ignore the new
+		# setting.
+		#
+		chroot "/var/lib/machines/$CONTAINER" systemctl unmask "$svc"
+		if systemctl is-enabled -q "$svc"; then
+			chroot "/var/lib/machines/$CONTAINER" systemctl \
+				enable "$svc"
+		else
+			chroot "/var/lib/machines/$CONTAINER" systemctl \
+				disable "$svc"
+		fi
 	fi
 }
 
@@ -540,7 +557,11 @@ function migrate_configuration() {
 		migrate_svc "$svc"
 	done <<-EOF
 		delphix-masking.service
+		nfs-mountd.service
 		ntp.service
+		rpc-statd.service
+		rpcbind.service
+		rpcbind.socket
 	EOF
 
 	#
@@ -560,6 +581,7 @@ function migrate_configuration() {
 	while read -r file; do
 		migrate_file "$file"
 	done <<-EOF
+		/etc/default/nfs-kernel-server
 		/etc/hostid
 		/etc/hostname
 		/etc/hosts

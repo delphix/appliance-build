@@ -45,3 +45,34 @@
       domain=
       dns1=
       dns2=
+
+#
+# Initial NFS Server configuration for virtualization. We do this here instead
+# of within the virtualization package because the virtualization software
+# modifies this configuration at runtime, and we don't want ansible roles that
+# are re-run as part of upgrades to undo these runtime modifications.
+#
+- name: Link initial NFS configuration
+  file:
+    src: /opt/delphix/server/etc/nfs-kernel-server-v4
+    dest: /etc/default/nfs-kernel-server
+    force: yes
+    owner: root
+    group: root
+    state: link
+
+#
+# Because we want an NFSv4-only configuration out of the box, we need to mask
+# NFSv3 services so that they don't get automatically started at boot via
+# dependencies. The virtualization software is responsible for unmasking and
+# starting these services if NFSv3 needed at runtime.
+#
+- name: Mask NFSv3 services
+  file:
+    src: "/dev/null"
+    dest: "/etc/systemd/system/{{ item }}"
+    state: link
+  with_items:
+      - rpc-statd.service
+      - rpcbind.service
+      - rpcbind.socket
