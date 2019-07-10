@@ -90,6 +90,8 @@ cp config/hooks/template.ctl delphix-entire.ctl
 # shellcheck disable=SC2016
 chroot binary dpkg-query -Wf '${Package}=${Version}\n' | sort >packages.list
 
+echo "$APPLIANCE_VARIANT" >variant
+
 if [[ -n "${DELPHIX_APPLIANCE_VERSION:-}" ]]; then
 	#
 	# If the build specified a version for the delphix-entire package,
@@ -108,7 +110,6 @@ else
 	VERSION=$(date '+%Y.%-m.%-d.%-H')
 fi
 
-sed -i "s/@@VARIANT@@/$APPLIANCE_VARIANT/" delphix-entire.ctl
 sed -i "s/@@VERSION@@/$VERSION/" delphix-entire.ctl
 sed -i "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/" delphix-entire.ctl
 
