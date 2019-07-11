@@ -37,7 +37,7 @@
 
 - file:
     path: "/export/home/delphix/{{ item }}"
-    owner: "delphix"
+    owner: delphix
     group: staff
     mode: "g+w"
     state: directory

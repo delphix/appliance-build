@@ -25,20 +25,23 @@
   when: lookup('env', 'APPLIANCE_PASSWORD') == ''
   no_log: true
 
-#
-# While the "delphix-platform" package will take care of creating the
-# delphix user, it won't configure the user's password. Thus, we have to
-# do that here, during the intial build of the appliance.
-#
+- file:
+    path: /export/home
+    state: directory
+    mode: 0755
+
 - user:
     name: delphix
+    uid: 65433
+    group: staff
+    groups: root
+    shell: /bin/bash
+    create_home: yes
+    comment: Delphix User
+    home: /export/home/delphix
     password:
       "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
 
-#
-# We also want the root user's password to match the delphix user's
-# password, so we also set that here.
-#
 - user:
     name: root
     password:
