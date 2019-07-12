@@ -605,7 +605,6 @@ function migrate_configuration() {
 		/etc/delphix-interface-names.yaml
 		/etc/default/locale
 		/etc/engine-code
-		/etc/engine-uuid
 		/etc/engine.install
 		/etc/fluent/fluent.conf
 		/etc/issue
