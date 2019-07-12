@@ -59,7 +59,7 @@
 
 - file:
     path: "/export/home/delphix/{{ item }}"
-    owner: "delphix"
+    owner: delphix
     group: staff
     mode: "g+w"
     state: directory
@@ -68,7 +68,7 @@
     - dlpx-app-gate
 
 - authorized_key:
-    user: "delphix"
+    user: delphix
     state: present
     key:
       "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAyvw2gQRkDqrRY5qxUn0VYAL6Rtt1/\
