@@ -51,8 +51,8 @@ function usage() {
 	PREFIX_NCHARS=$(echo -n "$PREFIX_STRING" | wc -c)
 	PREFIX_SPACES=$(printf "%.s " $(seq "$PREFIX_NCHARS"))
 
-	echo "$PREFIX_STRING [-n] [-v] in-place"
-	echo "$PREFIX_SPACES [-n] [-v] not-in-place"
+	echo "$PREFIX_STRING [-n] [-v] deferred"
+	echo "$PREFIX_SPACES [-n] [-v] full"
 	echo "$PREFIX_SPACES rollback"
 
 	exit 2
@@ -98,6 +98,14 @@ function cleanup_in_place_upgrade() {
 function upgrade_in_place() {
 	trap cleanup_in_place_upgrade EXIT
 
+	case "$UPGRADE_TYPE" in
+	DEFERRED | FULL) ;;
+	*)
+		die "upgrade type ('$UPGRADE_TYPE') is not supported for " \
+			"in-place upgrade."
+		;;
+	esac
+
 	CONTAINER=$("$IMAGE_PATH/upgrade-container" create in-place)
 	[[ -n "$CONTAINER" ]] || die "failed to create container"
 
@@ -122,8 +130,8 @@ function upgrade_in_place() {
 	#
 	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] && return
 
-	set_upgrade_property "UPGRADE_TYPE" "FULL" ||
-		die "failed to set upgrade property 'UPGRADE_TYPE'"
+	set_upgrade_property "UPGRADE_TYPE" "$UPGRADE_TYPE" ||
+		die "failed to set upgrade property 'UPGRADE_TYPE' to '$UPGRADE_TYPE'"
 
 	set_upgrade_property "UPGRADE_BASE_CONTAINER" \
 		"$(get_mounted_rootfs_container_name)" ||
@@ -145,7 +153,9 @@ function upgrade_in_place() {
 	"$IMAGE_PATH/execute" -p "$(get_platform)" ||
 		die "'$IMAGE_PATH/execute' failed in running appliance."
 
-	systemctl reboot || die "'systemctl reboot' failed"
+	if [[ "$UPGRADE_TYPE" == "FULL" ]]; then
+		systemctl reboot || die "'systemctl reboot' failed"
+	fi
 }
 
 function cleanup_not_in_place_upgrade() {
@@ -174,6 +184,14 @@ function cleanup_not_in_place_upgrade() {
 
 function upgrade_not_in_place() {
 	trap cleanup_not_in_place_upgrade EXIT
+
+	case "$UPGRADE_TYPE" in
+	FULL) ;;
+	*)
+		die "upgrade type ('$UPGRADE_TYPE') is not supported for " \
+			"not-in-place upgrade."
+		;;
+	esac
 
 	#
 	# We query the mounted rootfs container name here, so that if we
@@ -329,16 +347,31 @@ done
 shift $((OPTIND - 1))
 
 case "$1" in
-in-place)
+deferred)
+	UPGRADE_TYPE="DEFERRED"
 	shift 1
 	verify_upgrade_is_allowed
 	verify_upgrade_in_place_is_allowed
 	upgrade_in_place "$@"
 	;;
-not-in-place)
+full)
+	UPGRADE_TYPE="FULL"
 	shift 1
 	verify_upgrade_is_allowed
-	upgrade_not_in_place "$@"
+
+	#
+	# FULL upgrade always perform a reboot but can take on two
+	# flavors -- in-place or not-in-place. The flavor of a FULL upgrade
+	# is determined by the MINIMUM_REBOOT_OPTIONAL_VERSION. If our
+	# upgrade version is not greater than MINIMUM_REBOOT_OPTIONAL_VERSION
+	# than the upgrade will be a not-in-place upgrade. If you wish to force
+	# a not-in-place upgrade, use the -x option when running unpack-image.
+	#
+	if is_upgrade_in_place_allowed; then
+		upgrade_in_place "$@"
+	else
+		upgrade_not_in_place "$@"
+	fi
 	;;
 rollback)
 	shift 1

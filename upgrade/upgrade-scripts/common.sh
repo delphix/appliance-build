@@ -114,7 +114,7 @@ function verify_upgrade_is_allowed() {
 		"$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
 		die "upgrade is not allowed;" \
 			"installed version ($INSTALLED_VERSION)" \
-			"is less than minimum allowed version" \
+			"is not greater than minimum allowed version" \
 			"($MINIMUM_VERSION)"
 }
 
@@ -129,10 +129,13 @@ function is_upgrade_in_place_allowed() {
 }
 
 function verify_upgrade_in_place_is_allowed() {
+	local INSTALLED_VERSION
+	INSTALLED_VERSION=$(get_installed_version)
+
 	if ! is_upgrade_in_place_allowed; then
 		die "upgrade in-place is not allowed for reboot required upgrade;" \
 			"installed version ($INSTALLED_VERSION)" \
-			"is less than minimum allowed version" \
+			"is not greater than minimum allowed version" \
 			"($MINIMUM_REBOOT_OPTIONAL_VERSION)"
 	fi
 }
