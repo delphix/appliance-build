@@ -38,7 +38,7 @@ Log into that VM using the "delphix" user, and run these commands:
 
     $ download-latest-image internal-dev
     $ sudo unpack-image internal-dev.upgrade.tar.gz
-    $ sudo /var/dlpx-update/latest/upgrade -v in-place
+    $ sudo /var/dlpx-update/latest/upgrade -v deferred
 
 ## FAQ
 
