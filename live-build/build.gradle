@@ -105,9 +105,11 @@ for (variant in allVariants) {
                 inputs.file "${rootProject.projectDir}/scripts/run-live-build.sh"
 
                 for (envVar in ["APPLIANCE_PASSWORD",
+                                "DELPHIX_APPLIANCE_VERSION",
+                                "DELPHIX_PACKAGE_MIRROR_PRIMARY",
+                                "DELPHIX_PACKAGE_MIRROR_SECONDARY",
                                 "DELPHIX_SIGNATURE_URL",
-                                "DELPHIX_SIGNATURE_TOKEN",
-                                "DELPHIX_APPLIANCE_VERSION"]) {
+                                "DELPHIX_SIGNATURE_TOKEN"]) {
                     inputs.property(envVar, System.getenv(envVar)).optional(true)
                 }
 
