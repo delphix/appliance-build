@@ -55,10 +55,12 @@ $DOCKER_RUN --rm \
 	--env APPLIANCE_PASSWORD \
 	--env AWS_ACCESS_KEY_ID \
 	--env AWS_SECRET_ACCESS_KEY \
+	--env DELPHIX_APPLIANCE_VERSION \
+	--env DELPHIX_PACKAGE_MIRROR_MAIN \
+	--env DELPHIX_PACKAGE_MIRROR_SECONDARY \
+	--env DELPHIX_PLATFORMS \
 	--env DELPHIX_SIGNATURE_URL \
 	--env DELPHIX_SIGNATURE_TOKEN \
-	--env DELPHIX_PLATFORMS \
-	--env DELPHIX_APPLIANCE_VERSION \
 	--volume "$TOP:/opt/appliance-build" \
 	--workdir "/opt/appliance-build" \
 	appliance-build "$@"

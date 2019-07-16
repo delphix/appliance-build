@@ -129,7 +129,36 @@ while ! curl --output /dev/null --silent --head --fail \
 done
 set -o errexit
 
-lb config
+if [[ -n "$DELPHIX_PACKAGE_MIRROR_SECONDARY" ]]; then
+	sed "s|@@URL@@|$DELPHIX_PACKAGE_MIRROR_SECONDARY|" \
+		<config/archives/delphix-secondary-mirror.list.in \
+		>config/archives/delphix-secondary-mirror.list
+fi
+
+if [[ -n "$DELPHIX_PACKAGE_MIRROR_MAIN" ]]; then
+	lb config \
+		--parent-mirror-bootstrap "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-chroot "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-chroot-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-chroot-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-chroot-backports "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-binary "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-binary-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-binary-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--parent-mirror-binary-backports "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-bootstrap "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-chroot "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-chroot-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-chroot-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-chroot-backports "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-binary "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-binary-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-binary-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+		--mirror-binary-backports "$DELPHIX_PACKAGE_MIRROR_MAIN"
+else
+	lb config
+fi
+
 lb build
 
 kill -9 $APTLY_SERVE_PID
