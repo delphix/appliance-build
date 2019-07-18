@@ -155,6 +155,12 @@ function upgrade_in_place() {
 
 	if [[ "$UPGRADE_TYPE" == "FULL" ]]; then
 		systemctl reboot || die "'systemctl reboot' failed"
+	else
+		systemctl reload delphix-platform ||
+			die "'systemctl reload delphix-platform' failed"
+
+		systemctl restart delphix-platform ||
+			die "'systemctl restart delphix-platform' failed"
 	fi
 }
 
