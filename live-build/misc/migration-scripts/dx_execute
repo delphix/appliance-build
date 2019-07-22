@@ -32,6 +32,8 @@ umask 0022
 
 set -o pipefail
 
+DX_UPG_PAUSE="${BASH_SOURCE%/*}/dx_upg_pause_options"
+
 function die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1
@@ -161,6 +163,9 @@ sed -i '/autoboot_delay/c\set autoboot_delay=20' /boot/menu.rc.local ||
 MAIN_MENU_LINUX_CMD=$(grep -F 'mainmenu_command[8]' /boot/menu.rc.local |
 	cut -d = -f 2-)
 echo "set menu_timeout_command=$MAIN_MENU_LINUX_CMD" >>/boot/menu.rc.local
+
+$DX_UPG_PAUSE --pause "PAUSE_IN_DX_EXECUTE_BEFORE_RESTART" ||
+	die "failed to pause fully on stress option"
 
 # Constants used by the uadmin syscall.
 A_SHUTDOWN=2
