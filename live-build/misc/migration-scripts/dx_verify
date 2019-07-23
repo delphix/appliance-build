@@ -141,12 +141,11 @@ function run_upgrade_verify() {
 		upgrade_verify_opts="-disableConsistentMdsZfsDataUtil"
 	local progress_low=$4
 	local progress_high=$5
-
-	[[ $(svcprop -p delphix/debug $MGMT_FMRI) == "true" ]] &&
-		delphix_debug="-Ddelphix.debug=true"
+	local debug_mode
+	debug_mode=$(svcprop -p delphix/debug $MGMT_FMRI)
 
 	local jar=$root$UPGRADE_VERIFY_JAR
-	$java -Dlog.dir=$LOG_DIR -Dmdsverify=true "$delphix_debug" \
+	$java -Dlog.dir=$LOG_DIR -Dmdsverify=true -Ddelphix.debug="$debug_mode" \
 		-DosMigration=true -jar "$jar" -d "$output" -f "$format" \
 		-l "$locale" -v "$version" -root "$root" "$upgrade_verify_opts" \
 		-droot "$root" -pl "$progress_low" -ph "$progress_high" ||
