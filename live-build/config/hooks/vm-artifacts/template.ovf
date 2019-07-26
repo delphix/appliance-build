@@ -42,7 +42,7 @@
         <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>
         <vssd:InstanceID>0</vssd:InstanceID>
         <vssd:VirtualSystemIdentifier>@@VM_NAME@@</vssd:VirtualSystemIdentifier>
-        <vssd:VirtualSystemType>vmx-09</vssd:VirtualSystemType>
+        <vssd:VirtualSystemType>vmx-10</vssd:VirtualSystemType>
       </System>
       <Item>
         <rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>
@@ -88,7 +88,6 @@
         <rasd:InstanceID>6</rasd:InstanceID>
         <rasd:ResourceType>24</rasd:ResourceType>
         <vmw:Config ovf:required="false" vmw:key="enable3DSupport" vmw:value="false"/>
-        <vmw:Config ovf:required="false" vmw:key="enableMPTSupport" vmw:value="false"/>
         <vmw:Config ovf:required="false" vmw:key="use3dRenderer" vmw:value="automatic"/>
         <vmw:Config ovf:required="false" vmw:key="useAutoDetect" vmw:value="false"/>
         <vmw:Config ovf:required="false" vmw:key="videoRamSizeInKB" vmw:value="4096"/>
@@ -152,7 +151,7 @@
     </VirtualHardwareSection>
     <AnnotationSection ovf:required="false">
       <Info>A human-readable annotation</Info>
-      <Annotation>Delphix Appliance, VM Hardware Version 9</Annotation>
+      <Annotation>Delphix Appliance, VM Hardware Version 10</Annotation>
     </AnnotationSection>
   </VirtualSystem>
 </Envelope>
