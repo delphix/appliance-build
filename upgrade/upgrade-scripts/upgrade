@@ -159,8 +159,8 @@ function upgrade_in_place() {
 		systemctl reload delphix-platform ||
 			die "'systemctl reload delphix-platform' failed"
 
-		systemctl restart delphix-platform ||
-			die "'systemctl restart delphix-platform' failed"
+		systemctl restart delphix.target ||
+			die "'systemctl restart delphix.target' failed"
 	fi
 }
 

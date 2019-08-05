@@ -648,16 +648,16 @@ function do_upgrade_container_in_place() {
 	run /bin/systemctl reload delphix-platform ||
 		die "'systemctl reload delphix-platform' failed in '$CONTAINER'"
 
-	run /bin/systemctl restart delphix-platform ||
-		die "'systemctl restart delphix-platform' failed in '$CONTAINER'"
+	run /bin/systemctl restart delphix.target ||
+		die "'systemctl restart delphix.target' failed in '$CONTAINER'"
 }
 
 function do_upgrade_container_not_in_place() {
 	run "$IMAGE_PATH/execute" -p "$(get_platform)" ||
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
-	run /bin/systemctl start delphix-platform ||
-		die "'systemctl start delphix-platform' failed in '$CONTAINER'"
+	run /bin/systemctl start delphix.target ||
+		die "'systemctl start delphix.target' failed in '$CONTAINER'"
 
 	migrate_configuration ||
 		die "failed to migrate configuration for '$CONTAINER'"
