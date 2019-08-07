@@ -195,6 +195,17 @@ cat <<-EOF >"$TMP_ROOT/etc/fstab" || die "Failed to setup /etc/fstab"
 EOF
 
 #
+# On some platforms (currently AWS and new enough versions of ESX), the
+# engine's UUID as reported by the os-level tools changes after
+# migration. This is because of a confusion over the proper endianness of the
+# first three fields of the UUID. To avoid having engine UUIDs change after
+# migration, we store the current UUID before we finish the migration, and
+# then use that on Linux.
+#
+/opt/delphix/server/bin/bos_mgmt get_system_uuid appliance >"$TMP_ROOT/etc/engine-uuid" ||
+	die "failed to copy engine uuid"
+
+#
 # Set things up for the FreeBSD bootloader to provide an option for
 # booting into the Linux environment This happens in two steps:
 # [1] We place vmlinuz and initrd from our migration image into
