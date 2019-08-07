@@ -164,6 +164,12 @@ MAIN_MENU_LINUX_CMD=$(grep -F 'mainmenu_command[8]' /boot/menu.rc.local |
 	cut -d = -f 2-)
 echo "set menu_timeout_command=$MAIN_MENU_LINUX_CMD" >>/boot/menu.rc.local
 
+#
+# Notify the UI that the system is rebooting.
+# This could hang if the JVM is in a bad state, so we use a timeout.
+#
+timeout 10 /opt/delphix/server/bin/jmxtool boot upgrade server
+
 $DX_UPG_PAUSE --pause "PAUSE_IN_DX_EXECUTE_BEFORE_RESTART" ||
 	die "failed to pause fully on stress option"
 
