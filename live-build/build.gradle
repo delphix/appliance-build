@@ -113,6 +113,17 @@ for (variant in allVariants) {
                     inputs.property(envVar, System.getenv(envVar)).optional(true)
                 }
 
+                if (!System.getenv('DELPHIX_APPLIANCE_VERSION')) {
+                    /*
+                     * If we are running the build manually and
+                     * DELPHIX_APPLIANCE_VERSION is not set explicitly,
+                     * just use an arbitrarily high value for the
+                     * appliance version to allow upgrading to the
+                     * produced image.
+                     */
+                    environment 'DELPHIX_APPLIANCE_VERSION', '99.9.9.9'
+                }
+
                 switch (runType) {
                     case upgradeArtifactsRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
