@@ -92,25 +92,9 @@ chroot binary dpkg-query -Wf '${Package}=${Version}\n' | sort >packages.list
 
 echo "$APPLIANCE_VARIANT" >variant
 
-if [[ -n "${DELPHIX_APPLIANCE_VERSION:-}" ]]; then
-	#
-	# If the build specified a version for the delphix-entire package,
-	# then use it.
-	#
-	VERSION=$DELPHIX_APPLIANCE_VERSION
-else
-	#
-	# Otherwise, just use a default value for the version, based on when
-	# the build occurs.
-	#
-	# Note that we want to generate the timestamp without any leading
-	# zeroes, because the Delphix API handles versions as integers.
-	# Leading zeroes will be stripped and cause mismatches.
-	#
-	VERSION=$(date '+%Y.%-m.%-d.%-H')
-fi
+test -n "$DELPHIX_APPLIANCE_VERSION"
 
-sed -i "s/@@VERSION@@/$VERSION/" delphix-entire.ctl
+sed -i "s/@@VERSION@@/$DELPHIX_APPLIANCE_VERSION/" delphix-entire.ctl
 sed -i "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/" delphix-entire.ctl
 
 equivs-build delphix-entire.ctl

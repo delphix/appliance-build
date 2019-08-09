@@ -85,6 +85,8 @@ mkdir $DEPOT_DIRECTORY
 #
 cp migration-scripts/* $DEPOT_DIRECTORY
 
+test -n "$DELPHIX_APPLIANCE_VERSION"
+
 #
 # There may be a version.info file in the current directory already.
 # That version.info is Linux-specific and does not necessarily have
@@ -118,8 +120,7 @@ cp migration-scripts/* $DEPOT_DIRECTORY
 	# nickname, etc.)
 	#
 	# shellcheck disable=SC2016
-	echo "DLPX_VERSION=$(chroot binary dpkg-query \
-		-Wf '${Version}' delphix-virtualization)"
+	echo "DLPX_VERSION=$DELPHIX_APPLIANCE_VERSION"
 } >$DEPOT_DIRECTORY/version.info
 
 #
