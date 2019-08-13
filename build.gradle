@@ -79,7 +79,9 @@ def shellScripts = fileTree("scripts") +
                    fileTree("live-build/config/hooks").include({ details ->
                         details.file.canExecute()
                    }) +
-                   fileTree("live-build/misc/migration-scripts") +
+                   fileTree("live-build/misc/migration-scripts", {
+                       exclude "etc_system_whitelist"
+                   }) +
                    fileTree("upgrade", {
                        include "prepare"
                    }) +

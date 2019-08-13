@@ -93,8 +93,7 @@ function mount_datasets() {
 	chmod 755 "$root" || die "unable to set permissions for $root"
 	mount -F zfs -o ignoremountpoint "$rds" "$root" || die "unable to mount $rds"
 
-	#TODO dummy files for UpgradeVerify, see LX-1817 and LX-1808
-	touch /var/dlpx-update/"$version"/etc_system_whitelist
+	#TODO dummy file for UpgradeVerify see LX-1808
 	touch /var/dlpx-update/"$version"/dx_upg_stress_options
 
 	#
