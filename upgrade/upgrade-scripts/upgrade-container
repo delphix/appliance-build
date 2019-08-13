@@ -581,6 +581,7 @@ function migrate_configuration() {
 	while read -r file; do
 		migrate_file "$file"
 	done <<-EOF
+		/etc/cloud/templates/hosts.debian.tmpl
 		/etc/default/nfs-kernel-server
 		/etc/hostid
 		/etc/hostname
@@ -646,6 +647,35 @@ function migrate_configuration() {
 	done <<-EOF
 		/var/lib/nfs
 		/var/target/pr
+	EOF
+
+	#
+	# These directories and files are created by cloud-init. When
+	# cloud-init runs, it stores some metadata such as the instance id,
+	# hostname, timestamps for when given modules were last run.
+	# We also want to persist the network configuration auto-generated
+	# by cloud-init.
+	#
+	# If we do not migrate those files, cloud-init will consider this
+	# system as a new instance and re-configure it. This should not be
+	# an issue in most cases since we have tuned our cloud-init
+	# configuration to eliminate unwanted side-effects on new instance
+	# detection. However, those tunings were done as a precaution and
+	# are not guaranteed to be always sufficient to avoid side-effects.
+	#
+	while read -r dir; do
+		migrate_dir "$dir"
+	done <<-EOF
+		/var/lib/cloud/data
+		/var/lib/cloud/instances
+		/var/lib/cloud/sem
+	EOF
+
+	while read -r file; do
+		migrate_file "$file"
+	done <<-EOF
+		/etc/netplan/50-cloud-init.yaml
+		/var/lib/cloud/instance
 	EOF
 
 	#
