@@ -17,3 +17,9 @@
 .gradle/
 .gradleUserHome/
 build/
+
+# Ignore IntelliJ .iml files
+*.iml
+
+# Ignore the .idea directory that IntelliJ puts in the root of projects
+.idea
