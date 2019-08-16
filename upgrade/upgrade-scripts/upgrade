@@ -106,6 +106,8 @@ function upgrade_in_place() {
 		;;
 	esac
 
+	pre_upgrade_version=$(get_installed_version)
+
 	CONTAINER=$("$IMAGE_PATH/upgrade-container" create in-place)
 	[[ -n "$CONTAINER" ]] || die "failed to create container"
 
@@ -138,7 +140,7 @@ function upgrade_in_place() {
 		die "failed to set upgrade property 'UPGRADE_BASE_CONTAINER'"
 
 	set_upgrade_property "UPGRADE_BASE_VERSION" \
-		"$(get_installed_version)" ||
+		"$pre_upgrade_version" ||
 		die "failed to set upgrade property 'UPGRADE_BASE_VERSION'"
 
 	#
