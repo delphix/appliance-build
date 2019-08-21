@@ -110,7 +110,11 @@ test -n "$DELPHIX_APPLIANCE_VERSION"
 	# DLPX_MIN_VERSION is specified for ensuring that we are
 	# migrating from the right version.
 	#
-	echo "DLPX_MIN_VERSION=5.3.5.0"
+	# Note that this will be checked by the dx_apply script
+	# of migration, so every time we bump this number we
+	# need to bump the one from the checks there too.
+	#
+	echo "DLPX_MIN_VERSION=5.3.6.0"
 
 	#
 	# DLPX_VERSION is set explicitly to match the version of the

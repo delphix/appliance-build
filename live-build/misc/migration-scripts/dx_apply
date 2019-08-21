@@ -64,8 +64,10 @@ ARCHIVE_DIR="$1"
 	die "$ARCHIVE_DIR does not have a version.info file"
 
 . "$ARCHIVE_DIR/version.info"
-[[ "$DLPX_MIN_VERSION" == "5.3.5.0" ]] ||
-	die "expected DLPX_MIN_VERSION for migration to be 5.3.5.0"
+MIN_MIGRATION_VERSION="5.3.6.0"
+[[ "$DLPX_MIN_VERSION" == "$MIN_MIGRATION_VERSION" ]] ||
+	die "expected DLPX_MIN_VERSION for migration to be" \
+		"$MIN_MIGRATION_VERSION"
 
 #
 # Ensure that this VM is version 5.3.5.X or greater (but not 5.4 or 6.X).
@@ -75,14 +77,15 @@ CURRENT_VERSION=$(basename "$CURRENT_DDS")
 MAJOR_VERSION_0=$(echo "$CURRENT_VERSION" | cut -d. -f1)
 MAJOR_VERSION_1=$(echo "$CURRENT_VERSION" | cut -d. -f2)
 [[ $MAJOR_VERSION_0 -eq 5 ]] ||
-	die "expected version 5.3.5 or greater but found" \
+	die "expected version $MIN_MIGRATION_VERSION or greater but found" \
 		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
 [[ $MAJOR_VERSION_1 -eq 3 ]] ||
-	die "expected version 5.3.5 or greater but found" \
+	die "expected version $MIN_MIGRATION_VERSION or greater but found" \
 		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
 MINOR_VERSION=$(echo "$CURRENT_VERSION" | cut -d. -f3)
-[[ $MINOR_VERSION -ge 3 ]] ||
-	die "expected version 5.3.5 or greater but found" \
+MIGRATION_MINOR_VERSION=$(echo "$MIN_MIGRATION_VERSION" | cut -d. -f3)
+[[ $MINOR_VERSION -ge $MIGRATION_MINOR_VERSION ]] ||
+	die "expected version $MIN_MIGRATION_VERSION or greater but found" \
 		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
 
 #
