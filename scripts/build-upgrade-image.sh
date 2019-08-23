@@ -104,11 +104,10 @@ if [[ -n "${DELPHIX_SIGNATURE_TOKEN:-}" ]] && [[ -n "${DELPHIX_SIGNATURE_URL:-}"
 	#
 	# Here, we need to generate signature files for all of the appliance
 	# versions that'll be allowed to upgrade from, using this upgrade
-	# image. For now, we hardcode this to simply generate a signature for
-	# the "5.3" release, but eventually we'll need to update this code to
-	# support more versions (as more linux-based versions are released).
+	# image. We rely on the user of this script to pass in this list
+	# of versions; generally this will be some Jenkins automation.
 	#
-	for signature_version in "5.3"; do
+	for signature_version in $DELPHIX_SIGNATURE_VERSIONS; do
 		curl -s -S -f -H "Content-Type: application/json" \
 			-u "$DELPHIX_SIGNATURE_TOKEN" -d @sign-request.payload \
 			"$DELPHIX_SIGNATURE_URL/upgrade/keyVersion/${signature_version}/sign" \
