@@ -51,6 +51,18 @@ EOM
 	exit 2
 }
 
+#
+# cleanup a leftover dataset from a previous run of dx_execute if needed.
+#
+function cleanup_leftover_dataset() {
+	local dataset=$1
+
+	if zfs list "$dataset" &>/dev/null; then
+		zfs destroy "$dataset" ||
+			die "Failed to destroy leftover dataset '$dataset'"
+	fi
+}
+
 opt_s=false
 while getopts :hs c; do
 	case "$c" in
@@ -142,11 +154,36 @@ EOF
 LX_VAR_DLPX="$LX_RDS_PARENT/data"
 CUR_VAR_DLPX=$(zfs list -Ho name /var/delphix)
 [[ -n $CUR_VAR_DLPX ]] || die "could not determine current /var/delphix dataset"
-zfs list "$CUR_VAR_DLPX" >/dev/null 2>&1 ||
-	die "'$CUR_VAR_DLPX' is not a valid zfs dataset"
-zfs snapshot "${CUR_VAR_DLPX}@${LX_CONTAINER}"
+cleanup_leftover_dataset "${CUR_VAR_DLPX}@migration"
+zfs snapshot "${CUR_VAR_DLPX}@migration" ||
+	die "failed to create snapshot '${CUR_VAR_DLPX}@migration'"
 zfs clone -o compression=on -o mountpoint=legacy \
-	"${CUR_VAR_DLPX}@${LX_CONTAINER}" "$LX_VAR_DLPX"
+	"${CUR_VAR_DLPX}@migration" "$LX_VAR_DLPX" ||
+	die "failed to clone dataset ${CUR_VAR_DLPX}@migration"
+
+#
+# Create a clone of the current /export/home dataset. It will be kept as
+# a backup in case Delphix support or services have left useful files in
+# there since all rpool/versions datasets will be cleaned-up on next upgrade.
+#
+CUR_HOME=$(zfs list -Ho name /export/home)
+[[ -n $CUR_HOME ]] || die "could not determine current /export/home dataset"
+zfs list "$CUR_HOME" &>/dev/null ||
+	die "'$CUR_HOME' is not a valid zfs dataset"
+cleanup_leftover_dataset "${CUR_HOME}@migration"
+cleanup_leftover_dataset rpool/illumos-home
+zfs snapshot "${CUR_HOME}@migration" ||
+	die "failed to create snapshot '${CUR_HOME}@migration'"
+zfs clone -o compression=on -o mountpoint=legacy \
+	"${CUR_HOME}@migration" rpool/illumos-home ||
+	die "failed to clone dataset ${CUR_HOME}@migration"
+
+#
+# Create a snapshot of /mds to make it easier to rollback to it if needed.
+#
+cleanup_leftover_dataset domain0/mds@migration
+zfs snapshot domain0/mds@migration ||
+	die "failed to create snapshot domain0/mds@migration"
 
 #
 # Increase the boot delay to 20 seconds to ease bootloader access during
