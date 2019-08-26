@@ -116,6 +116,41 @@ __STRESS_OPTIONS_JSON=$(
 		    "location": "mgmt service (after point of no return)",
 		    "err_msg": "Stress option triggered before enabling sources.",
 		    "auto_unset": true
+		},
+		"STRESS_MIGRATION_FAIL_BEGIN_MIGRATION_SERVICE": {
+		    "location": "migration service",
+		    "err_msg": "Stress option triggered starting migration service.",
+		    "auto_unset": true
+		},
+		"STRESS_MIGRATION_FAIL_BEFORE_DOMAIN0_IMPORT": {
+		    "location": "migration service",
+		    "err_msg": "Stress option triggered before importing domain0.",
+		    "auto_unset": true
+		},
+		"STRESS_MIGRATION_FAIL_AFTER_DOMAIN0_IMPORT": {
+		    "location": "migration service",
+		    "err_msg": "Stress option triggered after importing domain0.",
+		    "auto_unset": true
+		},
+		"STRESS_MIGRATION_FAIL_AFTER_ZFS_MOUNT": {
+		    "location": "migration service",
+		    "err_msg": "Stress option triggered after zfs mount -a.",
+		    "auto_unset": true
+		},
+		"STRESS_MIGRATION_FAIL_AFTER_MOUNT_PERMISSION_FIX": {
+		    "location": "migration service",
+		    "err_msg": "Stress option triggered after fixing mount permissions.",
+		    "auto_unset": true
+		},
+		"STRESS_MIGRATION_FAIL_BEFORE_MIGRATE_CONFIG": {
+		    "location": "migration service",
+		    "err_msg": "Stress option triggered before calling migrate-config.",
+		    "auto_unset": true
+		},
+		"STRESS_MIGRATION_FAIL_AFTER_MIGRATE_CONFIG": {
+		    "location": "migration service",
+		    "err_msg": "Stress option triggered after calling migrate-config.",
+		    "auto_unset": true
 		}
 		}
 	EOF
