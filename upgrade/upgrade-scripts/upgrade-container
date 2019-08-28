@@ -120,7 +120,6 @@ function create_upgrade_container() {
 	in-place | rollback)
 		zfs clone \
 			-o canmount=noauto \
-			-o compression=on \
 			-o mountpoint="$DIRECTORY" \
 			"$ROOTFS_DATASET/root@$SNAPSHOT_NAME" \
 			"rpool/ROOT/$CONTAINER/root" ||
@@ -132,7 +131,6 @@ function create_upgrade_container() {
 	not-in-place)
 		zfs create \
 			-o canmount=noauto \
-			-o compression=on \
 			-o mountpoint="$DIRECTORY" \
 			"rpool/ROOT/$CONTAINER/root" ||
 			die "failed to create upgrade / filesystem"
@@ -143,21 +141,18 @@ function create_upgrade_container() {
 	esac
 
 	zfs clone \
-		-o compression=on \
 		-o mountpoint=legacy \
 		"$ROOTFS_DATASET/home@$SNAPSHOT_NAME" \
 		"rpool/ROOT/$CONTAINER/home" ||
 		die "failed to create upgrade /export/home clone"
 
 	zfs clone \
-		-o compression=on \
 		-o mountpoint=legacy \
 		"$ROOTFS_DATASET/data@$SNAPSHOT_NAME" \
 		"rpool/ROOT/$CONTAINER/data" ||
 		die "failed to create upgrade /var/delphix clone"
 
 	zfs clone \
-		-o compression=on \
 		-o mountpoint=legacy \
 		"$ROOTFS_DATASET/log@$SNAPSHOT_NAME" \
 		"rpool/ROOT/$CONTAINER/log" ||
