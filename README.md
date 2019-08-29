@@ -167,7 +167,7 @@ directory:
 
     $ ls -lh build/artifacts/
     total 837M
-    -rw-r--r-- 1 root root 837M Jan 11 22:35 internal-minimal.upgrade.tar.gz
+    -rw-r--r-- 1 root root 837M Jan 11 22:35 internal-minimal.upgrade.tar
 
 ## Using Gradle
 

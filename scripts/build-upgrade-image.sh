@@ -122,11 +122,11 @@ fi
 set -o xtrace
 
 # shellcheck disable=SC2046
-tar -I pigz -cf "$APPLIANCE_VARIANT.upgrade.tar.gz" \
+tar -cf "$APPLIANCE_VARIANT.upgrade.tar" \
 	$(ls SHA256SUMS.sig.* 2>/dev/null) \
 	SHA256SUMS \
 	version.info \
 	prepare \
 	payload.tar.gz
 
-mv "$APPLIANCE_VARIANT.upgrade.tar.gz" "$TOP/build/artifacts"
+mv "$APPLIANCE_VARIANT.upgrade.tar" "$TOP/build/artifacts"
