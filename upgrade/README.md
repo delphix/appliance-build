@@ -37,7 +37,7 @@ Run this command on "dlpxdc.co" to create the VM used to do the upgrade:
 Log into that VM using the "delphix" user, and run these commands:
 
     $ download-latest-image internal-dev
-    $ sudo unpack-image internal-dev.upgrade.tar.gz
+    $ sudo unpack-image internal-dev.upgrade.tar
     $ sudo /var/dlpx-update/latest/upgrade -v deferred
 
 ## FAQ
