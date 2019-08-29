@@ -1,4 +1,4 @@
-#!/bin/bash -eux
+#!/bin/bash -ex
 #
 # Copyright 2018 Delphix
 #
@@ -87,9 +87,33 @@ aptly publish repo -skip-contents -skip-signing upgrade-repository
 #
 tar -I pigz -cf "payload.tar.gz" -C upgrade-scripts . -C ~/.aptly .
 
+cp version.info.template version.info
+
 # Include version information about this image.
 VERSION=$(dpkg -f "$(find debs/ -name 'delphix-entire-*' | head -n 1)" version)
-sed "s/@@VERSION@@/$VERSION/" <version.info.template >version.info
+sed -i "s/@@VERSION@@/$VERSION/" version.info
+
+#
+# If we're running the build manually, and these variables are not
+# already set in the environment, we use an arbitrarily low falue to
+# allow upgrading to the produce upgrade image from any version.
+#
+
+if [[ -n "$DELPHIX_UPGRADE_MINIMUM_VERSION" ]]; then
+	sed -i \
+		"s/@@MINIMUM_VERSION@@/$DELPHIX_UPGRADE_MINIMUM_VERSION/" \
+		version.info
+else
+	sed -i "s/@@MINIMUM_VERSION@@/0.0.0.0/" version.info
+fi
+
+if [[ -n "$DELPHIX_UPGRADE_MINIMUM_REBOOT_OPTIONAL_VERSION" ]]; then
+	sed -i \
+		"s/@@MINIMUM_REBOOT_OPTIONAL_VERSION@@/$DELPHIX_UPGRADE_MINIMUM_REBOOT_OPTIONAL_VERSION/" \
+		version.info
+else
+	sed -i "s/@@MINIMUM_REBOOT_OPTIONAL_VERSION@@/0.0.0.0/" version.info
+fi
 
 sha256sum payload.tar.gz version.info prepare >SHA256SUMS
 

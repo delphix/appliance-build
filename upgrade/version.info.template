@@ -44,7 +44,7 @@ VERSION=@@VERSION@@
 # image has to be compatible with, and is typically set to be 2 major
 # versions behind the latest version.
 #
-MINIMUM_VERSION=5.3.0.0
+MINIMUM_VERSION=@@MINIMUM_VERSION@@
 
 #
 # The minimum version from which a reboot after upgrade is optional.
@@ -56,4 +56,4 @@ MINIMUM_VERSION=5.3.0.0
 # This version must be equal to, or greater, than the version specified by
 # MINIMUM_VERSION above.
 #
-MINIMUM_REBOOT_OPTIONAL_VERSION=5.3.0.0
+MINIMUM_REBOOT_OPTIONAL_VERSION=@@MINIMUM_REBOOT_OPTIONAL_VERSION@@
