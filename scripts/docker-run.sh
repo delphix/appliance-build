@@ -62,6 +62,8 @@ $DOCKER_RUN --rm \
 	--env DELPHIX_SIGNATURE_URL \
 	--env DELPHIX_SIGNATURE_TOKEN \
 	--env DELPHIX_SIGNATURE_VERSIONS \
+	--env DELPHIX_UPGRADE_MINIMUM_VERSION \
+	--env DELPHIX_UPGRADE_MINIMUM_REBOOT_OPTIONAL_VERSION \
 	--volume "$TOP:/opt/appliance-build" \
 	--workdir "/opt/appliance-build" \
 	appliance-build "$@"
