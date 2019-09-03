@@ -140,7 +140,6 @@ zfs create \
 
 zfs create \
 	-o canmount=noauto \
-	-o compression=on \
 	-o mountpoint="$TMP_ROOT" \
 	"$RPOOL/ROOT/$FSNAME/root" ||
 	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/root"
@@ -149,19 +148,16 @@ zfs mount "$RPOOL/ROOT/$FSNAME/root" ||
 	die "failed to mount $RPOOL/ROOT/$FSNAME/root in temporary dir $TMP_ROOT"
 
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	"$RPOOL/ROOT/$FSNAME/home" ||
 	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/home"
 
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	"$RPOOL/ROOT/$FSNAME/data" ||
 	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/data"
 
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	"$RPOOL/ROOT/$FSNAME/log" ||
 	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME/log"

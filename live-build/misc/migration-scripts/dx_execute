@@ -157,8 +157,10 @@ CUR_VAR_DLPX=$(zfs list -Ho name /var/delphix)
 cleanup_leftover_dataset "${CUR_VAR_DLPX}@migration"
 zfs snapshot "${CUR_VAR_DLPX}@migration" ||
 	die "failed to create snapshot '${CUR_VAR_DLPX}@migration'"
-zfs clone -o compression=on -o mountpoint=legacy \
-	"${CUR_VAR_DLPX}@migration" "$LX_VAR_DLPX" ||
+zfs clone \
+	-o mountpoint=legacy \
+	"${CUR_VAR_DLPX}@migration" \
+	"$LX_VAR_DLPX" ||
 	die "failed to clone dataset ${CUR_VAR_DLPX}@migration"
 
 #
@@ -174,8 +176,10 @@ cleanup_leftover_dataset "${CUR_HOME}@migration"
 cleanup_leftover_dataset rpool/illumos-home
 zfs snapshot "${CUR_HOME}@migration" ||
 	die "failed to create snapshot '${CUR_HOME}@migration'"
-zfs clone -o compression=on -o mountpoint=legacy \
-	"${CUR_HOME}@migration" rpool/illumos-home ||
+zfs clone \
+	-o mountpoint=legacy \
+	"${CUR_HOME}@migration" \
+	rpool/illumos-home ||
 	die "failed to clone dataset ${CUR_HOME}@migration"
 
 #

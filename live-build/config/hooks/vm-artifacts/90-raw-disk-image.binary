@@ -101,6 +101,7 @@ zpool create -d \
 	-o version=28 \
 	-O canmount=off \
 	-O mountpoint=none \
+	-O compression=on \
 	-R "$DIRECTORY" \
 	rpool "/dev/mapper/${LOOPNAME}p1"
 
@@ -116,24 +117,20 @@ zfs create \
 
 zfs create \
 	-o canmount=noauto \
-	-o compression=on \
 	-o mountpoint=/ \
 	"rpool/ROOT/$FSNAME/root"
 
 zfs mount "rpool/ROOT/$FSNAME/root"
 
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	"rpool/ROOT/$FSNAME/home"
 
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	"rpool/ROOT/$FSNAME/data"
 
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	"rpool/ROOT/$FSNAME/log"
 
@@ -155,7 +152,6 @@ zfs create \
 # make changes to it, and then quickly unmount it.
 #
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	rpool/grub
 
@@ -170,7 +166,6 @@ zfs create \
 # first boot or upgrade.
 #
 zfs create \
-	-o compression=on \
 	-o mountpoint=legacy \
 	rpool/crashdump
 
