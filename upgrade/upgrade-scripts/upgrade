@@ -150,8 +150,28 @@ function upgrade_in_place() {
 	cleanup_in_place_upgrade
 	trap - EXIT
 
+	ROOTFS_CONTAINER="$(get_mounted_rootfs_container_name)"
+	[[ -n "$ROOTFS_CONTAINER" ]] ||
+		die "unable to determine currently mounted rootfs container"
+
 	"$IMAGE_PATH/execute" -p "$(get_platform)" ||
 		die "'$IMAGE_PATH/execute' failed in running appliance."
+
+	#
+	# We use a seperate ZFS dataset for GRUB, and this dataset is
+	# generally not mounted when we update pacakges on the system.
+	# Thus, when a new kernel package is installed, via the call to
+	# "execute" above, the GRUB configuration will not be modified
+	# to use that new kernel.
+	#
+	# In order for the system to use the new kernel after a reboot,
+	# we must regenerate the GRUB configuration after the new kernel
+	# has been installed. The "rootfs-container set-bootfs" command
+	# will do just that; it knows how to mount our GRUB specific
+	# dataset, and how properly update the GRUB configuration.
+	#
+	"$IMAGE_PATH/rootfs-container" set-bootfs "$ROOTFS_CONTAINER" ||
+		die "failed to set-bootfs '$ROOTFS_CONTAINER'"
 
 	if [[ "$UPGRADE_TYPE" == "FULL" ]]; then
 		systemctl reboot || die "'systemctl reboot' failed"
