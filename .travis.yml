@@ -16,7 +16,7 @@ env:
   - TARGET=shfmtCheck
 
 install:
- - docker build -qt appliance-build:latest docker
+ - docker build -t appliance-build:latest docker
 
 script:
  - ./scripts/docker-run.sh gradle $TARGET
