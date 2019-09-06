@@ -28,6 +28,18 @@ die() {
 }
 
 #
+# The root filesystem container needs to have the appliance version
+# embedded in it as a dataset property, thus if this value was not
+# passed into the build, we need to error out (preferably before we do
+# anything else, to avoid having to do cleanup later). If the user
+# executing the build did not pass this in, the build system should
+# provide a default value (which is why we don't attempt to assign a
+# default value here).
+#
+[[ -n "$DELPHIX_APPLIANCE_VERSION" ]] ||
+	die "DELPHIX_APPLIANCE_VERSION variable is missing"
+
+#
 # We want to use different sized rpool depending on if we're building a
 # disk image meant for internal use, or external (i.e. customer) use.
 #
@@ -113,6 +125,8 @@ zfs create \
 zfs create \
 	-o canmount=off \
 	-o mountpoint=none \
+	-o "com.delphix:initial-version=$DELPHIX_APPLIANCE_VERSION" \
+	-o "com.delphix:current-version=$DELPHIX_APPLIANCE_VERSION" \
 	"rpool/ROOT/$FSNAME"
 
 zfs create \

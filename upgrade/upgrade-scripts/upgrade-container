@@ -83,6 +83,13 @@ function create_upgrade_container() {
 	[[ -n "$ROOTFS_DATASET" ]] ||
 		die "unable to determine mounted rootfs container dataset"
 
+	#
+	# We'll set the version property differently based on the
+	# upgrade container that we're created (e.g. in-place vs.
+	# not-in-place vs. rollback). Thus, we explicity don't set any
+	# version property here, and instead defer setting that property
+	# until later, in upgrade container type specific code.
+	#
 	zfs create \
 		-o canmount=off \
 		-o mountpoint=none \
@@ -100,6 +107,16 @@ function create_upgrade_container() {
 		SNAPSHOT_NAME="container-$CONTAINER"
 		zfs snapshot -r "$ROOTFS_DATASET@$SNAPSHOT_NAME" ||
 			die "failed to create upgrade container snapshots"
+
+		#
+		# The properties for a snapshot will inherit its values
+		# from the parent dataset by default. Thus, in order for
+		# this property to reflect the version contained in this
+		# specific snapshot, we need to explicity set the
+		# property here.
+		#
+		copy_dataset_property "$PROP_CURRENT_VERSION" \
+			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
 		;;
 	rollback)
 		#
@@ -118,6 +135,17 @@ function create_upgrade_container() {
 
 	case "$type" in
 	in-place | rollback)
+		#
+		# For in-place and rollback containers, we create the
+		# root filesystem by cloning an existing container.
+		# Thus, for these, we want the new container's version
+		# properties to match the dataset being cloned.
+		#
+		copy_dataset_property "$PROP_INITIAL_VERSION" \
+			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
+		copy_dataset_property "$PROP_CURRENT_VERSION" \
+			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
+
 		zfs clone \
 			-o canmount=noauto \
 			-o mountpoint="$DIRECTORY" \
@@ -129,6 +157,18 @@ function create_upgrade_container() {
 			die "failed to mount upgrade / clone"
 		;;
 	not-in-place)
+		#
+		# For not-in-place containers, the root filesystem is
+		# created such that it won't immediately have delphix
+		# software installed on it. Thus, we don't set any
+		# version properties here, since there isn't any version
+		# of delphix software installed.
+		#
+		# Later, when the "execute" script is used to install
+		# the delphix software, we'll set the version
+		# properties.
+		#
+
 		zfs create \
 			-o canmount=noauto \
 			-o mountpoint="$DIRECTORY" \
@@ -675,7 +715,11 @@ function migrate_configuration() {
 }
 
 function do_upgrade_container_in_place() {
-	run "$IMAGE_PATH/execute" -p "$(get_platform)" ||
+	[[ -f "/var/lib/delphix-appliance/platform" ]] ||
+		die "could not determine platform; file does not exist"
+
+	run "$IMAGE_PATH/execute" \
+		-p "$(cat /var/lib/delphix-appliance/platform)" ||
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
 	run /bin/systemctl reload delphix-platform ||
@@ -686,7 +730,11 @@ function do_upgrade_container_in_place() {
 }
 
 function do_upgrade_container_not_in_place() {
-	run "$IMAGE_PATH/execute" -p "$(get_platform)" ||
+	[[ -f "/var/lib/delphix-appliance/platform" ]] ||
+		die "could not determine platform; file does not exist"
+
+	run "$IMAGE_PATH/execute" \
+		-p "$(cat /var/lib/delphix-appliance/platform)" ||
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
 	run /bin/systemctl start delphix-platform ||
