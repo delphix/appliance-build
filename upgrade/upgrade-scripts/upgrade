@@ -137,8 +137,7 @@ function upgrade_in_place() {
 		"$(get_mounted_rootfs_container_name)" ||
 		die "failed to set upgrade property 'UPGRADE_BASE_CONTAINER'"
 
-	set_upgrade_property "UPGRADE_BASE_VERSION" \
-		"$(get_installed_version)" ||
+	set_upgrade_property "UPGRADE_BASE_VERSION" "$(get_current_version)" ||
 		die "failed to set upgrade property 'UPGRADE_BASE_VERSION'"
 
 	#
@@ -154,7 +153,11 @@ function upgrade_in_place() {
 	[[ -n "$ROOTFS_CONTAINER" ]] ||
 		die "unable to determine currently mounted rootfs container"
 
-	"$IMAGE_PATH/execute" -p "$(get_platform)" ||
+	[[ -f "/var/lib/delphix-appliance/platform" ]] ||
+		die "could not determine platform; file does not exist"
+
+	"$IMAGE_PATH/execute" \
+		-p "$(cat /var/lib/delphix-appliance/platform)" ||
 		die "'$IMAGE_PATH/execute' failed in running appliance."
 
 	#
@@ -275,8 +278,7 @@ function upgrade_not_in_place() {
 		"$(get_mounted_rootfs_container_name)" ||
 		die "failed to set upgrade property 'UPGRADE_BASE_CONTAINER'"
 
-	set_upgrade_property "UPGRADE_BASE_VERSION" \
-		"$(get_installed_version)" ||
+	set_upgrade_property "UPGRADE_BASE_VERSION" "$(get_current_version)" ||
 		die "failed to set upgrade property 'UPGRADE_BASE_VERSION'"
 
 	"$IMAGE_PATH/upgrade-container" convert-to-rootfs "$CONTAINER" ||
@@ -312,7 +314,7 @@ function rollback() {
 	ROLLBACK_BASE_CONTAINER="$(get_mounted_rootfs_container_name)"
 	[[ -n "$ROLLBACK_BASE_CONTAINER" ]] ||
 		die "unable to determine mounted rootfs container name"
-	ROLLBACK_BASE_VERSION="$(get_installed_version)"
+	ROLLBACK_BASE_VERSION="$(get_current_version)"
 	[[ -n "$ROLLBACK_BASE_VERSION" ]] ||
 		die "unable to determine current appliance version"
 

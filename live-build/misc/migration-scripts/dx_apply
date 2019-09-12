@@ -64,6 +64,15 @@ ARCHIVE_DIR="$1"
 	die "$ARCHIVE_DIR does not have a version.info file"
 
 . "$ARCHIVE_DIR/version.info"
+
+#
+# The root filesystem container needs to have the appliance version
+# embedded in it as a dataset property, thus if this version was not
+# found in the upgrade image, we need to error out (preferably before
+# we do anything else, to avoid having to do cleanup later).
+#
+[[ -n "$DLPX_VERSION" ]] || die "DLPX_VERSION variable is missing"
+
 MIN_MIGRATION_VERSION="5.3.6.0"
 [[ "$DLPX_MIN_VERSION" == "$MIN_MIGRATION_VERSION" ]] ||
 	die "expected DLPX_MIN_VERSION for migration to be" \
@@ -138,6 +147,8 @@ zfs create \
 zfs create \
 	-o canmount=off \
 	-o mountpoint=none \
+	-o "com.delphix:initial-version=$DLPX_VERSION" \
+	-o "com.delphix:current-version=$DLPX_VERSION" \
 	"$RPOOL/ROOT/$FSNAME" ||
 	die "failed to create linux dataset $RPOOL/ROOT/$FSNAME"
 

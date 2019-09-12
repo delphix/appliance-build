@@ -19,6 +19,26 @@
 UPDATE_DIR="/var/dlpx-update"
 LOG_DIRECTORY="/var/tmp/delphix-upgrade"
 
+#
+# We embed information as dataset properties in our rootfs containers.
+# These are the names of these properties.
+#
+# The values of each (respectively) represents the intial version of the
+# delphix software that was installed in the given rootfs container, and
+# the current version of the delphix software that is installed in the
+# given rootfs container.
+#
+# These names should not be changed without heeding caution, since they
+# represent part of the "on disk format" for our rootfs containers, and
+# any changes may still need to be backwards compatible with these old
+# names (due to existing systems still using the old names).
+#
+# Additionally, these names should remain consistent with the property
+# names used when creating the appliance-build VM artifacts.
+#
+PROP_CURRENT_VERSION="com.delphix:current-version"
+PROP_INITIAL_VERSION="com.delphix:initial-version"
+
 function die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1
@@ -66,13 +86,32 @@ function get_snapshot_clones() {
 	zfs get clones -Hpo value "$1"
 }
 
-function get_platform() {
-	dpkg-query -Wf '${Package}' 'delphix-platform-*' |
-		sed 's/delphix-platform-//'
+function get_current_version() {
+	local DATASET
+	DATASET="$(get_mounted_rootfs_container_dataset)"
+	[[ -n "$DATASET" ]] ||
+		die "could not determine mounted rootfs container dataset"
+
+	local VERSION
+	VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$DATASET")
+	[[ -n "$VERSION" && "$VERSION" != "-" ]] ||
+		die "could not determine current version for '$DATASET'"
+
+	echo "$VERSION"
 }
 
-function get_installed_version() {
-	dpkg-query -Wf '${Version}' "delphix-entire-$(get_platform)"
+function copy_dataset_property() {
+	local PROP_NAME="$1"
+	local SRC_DATASET="$2"
+	local DST_DATASET="$3"
+	local PROP_VALUE
+
+	PROP_VALUE=$(zfs get -Hpo value "$PROP_NAME" "$SRC_DATASET")
+	[[ -n "$PROP_VALUE" && "$PROP_VALUE" != "-" ]] ||
+		die "failed to get property '$PROP_NAME' for '$SRC_DATASET'"
+
+	zfs set "$PROP_NAME=$PROP_VALUE" "$DST_DATASET" ||
+		die "failed to set property '$PROP_NAME=$PROP_VALUE' for '$DST_DATASET'"
 }
 
 function compare_versions() {
@@ -107,13 +146,13 @@ function source_version_information() {
 function verify_upgrade_is_allowed() {
 	source_version_information
 
-	local INSTALLED_VERSION
-	INSTALLED_VERSION=$(get_installed_version)
+	local CURRENT_VERSION
+	CURRENT_VERSION=$(get_current_version) || die "failed to get version"
 
 	compare_versions \
-		"$INSTALLED_VERSION" "ge" "$MINIMUM_VERSION" ||
+		"$CURRENT_VERSION" "ge" "$MINIMUM_VERSION" ||
 		die "upgrade is not allowed;" \
-			"installed version ($INSTALLED_VERSION)" \
+			"installed version ($CURRENT_VERSION)" \
 			"is not greater than minimum allowed version" \
 			"($MINIMUM_VERSION)"
 }
@@ -121,20 +160,20 @@ function verify_upgrade_is_allowed() {
 function is_upgrade_in_place_allowed() {
 	source_version_information
 
-	local INSTALLED_VERSION
-	INSTALLED_VERSION=$(get_installed_version)
+	local CURRENT_VERSION
+	CURRENT_VERSION=$(get_current_version) || die "failed to get version"
 
 	compare_versions \
-		"${INSTALLED_VERSION}" "ge" "${MINIMUM_REBOOT_OPTIONAL_VERSION}"
+		"${CURRENT_VERSION}" "ge" "${MINIMUM_REBOOT_OPTIONAL_VERSION}"
 }
 
 function verify_upgrade_in_place_is_allowed() {
-	local INSTALLED_VERSION
-	INSTALLED_VERSION=$(get_installed_version)
+	local CURRENT_VERSION
+	CURRENT_VERSION=$(get_current_version) || die "failed to get version"
 
 	if ! is_upgrade_in_place_allowed; then
 		die "upgrade in-place is not allowed for reboot required upgrade;" \
-			"installed version ($INSTALLED_VERSION)" \
+			"installed version ($CURRENT_VERSION)" \
 			"is not greater than minimum allowed version" \
 			"($MINIMUM_REBOOT_OPTIONAL_VERSION)"
 	fi

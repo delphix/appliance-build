@@ -67,16 +67,22 @@ fi
 
 source_version_information
 
-INSTALLED_VERSION=$(get_installed_version)
+#
+# When a not-in-place upgrade is performed, the rootfs container that's
+# created will not initially have any delphix software installed in it.
+# As a result, no version properties will be set on the container
+# dataset either.
+#
+# To detect this situation, we check if the "zfs" command is installed.
+# If it's installed, we query the current version. If it's not
+# installed, we assume we're running the initial "execute" for a
+# not-in-place container and don't set $CURRENT_VERSION.
+#
+if type zfs &>/dev/null; then
+	CURRENT_VERSION=$(get_current_version) || die "failed to get version"
+fi
 
-#
-# It's possible for the delphix-entire package not to be already
-# installed on the root filesystem being upgraded when we're doing a
-# not-in-place upgrade. Thus, when we can't determine the installed
-# version of delphix-entire, we assume we're doing a not-in-place
-# upgrade, and skip the version verification and snapshot generation.
-#
-if [[ -n "$INSTALLED_VERSION" ]]; then
+if [[ -n "$CURRENT_VERSION" ]]; then
 	verify_upgrade_is_allowed
 
 	ROOTFS_CONTAINER="$(get_mounted_rootfs_container_dataset)"
@@ -103,6 +109,18 @@ if [[ -n "$INSTALLED_VERSION" ]]; then
 	zfs snapshot -r \
 		"$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE" ||
 		die "failed to create recursive rootfs container snapshot"
+
+	#
+	# The properties for a snapshot will inherit its values from the
+	# parent dataset by default. Thus, in order for this property to
+	# reflect the version contained in this specific snapshot, we
+	# need to explicity set the property here. Otherwise, when the
+	# property changes on the dataset (i.e. when we change it later
+	# in this script), it'd change for this snapshot, even though
+	# the contents of the snapshot wouldn't change.
+	#
+	copy_dataset_property "$PROP_CURRENT_VERSION" \
+		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
 fi
 
 if [[ -f /etc/apt/sources.list ]]; then
@@ -247,7 +265,7 @@ dpkg-query -Wf '${Package}\n' "delphix-kernel-*" | xargs apt-mark manual ||
 
 # shellcheck disable=SC2153
 apt_get install -y --allow-downgrades "delphix-entire-$platform=$VERSION" ||
-	die "upgrade failed; from '$INSTALLED_VERSION' to '$VERSION'"
+	die "upgrade failed; from '$CURRENT_VERSION' to '$VERSION'"
 
 [[ -f "/usr/share/doc/delphix-entire-$platform/packages.list.gz" ]] ||
 	die "delphix-entire's packages.list.gz file is missing"
@@ -283,6 +301,47 @@ if [[ -f /etc/apt/sources.list.orig ]]; then
 	mv /etc/apt/sources.list.orig /etc/apt/sources.list ||
 		die "failed to restore /etc/apt/sources.list"
 fi
+
+#
+# As mentioned in an earlier comment, when $CURRENT_VERSION is not set,
+# we're assuming we're running the intial "execute" for a not-in-place
+# container. As such, when we detect this, we must also set the intial
+# version property, as this will not already be set (see also comments
+# in the "upgrade-container" script).
+#
+# We need to do this after we install all of the delphix software above,
+# since the software needed to set this property wouldn't otherwise be
+# installed (e.g. the "zfs" command wouldn't be installed).
+#
+if [[ -z "$CURRENT_VERSION" ]]; then
+	ROOTFS_CONTAINER="$(get_mounted_rootfs_container_dataset)"
+	[[ -n "$ROOTFS_CONTAINER" ]] ||
+		die "unable to determine currently mounted rootfs container"
+
+	#
+	# Since this is the first time installing the delphix software
+	# on this container (see the comment above), we need to set the
+	# intial version property since it will not already exist.
+	#
+	VALUE="$(zfs get -Hpo value "$PROP_INITIAL_VERSION" "$ROOTFS_CONTAINER")"
+
+	#
+	# When "zfs get" is used, and the property is not set,
+	# it will return "-" rather than the empty string. This
+	# is why we compare for "-" here.
+	#
+	[[ "$VALUE" == "-" ]] ||
+		die "property '$PROP_INITIAL_VERSION'" \
+			"already set to '$VALUE' for '$ROOTFS_CONTAINER'"
+
+	zfs set "$PROP_INITIAL_VERSION=$VERSION" "$ROOTFS_CONTAINER" ||
+		die "failed to set property '$PROP_INITIAL_VERSION'" \
+			"to '$VERSION' for '$ROOTFS_CONTAINER'"
+fi
+
+zfs set "$PROP_CURRENT_VERSION=$VERSION" "$ROOTFS_CONTAINER" ||
+	die "failed to set property '$PROP_CURRENT_VERSION'" \
+		"to '$VERSION' for '$ROOTFS_CONTAINER'"
 
 #
 # Before we exit, we want to ensure all of the changes made to the root
