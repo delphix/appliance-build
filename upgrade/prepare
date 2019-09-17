@@ -18,8 +18,15 @@
 UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
 
 function die() {
+	exit_code=$1
+	# Use first argument as exit code, if provided.
+	if [[ -z "${exit_code//[0-9]/}" ]]; then
+		shift
+	else
+		exit_code=1
+	fi
 	echo "$(basename "$0"): $*" >&2
-	exit 1
+	exit ${exit_code}
 }
 
 function usage() {
@@ -61,19 +68,19 @@ shift $((OPTIND - 1))
 [[ $# -eq 0 ]] && usage "too few arguments specified"
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
-[[ -d "$UPDATE_DIR" ]] || die "$UPDATE_DIR does not exist"
+[[ -d "$UPDATE_DIR" ]] || die 11 "$UPDATE_DIR does not exist"
 
 UNPACK_DIR="$1"
-[[ -d "$UNPACK_DIR" ]] || die "upgrade image unpack path is invalid"
+[[ -d "$UNPACK_DIR" ]] || die 13 "upgrade image unpack path is invalid"
 
 trap cleanup EXIT
 pushd "$UNPACK_DIR" &>/dev/null || die "'pushd $UNPACK_DIR' failed"
 
 for file in payload.tar.gz version.info; do
-	[[ -f "$file" ]] || die "image is corrupt; missing '$file' file"
+	[[ -f "$file" ]] || die 15 "image is corrupt; missing '$file' file"
 done
 
-tar -xzf payload.tar.gz || die "failed to extract payload.tar.gz"
+tar -xzf payload.tar.gz || die 14 "failed to extract payload.tar.gz"
 rm payload.tar.gz || die "failed to remove payload.tar.gz"
 
 #
@@ -102,7 +109,7 @@ popd &>/dev/null || die "'popd' failed"
 
 $opt_f && rm -rf "${UPDATE_DIR:?}/$VERSION" >/dev/null 2>&1
 
-[[ -d "$UPDATE_DIR/$VERSION" ]] && die "version $VERSION already exists"
+[[ -d "$UPDATE_DIR/$VERSION" ]] && die 18 "version $VERSION already exists"
 
 mv "$UNPACK_DIR" "$UPDATE_DIR/$VERSION" ||
 	die "failed to move unpacked upgrade image to $UPDATE_DIR/$VERSION"
