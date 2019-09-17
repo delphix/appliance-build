@@ -18,8 +18,11 @@
 UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
 
 function die() {
+	exit_code=$1
+	[[ -z "${exit_code//[0-9]}" ]] && [[ -n "$exit_code" ]] || exit_code=1
+	shift
 	echo "$(basename "$0"): $*" >&2
-	exit 1
+	exit ${exit_code}
 }
 
 function usage() {
@@ -60,55 +63,55 @@ shift $((OPTIND - 1))
 [[ $# -gt 1 ]] && usage "too many arguments specified"
 [[ $# -eq 0 ]] && usage "too few arguments specified"
 
-[[ "$EUID" -ne 0 ]] && die "must be run as root"
-[[ -d "$UPDATE_DIR" ]] || die "$UPDATE_DIR does not exist"
+[[ "$EUID" -ne 0 ]] && die 5 "must be run as root"
+[[ -d "$UPDATE_DIR" ]] || die 11 "$UPDATE_DIR does not exist"
 
 UNPACK_DIR="$1"
-[[ -d "$UNPACK_DIR" ]] || die "upgrade image unpack path is invalid"
+[[ -d "$UNPACK_DIR" ]] || die 13 "upgrade image unpack path is invalid"
 
 trap cleanup EXIT
-pushd "$UNPACK_DIR" &>/dev/null || die "'pushd $UNPACK_DIR' failed"
+pushd "$UNPACK_DIR" &>/dev/null || die 1 "'pushd $UNPACK_DIR' failed"
 
 for file in payload.tar.gz version.info; do
-	[[ -f "$file" ]] || die "image is corrupt; missing '$file' file"
+	[[ -f "$file" ]] || die 15 "image is corrupt; missing '$file' file"
 done
 
-tar -xzf payload.tar.gz || die "failed to extract payload.tar.gz"
-rm payload.tar.gz || die "failed to remove payload.tar.gz"
+tar -xzf payload.tar.gz || die 14 "failed to extract payload.tar.gz"
+rm payload.tar.gz || die 1 "failed to remove payload.tar.gz"
 
 #
 # We need to be careful when sourcing this file, since it can conflict
 # with (and clobber) functions and/or variables previously defined.
 #
 # shellcheck disable=SC1091
-. version.info || die "sourcing version.info file failed"
+. version.info || die 19 "sourcing version.info file failed"
 
-[[ -n "$VERSION" ]] || die "VERSION variable is empty"
-[[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION variable is empty"
+[[ -n "$VERSION" ]] || die 18 "VERSION variable is empty"
+[[ -n "$MINIMUM_VERSION" ]] || die 18 "MINIMUM_VERSION variable is empty"
 [[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
-	die "MINIMUM_REBOOT_OPTIONAL_VERSION variable is empty"
+	die 18 "MINIMUM_REBOOT_OPTIONAL_VERSION variable is empty"
 
 if $opt_x; then
 	sed -i \
 		"s/^\\(MINIMUM_REBOOT_OPTIONAL_VERSION\\)=.*$/\\1=$VERSION/" \
 		version.info ||
-		die "'sed -i ... version.info' failed"
+		die 18 "'sed -i ... version.info' failed"
 
 	# shellcheck disable=SC1091
-	. version.info || die "sourcing version.info file failed"
+	. version.info || die 19 "sourcing version.info file failed"
 fi
 
-popd &>/dev/null || die "'popd' failed"
+popd &>/dev/null || die 1 "'popd' failed"
 
 $opt_f && rm -rf "${UPDATE_DIR:?}/$VERSION" >/dev/null 2>&1
 
-[[ -d "$UPDATE_DIR/$VERSION" ]] && die "version $VERSION already exists"
+[[ -d "$UPDATE_DIR/$VERSION" ]] && die 20 "version $VERSION already exists"
 
 mv "$UNPACK_DIR" "$UPDATE_DIR/$VERSION" ||
-	die "failed to move unpacked upgrade image to $UPDATE_DIR/$VERSION"
+	die 21 "failed to move unpacked upgrade image to $UPDATE_DIR/$VERSION"
 
-rm -f "$UPDATE_DIR/latest" || die "failed to remove 'latest' symlink"
-ln -s "$VERSION" "$UPDATE_DIR/latest" || die "failed to create 'latest' symlink"
+rm -f "$UPDATE_DIR/latest" || die 1 "failed to remove 'latest' symlink"
+ln -s "$VERSION" "$UPDATE_DIR/latest" || die 1 "failed to create 'latest' symlink"
 
 report_progress_inc 90 "Prepare completed successfully."
 
