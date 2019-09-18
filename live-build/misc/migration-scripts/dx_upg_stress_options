@@ -52,9 +52,24 @@ __STRESS_OPTIONS_JSON=$(
 		    "err_msg": "Stress option triggered after upgrade mode.",
 		    "auto_unset": true
 		},
+		"STRESS_FAIL_BEFORE_MASKING_UPGRADE": {
+		    "location": "mgmt service (before point of no return)",
+		    "err_msg": "Stress option triggered before upgrading masking.",
+		    "auto_unset": true
+		},
+		"STRESS_FAIL_AFTER_MASKING_UPGRADE": {
+		    "location": "mgmt service (before point of no return)",
+		    "err_msg": "Stress option triggered after upgrading masking.",
+		    "auto_unset": true
+		},
 		"STRESS_FAIL_BEFORE_UPGRADE_COMMIT": {
 		    "location": "mgmt service (before point of no return)",
 		    "err_msg": "Stress option triggered before upgrade commit.",
+		    "auto_unset": true
+		},
+		"STRESS_FAIL_BEFORE_DOMAIN_UPGRADE": {
+		    "location": "mgmt service (before point of no return)",
+		    "err_msg": "Stress option triggered before domain upgrade.",
 		    "auto_unset": true
 		},
 		"STRESS_FAIL_BEFORE_CHECKPOINT_DISCARD": {
@@ -102,6 +117,11 @@ __STRESS_OPTIONS_JSON=$(
 		    "err_msg": "Stress option triggered between upgrade commit and checkpoint discard",
 		    "auto_unset": true
 		},
+		"STRESS_FAIL_BEFORE_BOOTLOADER_REWRITE": {
+		    "location": "mgmt service (after point of no return, migration only)",
+		    "err_msg": "Stress option triggered before rewriting bootloader.",
+		    "auto_unset": true
+		},
 		"STRESS_FAIL_AFTER_UPGRADE_COMMIT": {
 		    "location": "mgmt service (after point of no return)",
 		    "err_msg": "Stress option triggered after upgrade commit.",
@@ -110,6 +130,16 @@ __STRESS_OPTIONS_JSON=$(
 		"STRESS_UPGRADEMANAGER_FAIL_IN_START": {
 		    "location": "mgmt service (after point of no return)",
 		    "err_msg": "Stress option triggered in upgrade manager.",
+		    "auto_unset": true
+		},
+		"STRESS_FAIL_BEFORE_POST_MIGRATION_CLEANUP": {
+		    "location": "mgmt service (after point of no return, migation only)",
+		    "err_msg": "Stress option triggered before performing post-migration cleanup.",
+		    "auto_unset": true
+		},
+		"STRESS_FAIL_BEFORE_MIGRATION_MARKED_COMPLETED": {
+		    "location": "mgmt service (after point of no return, migation only)",
+		    "err_msg": "Stress option triggered before marking migration as completed.",
 		    "auto_unset": true
 		},
 		"STRESS_POSTCLEANUP_FAIL_BEFORE_ENABLE_SOURCES": {
