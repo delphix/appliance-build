@@ -132,6 +132,11 @@ __STRESS_OPTIONS_JSON=$(
 		    "err_msg": "Stress option triggered in upgrade manager.",
 		    "auto_unset": true
 		},
+		"STRESS_FAIL_BEFORE_POST_MIGRATION_CLEANUP": {
+		    "location": "mgmt service (after point of no return, migation only)",
+		    "err_msg": "Stress option triggered before performing post-migration cleanup.",
+		    "auto_unset": true
+		},
 		"STRESS_FAIL_BEFORE_MIGRATION_MARKED_COMPLETED": {
 		    "location": "mgmt service (after point of no return, migation only)",
 		    "err_msg": "Stress option triggered before marking migration as completed.",
