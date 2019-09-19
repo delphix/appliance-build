@@ -279,7 +279,8 @@ LX_CMDLINE=(
 	"root=ZFS=$RPOOL/ROOT/$FSNAME/root"
 	'console=tty0 console=ttyS0,115200n8'
 	'ipv6.disable=1'
-	'crashkernel=1024M-:512M'
+	'crashkernel=256M,high'
+	'crashkernel=256M,low'
 	'zfsforce=1'
 	'mitigations=off'
 )
