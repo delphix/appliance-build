@@ -86,7 +86,7 @@ function download_delphix_s3_debs() {
 	aws s3 sync --only-show-errors "$S3_URI" .
 	sha256sum -c --strict SHA256SUMS
 
-	mv ./*.deb "$pkg_directory/"
+	mv ./*deb "$pkg_directory/"
 
 	popd &>/dev/null
 	rm -rf "$tmp_directory"
