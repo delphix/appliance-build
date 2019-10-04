@@ -142,27 +142,30 @@ function build_ancillary_repository() {
 #    environment variables, and the script will work as expected.
 #
 
-upstream_branch="${UPSTREAM_PRODUCT_BRANCH:-master}"
+if [[ -z "$UPSTREAM_BRANCH" ]]; then
+	echo "UPSTREAM_BRANCH is not set."
+	exit 1
+fi
 
 AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
 	"$AWS_S3_URI_VIRTUALIZATION" \
 	"$AWS_S3_PREFIX_VIRTUALIZATION" \
-	"dlpx-app-gate/${upstream_branch}/build-package/post-push/latest")
+	"dlpx-app-gate/${UPSTREAM_BRANCH}/build-package/post-push/latest")
 
 AWS_S3_URI_MASKING=$(resolve_s3_uri \
 	"$AWS_S3_URI_MASKING" \
 	"$AWS_S3_PREFIX_MASKING" \
-	"dms-core-gate/${upstream_branch}/build-package/post-push/latest")
+	"dms-core-gate/${UPSTREAM_BRANCH}/build-package/post-push/latest")
 
 AWS_S3_URI_USERLAND_PKGS=$(resolve_s3_uri \
 	"$AWS_S3_URI_USERLAND_PKGS" \
 	"$AWS_S3_PREFIX_USERLAND_PKGS" \
-	"devops-gate/master/linux-pkg-build/${upstream_branch}/userland/post-push/latest")
+	"devops-gate/master/linux-pkg-build/${UPSTREAM_BRANCH}/userland/post-push/latest")
 
 AWS_S3_URI_KERNEL_PKGS=$(resolve_s3_uri \
 	"$AWS_S3_URI_KERNEL_PKGS" \
 	"$AWS_S3_PREFIX_KERNEL_PKGS" \
-	"devops-gate/master/linux-pkg-build/${upstream_branch}/kernel/post-push/latest")
+	"devops-gate/master/linux-pkg-build/${UPSTREAM_BRANCH}/kernel/post-push/latest")
 
 #
 # All package files will be placed into this temporary directory, such
