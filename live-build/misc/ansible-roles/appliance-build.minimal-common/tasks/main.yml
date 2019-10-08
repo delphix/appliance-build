@@ -51,22 +51,11 @@
 # The virtualization package uses the /etc/issue file to store a
 # customer-supplied banner that is displayed prior to login. By default,
 # there should be no banner. Thus, we need to remove this file to
-# acheive our desired behavior; Ubuntu ships with this file by default.
+# achieve our desired behavior; Ubuntu ships with this file by default.
 #
 - file:
     path: /etc/issue
     state: absent
-
-- apt_repository:
-    repo: "{{ item }}"
-  with_items:
-    - deb http://ddebs.ubuntu.com bionic main restricted universe multiverse
-    - deb http://ddebs.ubuntu.com bionic-updates main restricted universe multiverse
-    - deb http://ddebs.ubuntu.com bionic-proposed main restricted universe multiverse
-  retries: 3
-  delay: 30
-  register: result
-  until: result is succeeded
 
 - shell: ls /lib/modules
   register: kernel_versions

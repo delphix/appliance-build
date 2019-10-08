@@ -14,4 +14,5 @@
 # limitations under the License.
 #
 
-deb [trusted=yes] @@URL@@ bionic main
+deb @@URL@@ bionic main multiverse universe
+deb @@URL@@ bionic-updates main multiverse universe
