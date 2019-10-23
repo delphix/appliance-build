@@ -113,21 +113,12 @@ rm -f /boot/vmlinuz-* /boot/initrd.img-* ||
 zfs destroy -r "$RPOOL/ROOT" 2>/dev/null
 zfs list "$RPOOL/ROOT" 2>/dev/null &&
 	die "could not destroy linux root dataset from previous run"
-sed -i '/set lxcmdline/d' /boot/menu.rc.local
-[[ "$(grep -cF 'set lxcmdline' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup lxcmdline from previous run"
-sed -i '/set mainmenu_caption\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainmenu_caption from previous run"
-sed -i '/set mainansi_caption\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainansi_caption[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainansi_caption from previous run"
-sed -i '/set mainmenu_keycode\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainmenu_keycode[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainmenu_keycode from previous run"
-sed -i '/set mainmenu_command\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainmenu_command[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainmenu_command from previous run"
+
+#
+# Save a copy of the boot menu to restore if we aren't upgrading
+#
+cp "/boot/menu.rc.local" "/boot/menu.rc.local.copy" ||
+	die "failed to save copy of /boot/menu.rc.local"
 
 report_progress_inc 20
 
