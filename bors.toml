@@ -1,16 +1,7 @@
-#
-# The automation associated with the "jenkins/appliance-build" commit
-# status uses a timeout of 12 hours. Thus, the bors timeout should match
-# that. We then add an additional hour to the bors timeout, to account
-# for the time it may take for the automation to start its testing.
-#
-timeout-sec = 46800
-
 pr_status = [
   "license/cla"
 ]
 
 status = [
   "continuous-integration/travis-ci/push",
-  "jenkins/appliance-build"
 ]
