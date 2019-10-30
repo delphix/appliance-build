@@ -104,15 +104,13 @@ function mount_datasets() {
 		die "unable to create snapshot $runningVar@$MDS_SNAPNAME"
 	zfs clone "$runningVar@$MDS_SNAPNAME" "$runningVar/$MDS_SNAPNAME" ||
 		die "unable to create $runningVar/$MDS_SNAPNAME"
-	zfs destroy -d "$runningVar@$MDS_SNAPNAME" ||
-		die "unable to defer destroy $runningVar@$MDS_SNAPNAME"
 	mount -F zfs "$runningVar/$MDS_SNAPNAME" "$root/var/delphix" ||
 		die "unable to mount $root/var/delphix"
 }
 
 function cleanup_datasets() {
 	if [[ -n "$runningVar" ]]; then
-		zfs destroy -f "$runningVar/$MDS_SNAPNAME"
+		zfs destroy -R "$runningVar@$MDS_SNAPNAME"
 	fi
 	umount -f "$root"
 	rmdir "$root"
