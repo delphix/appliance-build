@@ -274,6 +274,7 @@ LX_CMDLINE=(
 	'crashkernel=256M,low'
 	'zfsforce=1'
 	'mitigations=off'
+	'elevator=noop'
 )
 
 #
