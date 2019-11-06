@@ -97,6 +97,11 @@ MIGRATION_MINOR_VERSION=$(echo "$MIN_MIGRATION_VERSION" | cut -d. -f3)
 	die "expected version $MIN_MIGRATION_VERSION or greater but found" \
 		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
 
+DX_UPG_STRESS=$ARCHIVE_DIR/dx_upg_stress_options
+# shellcheck source=/dev/null
+. $DX_UPG_STRESS --source
+__trigger_unset_stress_option "STRESS_DX_APPLY_FAIL_AFTER_VERSION_CHECK"
+
 #
 # Get the root dataset and the current ZFS pool that we're currently using.
 #
@@ -337,6 +342,8 @@ MAIN_MENU_FICL=(
 	[[ $(find . -mindepth 1 | wc -l) -eq 0 ]] ||
 		die "linux dataset for /var/delphix contains unexpected files"
 ) || die "verification of /var/delphix failed"
+
+__trigger_unset_stress_option "STRESS_DX_APPLY_FAIL_BEFORE_UNMOUNTING"
 
 umount "$TMP_ROOT/var/log" ||
 	die "couldn't unmount linux dataset $TMP_ROOT/var/log"
