@@ -39,10 +39,84 @@ function die() {
 # names are randomly generated.
 #
 
-linux_dataset="rpool/ROOT"
-if ! zfs list ${linux_dataset} &>/dev/null; then
-	echo "Linux dataset '${linux_dataset}' is not installed."
+LX_DATASET="rpool/ROOT"
+if ! zfs list ${LX_DATASET} &>/dev/null; then
+	echo "Linux dataset '${LX_DATASET}' is not installed."
 	exit 0
 fi
 
-zfs destroy -r ${linux_dataset} || die "Failed to destroy Linux dataset '${linux_dataset}'"
+LX_RDS_PARENT=$(zfs list -o name -H -d 1 "$LX_DATASET" | tail -n 1)
+[[ -n $LX_RDS_PARENT ]] || die "could not find Linux RDS parent dataset"
+LX_CONTAINER="${LX_RDS_PARENT##*/}"
+LX_RDS_TMP_ROOT_MOUNT="/tmp/$LX_CONTAINER/root"
+
+MDS_SNAPNAME="MDS-CLONE-upgradeverify"
+MDS_CLONE=domain0/$MDS_SNAPNAME
+SVC=svc:/system/delphix/postgres:$MDS_SNAPNAME
+PG_DATA=/$MDS_CLONE/db
+
+BOOT_MENU=/boot/menu.rc.local
+BOOT_MENU_COPY=$BOOT_MENU.copy
+
+function dx_apply_cleanup() {
+	#
+	# Restore original version of the bootloader
+	#
+	if [[ -e $BOOT_MENU_COPY ]]; then
+		mv $BOOT_MENU_COPY $BOOT_MENU ||
+			die "failed to restore copy of $BOOT_MENU"
+	fi
+
+	rm -f /boot/vmlinuz-* /boot/initrd.img-* ||
+		die "failed to destroy previously copied Linux kernel data"
+}
+
+function dx_verify_cleanup() {
+	#
+	# dx_verify creates a clone of the MDS dataset and the postgres
+	# service as well as a clone of /var/delphix for masking validation.
+	# If any are left, clean them up. (This logic is based on dx_manage_pg
+	# stop and cleanup.)
+	#
+	local sta
+	sta=$(svcs -Ho sta $SVC)
+	if [[ -n "$sta" ]]; then
+		/usr/sbin/svcadm disable -s $SVC ||
+			die "unable to disable SMF service: $SVC"
+		/usr/sbin/svccfg delete -f $SVC ||
+			die "unable to delete SMF service: $SVC"
+	fi
+
+	#
+	# Clean up the postmaster.pid leftover from the main MDS in the
+	# snapshot. This needs to be done after disabling the SMF service in
+	# case the postmaster.pid was instead from the active clone.
+	#
+	if [[ -e $PG_DATA/postmaster.pid ]]; then
+		echo "renaming $PG_DATA/postmaster.pid to $PG_DATA/postmaster.pid.original"
+		mv $PG_DATA/postmaster.pid $PG_DATA/postmaster.pid.original ||
+			echo "failed to move postmaster.pid file"
+	fi
+
+	[[ $(zfs list domain0/mds@$MDS_SNAPNAME) ]] &&
+		zfs destroy -R "domain0/mds@$MDS_SNAPNAME"
+	[[ $(zfs list domain0/mds@$MDS_SNAPNAME) ]] &&
+		die "unable to cleanup domain0/mds@$MDS_SNAPNAME"
+
+	runningVar=$(mount | awk '/^\/var\/delphix /{ print $3 }')
+	[[ $(zfs list "$runningVar@$MDS_SNAPNAME") ]] &&
+		zfs destroy -R "$runningVar@$MDS_SNAPNAME"
+	[[ $(zfs list "$runningVar@$MDS_SNAPNAME") ]] &&
+		die "unable to cleanup $runningVar@$MDS_SNAPNAME"
+}
+
+dx_apply_cleanup
+dx_verify_cleanup
+
+#
+# Recursively destroy and force-unmount the Linux Root Dataset. Even though all the
+# datasets are cleaned up in a normal execution of Verify, this handles the case when
+# it was cancelled early.
+#
+zfs destroy -rf ${LX_DATASET} || die "Failed to destroy Linux dataset '${LX_DATASET}'"
+rm -rf "$LX_RDS_TMP_ROOT_MOUNT"
