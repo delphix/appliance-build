@@ -106,13 +106,8 @@ RPOOL=${RDS%%/*}
 #
 # Cleanup any previous intermediate state.
 #
-rm -rf /tmp/delphix.* ||
-	die "failed to destroy old delphix temporary directories"
-rm -f /boot/vmlinuz-* /boot/initrd.img-* ||
-	die "failed to destroy previously copied Linux kernel data"
-zfs destroy -r "$RPOOL/ROOT" 2>/dev/null
-zfs list "$RPOOL/ROOT" 2>/dev/null &&
-	die "could not destroy linux root dataset from previous run"
+"${BASH_SOURCE%/*}/dx_delete" ||
+	die "failed to cleanup previous state with dx_delete"
 
 #
 # Save a copy of the boot menu to restore if we aren't upgrading
