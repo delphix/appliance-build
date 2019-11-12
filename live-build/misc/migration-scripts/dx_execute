@@ -33,6 +33,9 @@ umask 0022
 set -o pipefail
 
 DX_UPG_PAUSE="${BASH_SOURCE%/*}/dx_upg_pause_options"
+DX_UPG_STRESS="${BASH_SOURCE%/*}/dx_upg_stress_options"
+# shellcheck source=/dev/null
+. $DX_UPG_STRESS --source
 
 function die() {
 	echo "$(basename "$0"): $*" >&2
@@ -58,7 +61,7 @@ function cleanup_leftover_dataset() {
 	local dataset=$1
 
 	if zfs list "$dataset" &>/dev/null; then
-		zfs destroy "$dataset" ||
+		zfs destroy -R "$dataset" ||
 			die "Failed to destroy leftover dataset '$dataset'"
 	fi
 }
@@ -129,6 +132,9 @@ mount -F zfs -o ignoremountpoint "$LX_RDS" "$LX_RDS_MOUNT" ||
 	die "failed to mount the root Linux dataset"
 "${LX_RDS_MOUNT}${MIGRATION_SCRIPT}" pre-upgrade \
 	>>/var/delphix/migration/log 2>&1 || die "failed to run migration"
+
+__trigger_unset_stress_option "STRESS_DX_EXECUTE_FAIL_AFTER_CONFIG_MIGRATION"
+
 #
 # Create a flag file that notifies the delphix-migration service that
 # post-reboot migration logic should be run. Note that the /var/delphix
@@ -213,6 +219,8 @@ timeout 10 /opt/delphix/server/bin/jmxtool boot upgrade server
 
 $DX_UPG_PAUSE --pause "PAUSE_IN_DX_EXECUTE_BEFORE_RESTART" ||
 	die "failed to pause fully on stress option"
+
+__trigger_unset_stress_option "STRESS_DX_EXECUTE_FAIL_BEFORE_REBOOT"
 
 # Constants used by the uadmin syscall.
 A_SHUTDOWN=2
