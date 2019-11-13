@@ -607,15 +607,6 @@ function migrate_configuration() {
 	# system to properly operate; these must be preserved acorss
 	# upgrades.
 	#
-	# Note, the "/etc/resolv.conf" file is in this list, but the
-	# "migrate_file" function will only migrate this path if it
-	# points to a regular file. Often, this file will be a symlink,
-	# in which case it won't be migrated, and we don't want it to
-	# be. We only want to migrate this file if the admin (or some
-	# software on the system) has converted it to a regular file,
-	# and configured some host specific DNS settings, in which case
-	# we want these settings to persist across the upgrade.
-	#
 	while read -r file; do
 		migrate_file "$file"
 	done <<-EOF
