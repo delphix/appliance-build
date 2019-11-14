@@ -64,10 +64,12 @@ sgdisk --zap-all "$ARTIFACT_NAME.img"
 # partition will be used and automatically detected by "grub-install"
 # based on the partitions typecode. This partition is required since we're
 # partitioning using GPT; if we used MBR, an explicit boot partition
-# wouldn't be required.
+# wouldn't be required. Also we leave the first 1MB unallocated since
+# some clouds (i.e. Azure)  may require space for their own internal
+# purposes.
 #
 sgdisk "$ARTIFACT_NAME.img" \
-	--set-alignment=1 --new=2:34:2047 --typecode=2:EF02
+	--set-alignment=1 --new=2:1m:+1m --typecode=2:EF02
 
 #
 # Now we create the partition that we'll use for the zpool that will be
