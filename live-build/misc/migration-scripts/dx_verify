@@ -201,7 +201,7 @@ run_upgrade_verify "$output" "$format" "$locale" 20 95
 
 DX_UPG_STRESS="${BASH_SOURCE%/*}/dx_upg_stress_options"
 # shellcheck source=/dev/null
-. $DX_UPG_STRESS --source
+. "$DX_UPG_STRESS" --source
 __trigger_unset_stress_option "STRESS_DX_VERIFY_FAIL_AFTER_TEST_MIGRATION"
 
 test_masking

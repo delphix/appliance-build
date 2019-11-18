@@ -35,7 +35,7 @@ set -o pipefail
 DX_UPG_PAUSE="${BASH_SOURCE%/*}/dx_upg_pause_options"
 DX_UPG_STRESS="${BASH_SOURCE%/*}/dx_upg_stress_options"
 # shellcheck source=/dev/null
-. $DX_UPG_STRESS --source
+. "$DX_UPG_STRESS" --source
 
 function die() {
 	echo "$(basename "$0"): $*" >&2
