@@ -31,4 +31,4 @@
 # environment.
 #
 chroot binary rm -f /etc/resolv.conf
-chroot binary ln -s ../run/systemd/resolve/resolv.conf /etc/resolv.conf
+chroot binary ln -s ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf

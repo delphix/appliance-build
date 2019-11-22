@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2016, 2017 by Delphix. All rights reserved.
+# Copyright (c) 2016, 2019 by Delphix. All rights reserved.
 #
 
 #
@@ -22,6 +22,11 @@ __STRESS_OPTIONS_JSON=$(
 		    "err_msg": "Stress option triggered after version check.",
 		    "auto_unset": true
 		},
+		"STRESS_DX_APPLY_FAIL_BEFORE_UNMOUNTING": {
+		    "location": "pre-reboot",
+		    "err_msg": "Stress option triggered before dx_apply dataset cleanup.",
+		    "auto_unset": true
+		},
 		"STRESS_DX_INSTALL_ARCHIVE_FAIL_AFTER_VERIFY_DX_ARCHIVE": {
 		    "location": "pre-reboot",
 		    "err_msg": "Stress option triggered after verify_dx_archive.",
@@ -34,7 +39,12 @@ __STRESS_OPTIONS_JSON=$(
 		},
 		"STRESS_DX_VERIFY_FAIL_AFTER_TEST_MIGRATION": {
 		    "location": "pre-reboot",
-		    "err_msg": "Stress option triggered after testing migration.",
+		    "err_msg": "Stress option triggered after upgrade-verify.jar.",
+		    "auto_unset": true
+		},
+		"STRESS_DX_EXECUTE_FAIL_AFTER_CONFIG_MIGRATION": {
+		    "location": "pre-reboot",
+		    "err_msg": "Stress option triggered after migrating OS config.",
 		    "auto_unset": true
 		},
 		"STRESS_DX_EXECUTE_FAIL_BEFORE_REBOOT": {
