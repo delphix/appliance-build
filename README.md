@@ -1,6 +1,6 @@
 # Delphix Appliance Build
 
-[![Build Status](https://travis-ci.com/delphix/appliance-build.svg?branch=master)](https://travis-ci.com/delphix/appliance-build)
+![](https://github.com/delphix/appliance-build/workflows/.github/workflows/main.yml/badge.svg)
 
 This repository contains the code used to build the Ubuntu-based Delphix
 Appliance, leveraging open-source tools such as Debian's live-build,
