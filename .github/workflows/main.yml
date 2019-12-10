@@ -1,0 +1,21 @@
+on: [push, pull_request]
+
+jobs:
+  check-ansible:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker build -t appliance-build:latest docker
+      - run: ./scripts/docker-run.sh gradle ansibleCheck
+  check-shellcheck:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker build -t appliance-build:latest docker
+      - run: ./scripts/docker-run.sh gradle shellCheck
+  check-shfmt:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker build -t appliance-build:latest docker
+      - run: ./scripts/docker-run.sh gradle shfmtCheck
