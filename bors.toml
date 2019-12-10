@@ -1,7 +1,0 @@
-pr_status = [
-  "license/cla"
-]
-
-status = [
-  "continuous-integration/travis-ci/push",
-]
