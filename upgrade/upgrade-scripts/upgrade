@@ -54,6 +54,7 @@ function usage() {
 	echo "$PREFIX_STRING [-n] [-v] deferred"
 	echo "$PREFIX_SPACES [-n] [-v] full"
 	echo "$PREFIX_SPACES rollback"
+	echo "$PREFIX_SPACES finalize"
 
 	exit 2
 }
@@ -296,7 +297,9 @@ function rollback() {
 
 	source_upgrade_properties
 
-	[[ -n "$UPGRADE_TYPE" ]] || die "variable UPGRADE_TYPE is not set"
+	[[ -n "$UPGRADE_TYPE" ]] ||
+		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+
 	[[ -n "$UPGRADE_BASE_CONTAINER" ]] ||
 		die "variable UPGRADE_BASE_CONTAINER is not set"
 	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
@@ -357,6 +360,39 @@ function rollback() {
 	systemctl reboot || die "'systemctl reboot' failed"
 }
 
+# TODO: Add support for not-in-place upgrades
+function finalize() {
+	[[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]] &&
+		die "unable to perform a 'dry-run' of finalize"
+
+	source_upgrade_properties
+
+	[[ -n "$UPGRADE_TYPE" ]] ||
+		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+
+	case "$UPGRADE_TYPE" in
+	DEFERRED | FULL)
+		# finalize is only supported for these upgrade types
+		;;
+	*)
+		die "rollback is not supported for upgrade type: '$UPGRADE_TYPE'"
+		;;
+	esac
+
+	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
+	[[ -n "$ROOTFS_DATASET" ]] ||
+		die "unable to determine mounted rootfs container dataset"
+
+	SNAPSHOT_NAME=$(get_dataset_rollback_snapshot_name "$ROOTFS_DATASET")
+	[[ -n "$SNAPSHOT_NAME" ]] ||
+		die "unable to determine rollback snapshot name"
+
+	zfs destroy -r "$ROOTFS_DATASET@$SNAPSHOT_NAME" ||
+		die "failed to destroy rollback snapshots"
+
+	remove_upgrade_properties
+}
+
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
 while getopts ':nv' c; do
@@ -404,6 +440,10 @@ full)
 rollback)
 	shift 1
 	rollback "$@"
+	;;
+finalize)
+	shift 1
+	finalize "$@"
 	;;
 *)
 	usage "invalid option -- '$1'"
