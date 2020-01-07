@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2020 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -217,6 +217,7 @@ aws) vm_artifact_ext=vmdk ;;
 azure) vm_artifact_ext=vhdx ;;
 esx) vm_artifact_ext=ova ;;
 gcp) vm_artifact_ext=gcp.tar.gz ;;
+hyperv) vm_artifact_ext=vhdx ;;
 kvm) vm_artifact_ext=qcow2 ;;
 *)
 	echo "Invalid platform"

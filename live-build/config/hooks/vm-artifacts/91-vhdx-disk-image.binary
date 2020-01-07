@@ -1,6 +1,6 @@
 #!/bin/bash -ex
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2020 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 # assumed to be a "raw" disk image, into a VHDX formated disk image.
 #
 
-[[ "$APPLIANCE_PLATFORM" == azure ]] || exit 0
+[[ "$APPLIANCE_PLATFORM" == azure ]] ||
+	[[ "$APPLIANCE_PLATFORM" == hyperv ]] || exit 0
 
 qemu-img convert "$ARTIFACT_NAME.img" \
 	-O vhdx -o subformat=dynamic "$ARTIFACT_NAME.vhdx"
