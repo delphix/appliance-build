@@ -19,7 +19,7 @@ import java.nio.file.Paths
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.regex.Pattern
 
-ext.allPlatforms = ["aws", "azure", "esx", "gcp", "hyperv", "kvm"]
+ext.allPlatforms = ["aws", "azure", "esx", "gcp", "hyperv", "kvm", "oci"]
 ext.allVariants = new File("${rootProject.projectDir}/live-build/variants").list()
 ext.allInternal = allVariants.findAll { it.startsWith("internal-") }
 ext.allExternal = allVariants.findAll { it.startsWith("external-") }
