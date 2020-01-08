@@ -20,7 +20,7 @@ Log into that VM using the "ubuntu" user, and run these commands:
     $ git clone https://github.com/delphix/appliance-build.git
     $ cd appliance-build
     $ ansible-playbook bootstrap/playbook.yml
-    $ sudo -E ./gradlew buildInternalMinimalKvm
+    $ sudo ./gradlew buildInternalMinimalKvm
     $ sudo qemu-system-x86_64 -nographic -m 1G \
     > -drive file=live-build/build/artifacts/internal-minimal-kvm.qcow2
 
@@ -87,7 +87,7 @@ correcting any deficencies that may exist. This is easily done like so:
 
 Now, with the "bootstrap" VM properly configured, we can run the build:
 
-    $ sudo -E ./gradlew ...
+    $ sudo ./gradlew ...
 
 Each variant will have ansible roles applied according to playbooks in
 per variant directories under live-build/variants. An appliance can be
@@ -96,7 +96,7 @@ The task name has the form 'build\<Variant\>\<Platform\>'. For instance,
 the task to build the 'internal-minimal' variant for KVM is
 'buildInternalMinimalKvm':
 
-    $ sudo -E ./gradlew buildInternalMinimalKvm
+    $ sudo ./gradlew buildInternalMinimalKvm
 
 When this completes, the newly built VM artifacts will be contained in
 the "live-build/build/artifacts/" directory:
@@ -137,7 +137,7 @@ An upgrade image for a particular variant can be built by running the
 an upgrade image for the internal-minimal variant is
 'buildUpgradeImageInternalMinimal':
 
-    $ DELPHIX_PLATFORMS='kvm aws' sudo -E ./gradlew buildUpgradeImageInternalMinimal
+    $ sudo DELPHIX_PLATFORMS='kvm aws' ./gradlew buildUpgradeImageInternalMinimal
 
 An upgrade image can contain the necessary packages to upgrade
 appliances running on multiple different platforms. Which platforms are
@@ -234,7 +234,7 @@ For this example, we add our new role to the playboodk as shown below:
 See the instructions [above](#step-4-run-live-build) to setup your build
 environment and kick off the build:
 
-    $ sudo -E ./gradlew buildInternalDcenterEsx
+    $ sudo ./gradlew buildInternalDcenterEsx
 
 ## Contributing
 
