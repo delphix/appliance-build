@@ -142,10 +142,28 @@ function build_ancillary_repository() {
 #    environment variables, and the script will work as expected.
 #
 
-if [[ -z "$UPSTREAM_BRANCH" ]]; then
-	echo "UPSTREAM_BRANCH is not set."
-	exit 1
+#
+# Set UPSTREAM_BRANCH. This will determine which version of the linux package
+# mirror is used.
+#
+if [[ -z "$UPSTREAM_PRODUCT_BRANCH" ]]; then
+	echo "UPSTREAM_PRODUCT_BRANCH is not set."
+	if ! source "$TOP/branch.config" 2>/dev/null; then
+		echo "No branch.config file found in repo root."
+		exit 1
+	fi
+
+	if [[ -z "$UPSTREAM_BRANCH" ]]; then
+		echo "UPSTREAM_BRANCH parameter was not sourced from branch.config." \
+			"Ensure branch.config is properly formatted with e.g." \
+			"UPSTREAM_BRANCH=\"<upstream-product-branch>\""
+		exit 1
+	fi
+	echo "Defaulting to branch $UPSTREAM_BRANCH set in branch.config."
+else
+	UPSTREAM_BRANCH="$UPSTREAM_PRODUCT_BRANCH"
 fi
+echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
 
 AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
 	"$AWS_S3_URI_VIRTUALIZATION" \

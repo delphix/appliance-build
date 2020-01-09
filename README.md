@@ -20,7 +20,7 @@ Log into that VM using the "ubuntu" user, and run these commands:
     $ git clone https://github.com/delphix/appliance-build.git
     $ cd appliance-build
     $ ansible-playbook bootstrap/playbook.yml
-    $ ./scripts/docker-run.sh gradle buildInternalMinimalKvm
+    $ sudo ./gradlew buildInternalMinimalKvm
     $ sudo qemu-system-x86_64 -nographic -m 1G \
     > -drive file=live-build/build/artifacts/internal-minimal-kvm.qcow2
 
@@ -31,29 +31,18 @@ To exit "qemu", use "Ctrl-A X".
 The Delphix Appliance build system has the following assuptions about
 the environment from which it will be executed:
 
- 1. Docker must be installed and available to be used on the host
-    that'll run the build. A Dockerfile is included in this repository,
-    which captures nearly all of the runtime dependencies needed to
-    execute the build. It is assumed that a Docker image will be
-    generated using this Dockerfile, and then the build executed in a
-    Docker container based on that Docker image.  This way, the amount
-    of dependencies on the host system running the build is minimal.
+ 1. Ansible must be installed and available to be used on the host
+    that'll run the build. An Ansible playbook is included in this
+    repository, which captures nearly all of the runtime dependencies
+    needed to execute the build. It is assumed that this playbook will
+    be used to configure the host that's used to execute the build.
 
- 2. The Docker host used to run the build must be based on Ubuntu 18.04.
-    As part of the build system, a ZFS pool and dataset will be
-    generated.  The userspace ZFS utilities will be executed from the
-    Docker container, but they interact with the ZFS kernel modules
-    provided by the host. Thus, to ensure compatibility between the ZFS
-    userspace utilities in the Docker container, and the ZFS kernel
-    modules in the host, we require the host system to be running the
-    same Ubuntu release as the Docker container that will be used.
-
- 3. The Docker container must have access to Delphix's Artifactory
-    service, as well as Delphix's AWS S3 buckets; generally this is
-    accomplished by running the build within Delphix's VPN. This is
-    required so that the build can download Delphix's Java distribution
-    stored in Artifactory, along with the Delphix specific packages
-    stored in S3.
+ 2. The host that's used to execute the build must have access to
+    Delphix's Artifactory service, as well as Delphix's AWS S3 buckets;
+    generally this is accomplished by running the build within Delphix's
+    VPN. This is required so that the build can download Delphix's Java
+    distribution stored in Artifactory, along with the Delphix specific
+    packages stored in S3.
 
 ## Getting Started
 
@@ -98,15 +87,7 @@ correcting any deficencies that may exist. This is easily done like so:
 
 Now, with the "bootstrap" VM properly configured, we can run the build:
 
-    $ ./scripts/docker-run.sh gradle ...
-
-This will create a new container based on the image we previously
-created, and then execute "gradle" inside of that container.
-
-The "./scripts/docker-run" script can also be run without any arguments,
-which will provide an interactive shell running in the container
-environment, with the appliance-build git repository mounted inside of
-the container; this can be useful for debugging and/or experimenting.
+    $ sudo ./gradlew ...
 
 Each variant will have ansible roles applied according to playbooks in
 per variant directories under live-build/variants. An appliance can be
@@ -115,7 +96,7 @@ The task name has the form 'build\<Variant\>\<Platform\>'. For instance,
 the task to build the 'internal-minimal' variant for KVM is
 'buildInternalMinimalKvm':
 
-    $ ./scripts/docker-run.sh gradle buildInternalMinimalKvm
+    $ sudo ./gradlew buildInternalMinimalKvm
 
 When this completes, the newly built VM artifacts will be contained in
 the "live-build/build/artifacts/" directory:
@@ -156,7 +137,7 @@ An upgrade image for a particular variant can be built by running the
 an upgrade image for the internal-minimal variant is
 'buildUpgradeImageInternalMinimal':
 
-    $ DELPHIX_PLATFORMS='kvm aws' ./scripts/docker-run.sh gradle buildUpgradeImageInternalMinimal
+    $ sudo DELPHIX_PLATFORMS='kvm aws' ./gradlew buildUpgradeImageInternalMinimal
 
 An upgrade image can contain the necessary packages to upgrade
 appliances running on multiple different platforms. Which platforms are
@@ -182,7 +163,7 @@ Gradle. The most commonly used tasks are likely to be
 
 The complete list of tasks can be listed using the 'tasks' task:
 
-    $ ./scripts/docker-run.sh gradle tasks
+    $ ./gradlew tasks
 
 ## Creating new build variants
 
@@ -253,7 +234,7 @@ For this example, we add our new role to the playboodk as shown below:
 See the instructions [above](#step-4-run-live-build) to setup your build
 environment and kick off the build:
 
-    $ ./scripts/docker-run.sh gradle buildInternalDcenterEsx
+    $ sudo ./gradlew buildInternalDcenterEsx
 
 ## Contributing
 
