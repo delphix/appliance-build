@@ -1,0 +1,24 @@
+on: [push, pull_request]
+
+jobs:
+  check-ansible:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - run: sudo ./.github/scripts/install-gradle.sh
+      - run: sudo ./.github/scripts/install-ansible-lint.sh
+      - run: /opt/gradle-5.1/bin/gradle ansibleCheck
+  check-shellcheck:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - run: sudo ./.github/scripts/install-gradle.sh
+      - run: sudo ./.github/scripts/install-shellcheck.sh
+      - run: /opt/gradle-5.1/bin/gradle shellCheck
+  check-shfmt:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v1
+      - run: sudo ./.github/scripts/install-gradle.sh
+      - run: sudo ./.github/scripts/install-shfmt.sh
+      - run: /opt/gradle-5.1/bin/gradle shfmtCheck

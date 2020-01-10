@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2018-2019 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,10 +23,38 @@
 
 - apt:
     name:
+      - ansible
+      - aptly
+      - awscli
+      - bc
+      - coreutils
+      - equivs
+      - gdisk
+      - git
+      - java-package
+      - jq
+      - kpartx
+      - libxt6
+      - livecd-rootfs
+      - make
+      - man
+      - openjdk-8-jre-headless
+      - pigz
+      - qemu
+      - rename
+      - shellcheck
+      - vim
+      - zfsutils-linux
+    state: present
+
+- modprobe:
+    name: zfs
+    state: present
+
+- apt:
+    name:
       - docker.io
       - python3-docker
-      - qemu
-      - zfsutils-linux
     state: present
 
 #
@@ -35,7 +63,3 @@
 # we need to be able to fetch things from Artifactory.
 #
 - shell: docker build --network host --tag "appliance-build:latest" "{{ toplevel.stdout }}/docker"
-
-- modprobe:
-    name: zfs
-    state: present
