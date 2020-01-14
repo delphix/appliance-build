@@ -21,7 +21,8 @@
 # assumed to be a "raw" disk image, into a qcow2 formated disk image.
 #
 
-[[ "$APPLIANCE_PLATFORM" == kvm ]] || exit 0
+[[ "$APPLIANCE_PLATFORM" == kvm ]] || [[ "$APPLIANCE_PLATFORM" == oci ]] ||
+	exit 0
 
 source /usr/share/livecd-rootfs/live-build/functions
 rm -f "$ARTIFACT_NAME.qcow2"
