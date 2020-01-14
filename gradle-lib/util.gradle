@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Delphix
+ * Copyright 2019, 2020 Delphix
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import java.nio.file.Paths
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.regex.Pattern
 
-ext.allPlatforms = ["aws", "azure", "esx", "gcp", "kvm"]
+ext.allPlatforms = ["aws", "azure", "esx", "gcp", "hyperv", "kvm", "oci"]
 ext.allVariants = new File("${rootProject.projectDir}/live-build/variants").list()
 ext.allInternal = allVariants.findAll { it.startsWith("internal-") }
 ext.allExternal = allVariants.findAll { it.startsWith("external-") }

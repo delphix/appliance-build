@@ -104,15 +104,13 @@ function mount_datasets() {
 		die "unable to create snapshot $runningVar@$MDS_SNAPNAME"
 	zfs clone "$runningVar@$MDS_SNAPNAME" "$runningVar/$MDS_SNAPNAME" ||
 		die "unable to create $runningVar/$MDS_SNAPNAME"
-	zfs destroy -d "$runningVar@$MDS_SNAPNAME" ||
-		die "unable to defer destroy $runningVar@$MDS_SNAPNAME"
 	mount -F zfs "$runningVar/$MDS_SNAPNAME" "$root/var/delphix" ||
 		die "unable to mount $root/var/delphix"
 }
 
 function cleanup_datasets() {
 	if [[ -n "$runningVar" ]]; then
-		zfs destroy -f "$runningVar/$MDS_SNAPNAME"
+		zfs destroy -R "$runningVar@$MDS_SNAPNAME"
 	fi
 	umount -f "$root"
 	rmdir "$root"
@@ -200,7 +198,12 @@ report_progress_inc 0 "preparing for verification"
 mount_datasets "$version"
 report_progress_inc 20 "running upgrade checks"
 run_upgrade_verify "$output" "$format" "$locale" 20 95
-#TODO LX-1808 stress options
+
+DX_UPG_STRESS="${BASH_SOURCE%/*}/dx_upg_stress_options"
+# shellcheck source=/dev/null
+. $DX_UPG_STRESS --source
+__trigger_unset_stress_option "STRESS_DX_VERIFY_FAIL_AFTER_TEST_MIGRATION"
+
 test_masking
 report_progress_inc 95 "cleaning up post-verification"
 cleanup

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Delphix
+ * Copyright 2019, 2020 Delphix
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,9 @@ def artifactTypes = ["aws": "vmdk",
                      "azure": "vhdx",
                      "esx": "ova",
                      "gcp": "gcp.tar.gz",
-                     "kvm": "qcow2"]
+                     "hyperv": "vhdx",
+                     "kvm": "qcow2",
+                     "oci": "qcow2"]
 
 def configDir = "configuration"
 

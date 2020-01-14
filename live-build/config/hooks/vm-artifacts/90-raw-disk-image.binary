@@ -64,10 +64,12 @@ sgdisk --zap-all "$ARTIFACT_NAME.img"
 # partition will be used and automatically detected by "grub-install"
 # based on the partitions typecode. This partition is required since we're
 # partitioning using GPT; if we used MBR, an explicit boot partition
-# wouldn't be required.
+# wouldn't be required. Also we leave the first 1MB unallocated since
+# some clouds (i.e. Azure)  may require space for their own internal
+# purposes.
 #
 sgdisk "$ARTIFACT_NAME.img" \
-	--set-alignment=1 --new=2:34:2047 --typecode=2:EF02
+	--set-alignment=1 --new=2:1m:+1m --typecode=2:EF02
 
 #
 # Now we create the partition that we'll use for the zpool that will be
@@ -135,6 +137,37 @@ zfs create \
 	"rpool/ROOT/$FSNAME/root"
 
 zfs mount "rpool/ROOT/$FSNAME/root"
+
+#
+# We are later going to recursively bind mount /proc/, /sys/, and /dev/
+# beneath the root dataset. Before doing that, we need to change the root
+# dataset's mount so that it has type 'slave'. If were to leave it 'shared',
+# the following would happen:
+#
+#  - The mount of $DIRECTORY/sys/ would be propagated to other existing
+#    namespaces.
+#  - We would recursively change the propagation type of $DIRECTORY/sys/ to
+#    be 'slave', for reasons explained below.
+#  - After finishing our work, we would 'umount -R $DIRECTORY/sys/'. For the
+#    children operated on recursively, this event would _not_ be propagated
+#    because they are not longer shared.
+#  - We would unmount $DIRECTORY. This would succeed, but propagation of it
+#    would silently fail, because it is busy in other namespaces, because
+#    $DIRECTORY/sys/ is still mounted on it.
+#  - We would export the pool, which would fail because the pool is busy
+#    because root filesystem is still mounted in other namespaces.
+#
+# To prevent this, we can change the propagation type of $DIRECTORY so that
+# the bind mount of /sys and the others is never propagated to other
+# namespaces.
+#
+# Also, since we are going to change the propagation type, we need to change
+# it before before mounting _any_ children. Otherwise we would end up in the
+# same situation, but with a different child: the mount would be proagated,
+# the unmount would not, and we would end up with EBUSY errors when exporting
+# the pool because some filesystems are mounted in other namespaces.
+#
+mount --make-slave "$DIRECTORY"
 
 zfs create \
 	-o mountpoint=legacy \
@@ -233,9 +266,18 @@ EOF
 # need to have the /dev, /proc, and /sys mountpoints present in that chroot
 # environment, which is why we bind mount here.
 #
-mount --make-slave "$DIRECTORY"
 for dir in /dev /proc /sys; do
 	mount --rbind "$dir" "${DIRECTORY}${dir}"
+	#
+	# Bind mounts are placed in the same peer group as the mount being
+	# copied. This means that when we later need to 'umount -R' this
+	# directory, the unmount events for any children of this mount will
+	# be propagated to the original mount point. So, for instance, when
+	# we unmount $DIRECTORY/sys/fs/cgroup, that will also attempt to
+	# unmount /sys/fs/cgroup. To prevent this from happening, we need to
+	# change the mount propagation type to prevent the unmount from being
+	# propagated.
+	#
 	mount --make-rslave "${DIRECTORY}${dir}"
 done
 

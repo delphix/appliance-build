@@ -97,6 +97,11 @@ MIGRATION_MINOR_VERSION=$(echo "$MIN_MIGRATION_VERSION" | cut -d. -f3)
 	die "expected version $MIN_MIGRATION_VERSION or greater but found" \
 		"$MAJOR_VERSION_0.$MAJOR_VERSION_1.$MINOR_VERSION"
 
+DX_UPG_STRESS=$ARCHIVE_DIR/dx_upg_stress_options
+# shellcheck source=/dev/null
+. $DX_UPG_STRESS --source
+__trigger_unset_stress_option "STRESS_DX_APPLY_FAIL_AFTER_VERSION_CHECK"
+
 #
 # Get the root dataset and the current ZFS pool that we're currently using.
 #
@@ -106,28 +111,14 @@ RPOOL=${RDS%%/*}
 #
 # Cleanup any previous intermediate state.
 #
-rm -rf /tmp/delphix.* ||
-	die "failed to destroy old delphix temporary directories"
-rm -f /boot/vmlinuz-* /boot/initrd.img-* ||
-	die "failed to destroy previously copied Linux kernel data"
-zfs destroy -r "$RPOOL/ROOT" 2>/dev/null
-zfs list "$RPOOL/ROOT" 2>/dev/null &&
-	die "could not destroy linux root dataset from previous run"
-sed -i '/set lxcmdline/d' /boot/menu.rc.local
-[[ "$(grep -cF 'set lxcmdline' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup lxcmdline from previous run"
-sed -i '/set mainmenu_caption\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainmenu_caption[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainmenu_caption from previous run"
-sed -i '/set mainansi_caption\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainansi_caption[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainansi_caption from previous run"
-sed -i '/set mainmenu_keycode\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainmenu_keycode[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainmenu_keycode from previous run"
-sed -i '/set mainmenu_command\[8\]/d' /boot/menu.rc.local
-[[ "$(grep -cF 'mainmenu_command[8]' /boot/menu.rc.local)" -eq 0 ]] ||
-	die "failed to cleanup mainmenu_command from previous run"
+"${BASH_SOURCE%/*}/dx_delete" ||
+	die "failed to cleanup previous state with dx_delete"
+
+#
+# Save a copy of the boot menu to restore if we aren't upgrading
+#
+cp "/boot/menu.rc.local" "/boot/menu.rc.local.copy" ||
+	die "failed to save copy of /boot/menu.rc.local"
 
 report_progress_inc 20
 
@@ -283,6 +274,7 @@ LX_CMDLINE=(
 	'crashkernel=256M,low'
 	'zfsforce=1'
 	'mitigations=off'
+	'elevator=noop'
 )
 
 #
@@ -345,6 +337,8 @@ MAIN_MENU_FICL=(
 	[[ $(find . -mindepth 1 | wc -l) -eq 0 ]] ||
 		die "linux dataset for /var/delphix contains unexpected files"
 ) || die "verification of /var/delphix failed"
+
+__trigger_unset_stress_option "STRESS_DX_APPLY_FAIL_BEFORE_UNMOUNTING"
 
 umount "$TMP_ROOT/var/log" ||
 	die "couldn't unmount linux dataset $TMP_ROOT/var/log"
