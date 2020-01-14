@@ -39,6 +39,19 @@ LOG_DIRECTORY="/var/tmp/delphix-upgrade"
 PROP_CURRENT_VERSION="com.delphix:current-version"
 PROP_INITIAL_VERSION="com.delphix:initial-version"
 
+#
+# To better enable root cause analysis of any upgrade failures, we
+# enable the "xtrace" feature here, and redirect that output to the
+# system log. This way, we can easily obtain a trace of the execution
+# path via the system log, which can be invaluable for any post-mortem
+# analysis of a failure. Verbose logging is available in /var/log/syslog
+# on the Delphix Engine
+#
+exec 4> >(logger -t "upgrade-scripts:$(basename "$0")" --id=$$)
+BASH_XTRACEFD="4"
+PS4='${BASH_SOURCE[0]}:${FUNCNAME[0]}:${LINENO[0]} '
+set -o xtrace
+
 function die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1
