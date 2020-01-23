@@ -184,6 +184,11 @@ function source_upgrade_properties() {
 		die "failed to source: '$UPDATE_DIR/upgrade.properties'"
 }
 
+function remove_upgrade_properties() {
+	rm "$UPDATE_DIR/upgrade.properties" ||
+		die "failed to remove: '$UPDATE_DIR/upgrade.properties'"
+}
+
 function set_upgrade_property() {
 	[[ -n "$1" ]] || die "upgrade property key is missing"
 	[[ -n "$2" ]] || die "upgrade property value is missing"
