@@ -54,6 +54,7 @@ function usage() {
 	echo "$PREFIX_STRING [-n] [-v] deferred"
 	echo "$PREFIX_SPACES [-n] [-v] full"
 	echo "$PREFIX_SPACES rollback"
+	echo "$PREFIX_SPACES finalize"
 
 	exit 2
 }
@@ -296,7 +297,9 @@ function rollback() {
 
 	source_upgrade_properties
 
-	[[ -n "$UPGRADE_TYPE" ]] || die "variable UPGRADE_TYPE is not set"
+	[[ -n "$UPGRADE_TYPE" ]] ||
+		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+
 	[[ -n "$UPGRADE_BASE_CONTAINER" ]] ||
 		die "variable UPGRADE_BASE_CONTAINER is not set"
 	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
@@ -357,6 +360,57 @@ function rollback() {
 	systemctl reboot || die "'systemctl reboot' failed"
 }
 
+function finalize() {
+	if [[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]]; then
+		#
+		# If we're executing a dry-run of the finalize
+		# sub-command, we assume that we're running after a
+		# dry-run upgrade. Thus, in that case, we only need to
+		# remove the upgrade image, as all of the snapshots and
+		# datasets for the dry-run upgrade will have already
+		# been removed.
+		#
+		rm -rf "$IMAGE_PATH" ||
+			die "failed to remove unpacked upgrade image"
+		return
+	fi
+
+	source_upgrade_properties
+
+	[[ -n "$UPGRADE_TYPE" ]] ||
+		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+
+	case "$UPGRADE_TYPE" in
+	DEFERRED)
+		#
+		# Currently, we've only implemented "finalize" for
+		# DEFERRED upgrades. This is to avoid adding the logic
+		# for "not-in-place" upgrades (DEFERRED is strictly
+		# "in-place") and rollback (which is not supported for
+		# DEFERRED), until we determine those are required.
+		#
+		;;
+	*)
+		die "rollback is not supported for upgrade type: '$UPGRADE_TYPE'"
+		;;
+	esac
+
+	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
+	[[ -n "$ROOTFS_DATASET" ]] ||
+		die "unable to determine mounted rootfs container dataset"
+
+	SNAPSHOT_NAME=$(get_dataset_rollback_snapshot_name "$ROOTFS_DATASET")
+	[[ -n "$SNAPSHOT_NAME" ]] ||
+		die "unable to determine rollback snapshot name"
+
+	zfs destroy -r "$ROOTFS_DATASET@$SNAPSHOT_NAME" ||
+		die "failed to destroy rollback snapshots"
+
+	rm -rf "$IMAGE_PATH" || die "failed to remove unpacked upgrade image"
+
+	remove_upgrade_properties
+}
+
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
 while getopts ':nv' c; do
@@ -404,6 +458,10 @@ full)
 rollback)
 	shift 1
 	rollback "$@"
+	;;
+finalize)
+	shift 1
+	finalize "$@"
 	;;
 *)
 	usage "invalid option -- '$1'"
