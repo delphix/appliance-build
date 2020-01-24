@@ -133,6 +133,9 @@ deb [trusted=yes] file://$IMAGE_PATH/public bionic delphix
 EOF
 	die "failed to configure apt sources"
 
+start_stdout_redirect_to_system_log
+start_stderr_redirect_to_system_log
+
 apt_get update || die "failed to update apt sources"
 
 #
@@ -283,6 +286,9 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 # that fall into this category are removed.
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
+
+stop_stdout_redirect_to_system_log
+stop_stderr_redirect_to_system_log
 
 #
 # Finally, for all of the packages listed in the "packages.list" file,
