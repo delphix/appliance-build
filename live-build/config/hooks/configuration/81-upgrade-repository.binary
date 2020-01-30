@@ -59,9 +59,6 @@ fi
 # This directory of download packages will later be passed to Aptly to
 # build our "upgrade repository".
 #
-# Note that we pass "Acquire::http::Pipeline-Depth=0" as a workaround for
-# issue https://github.com/delphix/appliance-build/issues/380.
-#
 chroot binary bash -eux <<'EOF'
 set -o pipefail
 
@@ -70,8 +67,7 @@ cd /packages
 
 apt-get update
 
-dpkg-query -Wf '${Package}=${Version}\n' |
-	xargs apt-get -o Acquire::http::Pipeline-Depth=0 download
+dpkg-query -Wf '${Package}=${Version}\n' | xargs apt-get download
 EOF
 
 #
