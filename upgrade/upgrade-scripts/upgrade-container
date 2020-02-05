@@ -476,6 +476,13 @@ function run() {
 		--quiet --wait --pipe -- "$@"
 }
 
+function run_pty() {
+	systemd-run \
+		--machine="$CONTAINER" \
+		--setenv=CONTAINER="$CONTAINER" \
+		--quiet --wait --pipe --pty -- "$@"
+}
+
 function convert_to_rootfs() {
 	#
 	# We're relying on the "mountpoint" property for the "data" and
@@ -807,6 +814,7 @@ function usage() {
 	echo "$PREFIX_SPACES stop <container>"
 	echo "$PREFIX_SPACES destroy <container>"
 	echo "$PREFIX_SPACES run <container> <command>"
+	echo "$PREFIX_SPACES run-pty <container> <command>"
 	echo "$PREFIX_SPACES upgrade <container>"
 	echo "$PREFIX_SPACES convert-to-rootfs <container>"
 	echo "$PREFIX_SPACES get-type <container>"
@@ -854,6 +862,12 @@ run)
 	CONTAINER="$2"
 	shift 2
 	run "$@"
+	;;
+run-pty)
+	[[ $# -lt 3 ]] && usage "too few arguments specified"
+	CONTAINER="$2"
+	shift 2
+	run_pty "$@"
 	;;
 upgrade)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
