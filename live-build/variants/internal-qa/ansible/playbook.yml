@@ -25,5 +25,3 @@
     - appliance-build.masking-common
     - appliance-build.qa-internal
     - appliance-build.virtualization-common
-    - appliance-build.virtualization-internal
-    - appliance-build.virtualization-standard
