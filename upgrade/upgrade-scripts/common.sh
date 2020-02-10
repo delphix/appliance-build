@@ -209,3 +209,9 @@ function set_upgrade_property() {
 	source_upgrade_properties ||
 		die "failed to read properties file after setting '$1=$2'"
 }
+
+function verify_upgrade_not_in_progress() {
+	. "$UPDATE_DIR/upgrade.properties"
+
+	[[ -z "$UPGRADE_TYPE" ]] || die "upgrade currently in-progress"
+}
