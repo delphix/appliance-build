@@ -323,6 +323,28 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
 
+#
+# Package configuration files are never removed unless the package
+# is purged. In our case, we may remove a configuration file for
+# a package that is still being used. Those configurations files must
+# be removed manually once they are marked obsolete. If we remove
+# any configuration files, then we also reload the systemd configuration.
+#
+reload_required=false
+for file in $(dpkg-query -W -f='${Conffiles}\n' |
+	grep obsolete$ | awk '{print $1}'); do
+	if [[ -f $file ]]; then
+		echo "Removing configuration file: $file"
+		rm -f $file
+		reload_required=true
+	fi
+done
+
+if $reload_required; then
+	echo "Reloading systemd configuration"
+	systemctl daemon-reload
+fi
+
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
 
