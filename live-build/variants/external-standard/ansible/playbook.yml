@@ -23,5 +23,3 @@
     - appliance-build.minimal-common
     - appliance-build.masking-common
     - appliance-build.virtualization-common
-    - appliance-build.virtualization-external
-    - appliance-build.virtualization-standard
