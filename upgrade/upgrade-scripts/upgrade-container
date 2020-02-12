@@ -897,7 +897,7 @@ run)
 	run "$@"
 	;;
 shell)
-	[[ $# -lt 3 ]] && usage "too few arguments specified"
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
 	CONTAINER="$2"
 	shift 2
 	shell
