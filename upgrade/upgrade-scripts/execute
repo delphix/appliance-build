@@ -323,6 +323,56 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
 
+#
+# Package configuration files are only automatically removed by the
+# package manager when the package that "owns" the file is "purged".
+# Thus, when upgrading a package to a new version that no longer
+# delivers a "conffile" that it used to deliver, that conffile will not
+# be automatically removed by the package manager.
+#
+# Generally, it is the responsibility of each specific package to
+# properly remove the conffile that is no longer used by the package.
+# Unfortuantely this means that if a given package does not do this
+# removal, the conffile will remain on the system indefinitely. Further,
+# that configuration file may actually result in a mis-configured
+# system.
+#
+# To help avoid mis-configuration when packages mistakenly omit the
+# removal of their conffiles, we have logic below to automatically
+# detect these "obsolete" conffiles, and remove them proactively.
+# Further, after we remove these obsolete files, we "--reinstall" the
+# package that previously owned the file, such that the package manager
+# will no longer report that file as obsolete.
+#
+dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
+	while read -r file; do
+		package=$(dpkg-query -S "$file" | awk -F: '{print $1}')
+		[[ -n "$package" ]] || die "failed to determine package name"
+
+		#
+		# We should only be operating on currently installed
+		# packages. So, to verify the package retrieved above,
+		# we double check that the package is installed.
+		#
+		dpkg-query -W "$package" &>/dev/null ||
+			die "package '$package' is not installed"
+
+		rm -f "$file" ||
+			die "failed to remove file '$file' of package '$package'"
+
+		#
+		# Since we run this each time a file is removed, if a
+		# package has multiple obsolete files, we'll end up
+		# reinstalling the package multiple times. Currently
+		# this isn't a problem, since we haven't hit a case
+		# where a package has multiple obsolete files; but
+		# perhaps this will change in the future, at which point
+		# we can optimize this better to handle that case.
+		#
+		apt_get install -y --reinstall "$package" ||
+			die "failed to reinstall package '$package'"
+	done || die "failed to remove obsolete package configuration files"
+
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
 
