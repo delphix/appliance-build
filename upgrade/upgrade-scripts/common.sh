@@ -39,13 +39,92 @@ LOG_DIRECTORY="/var/tmp/delphix-upgrade"
 PROP_CURRENT_VERSION="com.delphix:current-version"
 PROP_INITIAL_VERSION="com.delphix:initial-version"
 
+#
+# To better enable root cause analysis of any upgrade failures, we
+# enable the "xtrace" feature here, and redirect that output to the
+# system log. This way, we can easily obtain a trace of the execution
+# path via the system log, which can be invaluable for any post-mortem
+# analysis of a failure. Verbose logging is available in /var/log/syslog
+# on the Delphix Engine
+#
+exec 4> >(logger -t "upgrade-scripts:$(basename "$0")" --id=$$)
+BASH_XTRACEFD="4"
+PS4='${BASH_SOURCE[0]}:${FUNCNAME[0]}:${LINENO[0]} '
+set -o xtrace
+
+#
+# In addition to redirecting the execution trace output to syslog (which
+# is configured above), we also provide the following functions such
+# that each script can enable and disable the redirection of their
+# "stdout" and "stderr" to that same system log. This way, for the
+# scripts that leverage these functions, we'll capture a trace of the
+# script's execution, along with the output of the executed commands, in
+# a single location (complete with timestamps for all executed commands
+# and the commands' output).
+#
+# We don't automatically enable this redirection, since it would then
+# mask usage and help messages that can be helpful when manually running
+# the scripts. Thus, the intention is for each script to determine when
+# it's most appropriate to enable and disable this redirection.
+#
+
+function start_stdout_redirect_to_system_log() {
+	exec 5>&1
+	exec 1>&4
+}
+
+function stop_stdout_redirect_to_system_log() {
+	exec 1>&5
+}
+
+#
+# This global variable is used to track which file descriptor
+# corresponds to the script's stderr. This is relevant if a script
+# redirects its stderr to the system log using the functions below, and
+# helps us ensure errors (i.e. any calls to "die", "warn", etc.) will
+# always be visible on stderr.
+#
+STDERR_FD=2
+
+function start_stderr_redirect_to_system_log() {
+	STDERR_FD=6
+	eval "exec $STDERR_FD>&2"
+	exec 2>&4
+}
+
+function stop_stderr_redirect_to_system_log() {
+	exec 2>&$STDERR_FD
+	STDERR_FD=2
+}
+
 function die() {
-	echo "$(basename "$0"): $*" >&2
+	echo "$(basename "$0"): $*" >&$STDERR_FD
+
+	if [[ "$STDERR_FD" != "2" ]]; then
+		#
+		# If stderr is configured to be redirected to syslog, we
+		# want to emit the error message to both, syslog and the
+		# script's actual stderr file descriptor; this ensures
+		# the message is sent to syslog too.
+		#
+		echo "$(basename "$0"): $*" >&2
+	fi
+
 	exit 1
 }
 
 function warn() {
-	echo "$(basename "$0"): $*" >&2
+	echo "$(basename "$0"): $*" >&$STDERR_FD
+
+	if [[ "$STDERR_FD" != "2" ]]; then
+		#
+		# If stderr is configured to be redirected to syslog, we
+		# want to emit the error message to both, syslog and the
+		# script's actual stderr file descriptor; this ensures
+		# the message is sent to syslog too.
+		#
+		echo "$(basename "$0"): $*" >&2
+	fi
 }
 
 function get_image_path() {

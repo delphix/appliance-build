@@ -133,6 +133,45 @@ deb [trusted=yes] file://$IMAGE_PATH/public bionic delphix
 EOF
 	die "failed to configure apt sources"
 
+start_stdout_redirect_to_system_log
+start_stderr_redirect_to_system_log
+
+#
+# Older versions (i.e. the 6.0.0.0 release) of the "nfs-kernel-server"
+# package had "etab" file delivered as part of the package. Thus, when
+# upgrading the package, the existing "etab" file would get replaced
+# with a new/empty "etab" file from the new package.
+#
+# This file is dynamically modified during runtime, to contain the list
+# of currently exported filesystems. Thus, when it's replaced on upgrade
+# with an empty file, this results in all exports being unexported; i.e.
+# mountd notices that the file is empty, interprets that to mean no
+# filesystems should be currently exported, and then unexports all
+# previously exported filesystems.
+#
+# This is problematic, since the act of unexporting the filesystems can
+# result in client errors, if those exports are being actively used at
+# the time of the upgrade/unexport.
+#
+# To avoid this issue, we're modifying the dpkg state, such that dpkg
+# will no longer associate the "etab" file with the "nfs-kernel-server"
+# package. This way, when the old package is removed, the "etab" file
+# will not be automatically manipulated by dpkg.  We *must* do this
+# prior to invoking "apt-get" below, to ensure we remove the association
+# before upgrading the package.
+#
+# FWIW, we tried to do this via the package's "preinst" package hook,
+# but that did not help; the "etab" file was still removed when the old
+# package was replaced/upgraded.
+#
+# We can safely remove this once running a version that no longer
+# supports upgrading from the 6.0.0.0 release, since that's the only
+# release that suffers from this defect; we've dis-associated the "etab"
+# file from the "nfs-kernel-server" package in all later releases.
+#
+[[ -e /var/lib/dpkg/info/nfs-kernel-server.list ]] &&
+	sed -i '/\/var\/lib\/nfs\/etab/d' /var/lib/dpkg/info/nfs-kernel-server.list
+
 apt_get update || die "failed to update apt sources"
 
 #
@@ -283,6 +322,9 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 # that fall into this category are removed.
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
+
+stop_stdout_redirect_to_system_log
+stop_stderr_redirect_to_system_log
 
 #
 # Finally, for all of the packages listed in the "packages.list" file,
