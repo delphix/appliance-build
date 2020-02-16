@@ -39,7 +39,5 @@
     - appliance-build.masking-development
     - appliance-build.qa-internal
     - appliance-build.virtualization-common
-    - appliance-build.virtualization-internal
-    - appliance-build.virtualization-standard
     - appliance-build.virtualization-development
     - appliance-build.zfsonlinux-development
