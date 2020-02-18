@@ -104,7 +104,6 @@ the "live-build/build/artifacts/" directory:
     $ ls -lh live-build/build/artifacts/
     total 1.9G
     -rw-r--r-- 1 root root 275M Jan 11 22:31 internal-minimal-kvm.debs.tar.gz
-    -rw-r--r-- 1 root root   45 Jan 11 22:31 internal-minimal-kvm.migration.tar.gz
     -rw-r--r-- 1 root root 636M Jan 11 22:33 internal-minimal-kvm.qcow2
 
 The appliance produced will contain a kernel optimized for the
