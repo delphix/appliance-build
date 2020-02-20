@@ -172,6 +172,18 @@ start_stderr_redirect_to_system_log
 [[ -e /var/lib/dpkg/info/nfs-kernel-server.list ]] &&
 	sed -i '/\/var\/lib\/nfs\/etab/d' /var/lib/dpkg/info/nfs-kernel-server.list
 
+#
+# Older versions (i.e. the 6.0.0.0 release) of the virtualization
+# package would disable the "delphix-fluentd" service in that package's
+# "prerm" package hook. This meant that if the service was enabled prior
+# to the upgrade, it would be disabled after the upgrade. Since we can't
+# easily stop this behavior on systems already running 6.0.0.0, we have
+# to workaround this issue. Thus, before we upgrade the packages below,
+# we check to see if this service is currently enabled, and will
+# re-enable it after all packages have been upgraded.
+#
+DELPHIX_FLUENTD_IS_ENABLED=$(systemctl is-enabled delphix-fluentd.service)
+
 apt_get update || die "failed to update apt sources"
 
 #
@@ -322,6 +334,17 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 # that fall into this category are removed.
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
+
+#
+# As mentioned in a comment above, if the "delphix-fluentd" service is
+# enabled prior to upgrading all of the packages, we need to ensure it
+# remains enabled after upgrading all of the packages. Due to a bug in
+# 6.0.0.0 this might not be the case, so we explicitly enable it here.
+#
+if [[ "$DELPHIX_FLUENTD_IS_ENABLED" == "enabled" ]]; then
+	systemctl enable "delphix-fluentd.service" ||
+		die "failed to enable 'delphix-fluend.service'"
+fi
 
 #
 # Package configuration files are only automatically removed by the
