@@ -106,6 +106,17 @@ function download_input_delphix_s3_debs() {
 	[[ -e "$dir/$input_name" ]] && rm -rf "$dir/$input_name"
 	mv "$tmp_directory" "$dir/$input_name"
 	echo "$s3_uri" >"$dir/$input_name/S3_URI"
+
+	#
+	# Since the original directory was generated via "mktemp", the
+	# permissions of the artifact directory will be more restrictive
+	# than we want. Thus, here we fix this, and enable all users the
+	# ability to read/traverse the directory. This is useful since
+	# the build will likely be run as root, but the artifacts will
+	# be consumed after the build has finished, and by a non-root
+	# user.
+	#
+	chmod 755 "$dir/$input_name"
 }
 
 function build_ancillary_repository() {
