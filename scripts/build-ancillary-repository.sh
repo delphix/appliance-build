@@ -103,7 +103,7 @@ function download_input_delphix_s3_debs() {
 	#
 	local dir="$TOP/live-build/build/artifacts/inputs"
 	mkdir -p "$dir"
-	[[ -e "$dir/$input_name" ]] && rm -rf "$dir/$input_name"
+	[[ -e "$dir/$input_name" ]] && rm -rf "${dir:?}/$input_name"
 	mv "$tmp_directory" "$dir/$input_name"
 	echo "$s3_uri" >"$dir/$input_name/S3_URI"
 
