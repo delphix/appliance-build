@@ -101,11 +101,11 @@ function download_input_delphix_s3_debs() {
 	# build inputs, as we could later re-run the build using the
 	# same exact S3 artifacts used during the original build.
 	#
-	mkdir -p "$TOP/build/artifacts/inputs"
-	[[ -e "$TOP/build/artifacts/inputs/$input_name" ]] &&
-		rm -rf "$TOP/build/artifacts/inputs/$input_name"
-	mv "$tmp_directory" "$TOP/build/artifacts/inputs/$input_name"
-	echo "$s3_uri" >"$TOP/build/artifacts/inputs/$input_name/S3_URI"
+	local dir="$TOP/live-build/build/artifacts/inputs"
+	mkdir -p "$dir"
+	[[ -e "$dir/$input_name" ]] && rm -rf "$dir/$input_name"
+	mv "$tmp_directory" "$dir/$input_name"
+	echo "$s3_uri" >"$dir/$input_name/S3_URI"
 }
 
 function build_ancillary_repository() {
