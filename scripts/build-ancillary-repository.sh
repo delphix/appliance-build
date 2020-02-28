@@ -103,6 +103,7 @@ function download_input_delphix_s3_debs() {
 	#
 	mkdir -p "$TOP/build/artifacts/inputs"
 	mv "$tmp_directory" "$TOP/build/artifacts/inputs/$input_name"
+	echo "$s3_uri" >"$TOP/build/artifacts/inputs/$input_name/S3_URI"
 }
 
 function build_ancillary_repository() {
