@@ -75,21 +75,34 @@ function resolve_s3_uri() {
 	fi
 }
 
-function download_delphix_s3_debs() {
+function download_input_delphix_s3_debs() {
 	local pkg_directory="$1"
-	local S3_URI="$2"
+	local input_name="$2"
+	local s3_uri="$3"
 	local tmp_directory
 
 	tmp_directory=$(mktemp -d -p "$TOP/build" tmp.s3-debs.XXXXXXXXXX)
 	pushd "$tmp_directory" &>/dev/null
 
-	aws s3 sync --only-show-errors "$S3_URI" .
+	aws s3 sync --only-show-errors "$s3_uri" .
 	sha256sum -c --strict SHA256SUMS
 
-	mv ./*deb "$pkg_directory/"
+	cp -a ./*deb "$pkg_directory/"
 
 	popd &>/dev/null
-	rm -rf "$tmp_directory"
+
+	#
+	# We copy the S3 artifacts that are input to the build to the
+	# artifacts directory, such that these build inputs can be
+	# preserved along with all of the build outputs. This way, we
+	# have a better way of later auditing the build outputs, by
+	# comparing it with the build inputs. Additionally, this helps
+	# any effort to regenerate the build outputs from the same exact
+	# build inputs, as we could later re-run the build using the
+	# same exact S3 artifacts used during the original build.
+	#
+	mkdir -p "$TOP/build/artifacts/inputs"
+	mv "$tmp_directory" "$TOP/build/artifacts/inputs/$input_name"
 }
 
 function build_ancillary_repository() {
@@ -197,10 +210,10 @@ PKG_DIRECTORY=$(mktemp -d -p "$TOP/build" tmp.pkgs.XXXXXXXXXX)
 # Now that we've determined the URI of all first-party packages, we can
 # proceed to download these packages.
 #
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_USERLAND_PKGS"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_KERNEL_PKGS"
+download_input_delphix_s3_debs "$PKG_DIRECTORY" "virtualization" "$AWS_S3_URI_VIRTUALIZATION"
+download_input_delphix_s3_debs "$PKG_DIRECTORY" "masking" "$AWS_S3_URI_MASKING"
+download_input_delphix_s3_debs "$PKG_DIRECTORY" "userland-pkgs" "$AWS_S3_URI_USERLAND_PKGS"
+download_input_delphix_s3_debs "$PKG_DIRECTORY" "kernel-pkgs" "$AWS_S3_URI_KERNEL_PKGS"
 
 #
 # Now that our temporary package directory has been populated with all
