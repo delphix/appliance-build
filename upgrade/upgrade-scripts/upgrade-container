@@ -605,6 +605,7 @@ function migrate_configuration() {
 	while read -r svc; do
 		migrate_svc "$svc"
 	done <<-EOF
+		delphix-fluentd.service
 		delphix-masking.service
 		nfs-mountd.service
 		ntp.service
