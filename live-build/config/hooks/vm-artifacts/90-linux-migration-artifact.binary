@@ -114,7 +114,7 @@ test -n "$DELPHIX_APPLIANCE_VERSION"
 	# of migration, so every time we bump this number we
 	# need to bump the one from the checks there too.
 	#
-	echo "DLPX_MIN_VERSION=5.3.7.0"
+	echo "DLPX_MIN_VERSION=5.3.6.0"
 
 	#
 	# DLPX_VERSION is set explicitly to match the version of the
