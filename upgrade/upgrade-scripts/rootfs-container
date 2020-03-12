@@ -77,7 +77,17 @@ function get_bootloader_devices() {
 	#
 	zpool list -vH rpool |
 		awk '! /rpool|mirror|replacing|spare/ {print $1}' |
-		sed 's/p\{0,1\}[0-9]*$//'
+		while read -r part; do
+			#
+			# If the rpool is not installed a parition, we throw
+			# an error. We expect this to never happen, and the
+			# calling code is likely untested in that case, so we
+			# throw an error rather than try to handle it.
+			#
+			[[ "$(lsblk --nodeps -no type "/dev/$part")" == "part" ]] ||
+				die "rpool installed on full disk \"$part\""
+			lsblk -no pkname "/dev/$part"
+		done
 }
 
 function set_bootfs_not_mounted_cleanup() {
