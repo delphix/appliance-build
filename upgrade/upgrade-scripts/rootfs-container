@@ -31,16 +31,17 @@ function delete() {
 	local clonesnaps=()
 
 	#
-	# The "data" and "home" datasets of a rootfs container may have
-	# been cloned as part of a prior upgrade, and the "root" dataset
-	# may have been cloned as part of a prior rollback. Thus, in
-	# order to delete this specific rootfs container, we need to
-	# promote any clones that exist.
+	# The "data", "home", and "log" datasets of a rootfs container
+	# may have been cloned as part of a prior upgrade, and the
+	# "root" dataset may have been cloned as part of a prior
+	# rollback. Thus, in order to delete this specific rootfs
+	# container, we need to promote any clones that exist.
 	#
 	for snap in \
 		$(get_dataset_snapshots "rpool/ROOT/$CONTAINER/root") \
 		$(get_dataset_snapshots "rpool/ROOT/$CONTAINER/data") \
-		$(get_dataset_snapshots "rpool/ROOT/$CONTAINER/home"); do
+		$(get_dataset_snapshots "rpool/ROOT/$CONTAINER/home") \
+		$(get_dataset_snapshots "rpool/ROOT/$CONTAINER/log"); do
 		for clone in $(get_snapshot_clones "$snap"); do
 			zfs promote "$clone" ||
 				die "'zfs promote $clone' failed"
