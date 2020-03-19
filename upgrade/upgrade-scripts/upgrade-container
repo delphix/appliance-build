@@ -376,11 +376,11 @@ function start() {
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
-	systemctl start "systemd-nspawn@$CONTAINER" ||
+	machinectl start "$CONTAINER" ||
 		die "failed to start container '$CONTAINER'"
 
 	#
-	# When starting the container above with "systemctl start", the
+	# When starting the container above with "machinectl start", the
 	# command will return prior to the container having fully
 	# completed it's boot process. Thus, to ensure we don't attempt
 	# the verification steps prior to the container being ready, we
@@ -400,8 +400,26 @@ function start() {
 }
 
 function stop() {
-	systemctl stop "systemd-nspawn@$CONTAINER" ||
-		die "failed to stop container: '$CONTAINER'"
+	machinectl terminate "$CONTAINER" ||
+		die "failed to termiante container: '$CONTAINER'"
+
+	#
+	# The above command used to terminate the container is not
+	# synchronous, and may return before termination of the
+	# container is complete. Thus, we poll here, and wait for the
+	# the termination to complete before continuing.
+	#
+	# shellcheck disable=SC2034
+	for i in {1..600}; do
+		if ! machinectl status "$CONTAINER" &>/dev/null; then
+			break
+		fi
+
+		sleep 1
+	done
+
+	machinectl status "$CONTAINER" &>/dev/null &&
+		die "timeout waiting for container termination: '$CONTAINER'"
 }
 
 function destroy() {

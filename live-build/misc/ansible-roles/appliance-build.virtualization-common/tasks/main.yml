@@ -24,29 +24,6 @@
     state: directory
 
 #
-# The "product", "platform", and "cr_auth" fields are intentionally left
-# out of this file, as those fields should get filled in by other roles
-# that will run after this role.
-#
-- copy:
-    dest: /var/opt/delphix/server.conf
-    mode: 0644
-    content: |
-      [config]
-      hostname=delphix
-      disk=c?t0d0
-      interface=vmxnet3s0
-      primary_aggr_nic=vmxnet3s0
-      type=ipv4
-      method=dhcp
-      ip=
-      netmask=
-      gateway=
-      domain=
-      dns1=
-      dns2=
-
-#
 # Initial NFS Server configuration for virtualization. We do this here instead
 # of within the virtualization package because the virtualization software
 # modifies this configuration at runtime, and we don't want ansible roles that

@@ -133,6 +133,57 @@ deb [trusted=yes] file://$IMAGE_PATH/public bionic delphix
 EOF
 	die "failed to configure apt sources"
 
+start_stdout_redirect_to_system_log
+start_stderr_redirect_to_system_log
+
+#
+# Older versions (i.e. the 6.0.0.0 release) of the "nfs-kernel-server"
+# package had "etab" file delivered as part of the package. Thus, when
+# upgrading the package, the existing "etab" file would get replaced
+# with a new/empty "etab" file from the new package.
+#
+# This file is dynamically modified during runtime, to contain the list
+# of currently exported filesystems. Thus, when it's replaced on upgrade
+# with an empty file, this results in all exports being unexported; i.e.
+# mountd notices that the file is empty, interprets that to mean no
+# filesystems should be currently exported, and then unexports all
+# previously exported filesystems.
+#
+# This is problematic, since the act of unexporting the filesystems can
+# result in client errors, if those exports are being actively used at
+# the time of the upgrade/unexport.
+#
+# To avoid this issue, we're modifying the dpkg state, such that dpkg
+# will no longer associate the "etab" file with the "nfs-kernel-server"
+# package. This way, when the old package is removed, the "etab" file
+# will not be automatically manipulated by dpkg.  We *must* do this
+# prior to invoking "apt-get" below, to ensure we remove the association
+# before upgrading the package.
+#
+# FWIW, we tried to do this via the package's "preinst" package hook,
+# but that did not help; the "etab" file was still removed when the old
+# package was replaced/upgraded.
+#
+# We can safely remove this once running a version that no longer
+# supports upgrading from the 6.0.0.0 release, since that's the only
+# release that suffers from this defect; we've dis-associated the "etab"
+# file from the "nfs-kernel-server" package in all later releases.
+#
+[[ -e /var/lib/dpkg/info/nfs-kernel-server.list ]] &&
+	sed -i '/\/var\/lib\/nfs\/etab/d' /var/lib/dpkg/info/nfs-kernel-server.list
+
+#
+# Older versions (i.e. the 6.0.0.0 release) of the virtualization
+# package would disable the "delphix-fluentd" service in that package's
+# "prerm" package hook. This meant that if the service was enabled prior
+# to the upgrade, it would be disabled after the upgrade. Since we can't
+# easily stop this behavior on systems already running 6.0.0.0, we have
+# to workaround this issue. Thus, before we upgrade the packages below,
+# we check to see if this service is currently enabled, and will
+# re-enable it after all packages have been upgraded.
+#
+DELPHIX_FLUENTD_IS_ENABLED=$(systemctl is-enabled delphix-fluentd.service)
+
 apt_get update || die "failed to update apt sources"
 
 #
@@ -283,6 +334,70 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 # that fall into this category are removed.
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
+
+#
+# As mentioned in a comment above, if the "delphix-fluentd" service is
+# enabled prior to upgrading all of the packages, we need to ensure it
+# remains enabled after upgrading all of the packages. Due to a bug in
+# 6.0.0.0 this might not be the case, so we explicitly enable it here.
+#
+if [[ "$DELPHIX_FLUENTD_IS_ENABLED" == "enabled" ]]; then
+	systemctl enable "delphix-fluentd.service" ||
+		die "failed to enable 'delphix-fluend.service'"
+fi
+
+#
+# Package configuration files are only automatically removed by the
+# package manager when the package that "owns" the file is "purged".
+# Thus, when upgrading a package to a new version that no longer
+# delivers a "conffile" that it used to deliver, that conffile will not
+# be automatically removed by the package manager.
+#
+# Generally, it is the responsibility of each specific package to
+# properly remove the conffile that is no longer used by the package.
+# Unfortuantely this means that if a given package does not do this
+# removal, the conffile will remain on the system indefinitely. Further,
+# that configuration file may actually result in a mis-configured
+# system.
+#
+# To help avoid mis-configuration when packages mistakenly omit the
+# removal of their conffiles, we have logic below to automatically
+# detect these "obsolete" conffiles, and remove them proactively.
+# Further, after we remove these obsolete files, we "--reinstall" the
+# package that previously owned the file, such that the package manager
+# will no longer report that file as obsolete.
+#
+dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
+	while read -r file; do
+		package=$(dpkg-query -S "$file" | awk -F: '{print $1}')
+		[[ -n "$package" ]] || die "failed to determine package name"
+
+		#
+		# We should only be operating on currently installed
+		# packages. So, to verify the package retrieved above,
+		# we double check that the package is installed.
+		#
+		dpkg-query -W "$package" &>/dev/null ||
+			die "package '$package' is not installed"
+
+		rm -f "$file" ||
+			die "failed to remove file '$file' of package '$package'"
+
+		#
+		# Since we run this each time a file is removed, if a
+		# package has multiple obsolete files, we'll end up
+		# reinstalling the package multiple times. Currently
+		# this isn't a problem, since we haven't hit a case
+		# where a package has multiple obsolete files; but
+		# perhaps this will change in the future, at which point
+		# we can optimize this better to handle that case.
+		#
+		apt_get install -y --reinstall "$package" ||
+			die "failed to reinstall package '$package'"
+	done || die "failed to remove obsolete package configuration files"
+
+stop_stdout_redirect_to_system_log
+stop_stderr_redirect_to_system_log
 
 #
 # Finally, for all of the packages listed in the "packages.list" file,
