@@ -73,7 +73,7 @@ ARCHIVE_DIR="$1"
 #
 [[ -n "$DLPX_VERSION" ]] || die "DLPX_VERSION variable is missing"
 
-MIN_MIGRATION_VERSION="5.3.7.0"
+MIN_MIGRATION_VERSION="5.3.6.0"
 [[ "$DLPX_MIN_VERSION" == "$MIN_MIGRATION_VERSION" ]] ||
 	die "expected DLPX_MIN_VERSION for migration to be" \
 		"$MIN_MIGRATION_VERSION"
