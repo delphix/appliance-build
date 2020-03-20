@@ -63,6 +63,15 @@ function delete() {
 	for snap in "${clonesnaps[@]}"; do
 		zfs destroy "$snap" || die "'zfs destroy $snap' failed"
 	done
+
+	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
+	[[ -n "$ROOTFS_DATASET" ]] ||
+		die "unable to determine mounted rootfs container dataset"
+
+	if zfs list "$ROOTFS_DATASET@container-$CONTAINER" &>/dev/null; then
+		zfs destroy -r "$ROOTFS_DATASET@container-$CONTAINER" ||
+			die "failed to destroy container snapshot: '$CONTAINER'"
+	fi
 }
 
 function get_bootloader_devices() {
