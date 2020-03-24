@@ -52,12 +52,12 @@
       - libnss3-tools
       - libpam0g-dev
       - libssl-dev
-      - python-pip
-      - mono-complete
       - mingw-64
-      - nsis
+      - mono-complete
       - mono-reference-assemblies-3.5
       - mono-reference-assemblies-4.0
+      - nsis
+      - python-pip
     state: present
   register: result
   until: result is not failed
