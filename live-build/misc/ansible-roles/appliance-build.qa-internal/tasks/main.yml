@@ -53,7 +53,7 @@
       - libpam0g-dev
       - libssl-dev
       - python-pip
-      - mono
+      - mono-complete
       - mingw-64
       - nsis
       - mono-reference-assemblies-3.5
