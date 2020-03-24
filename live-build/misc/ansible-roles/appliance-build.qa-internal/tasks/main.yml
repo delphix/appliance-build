@@ -53,6 +53,11 @@
       - libpam0g-dev
       - libssl-dev
       - python-pip
+      - mono
+      - mingw-64
+      - nsis
+      - mono-reference-assemblies-3.5
+      - mono-reference-assemblies-4.0
     state: present
   register: result
   until: result is not failed
