@@ -379,32 +379,69 @@ function finalize() {
 
 	[[ -n "$UPGRADE_TYPE" ]] ||
 		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
+		die "variable UPGRADE_BASE_VERSION is not set"
 
 	case "$UPGRADE_TYPE" in
-	DEFERRED)
-		#
-		# Currently, we've only implemented "finalize" for
-		# DEFERRED upgrades. This is to avoid adding the logic
-		# for "not-in-place" upgrades (DEFERRED is strictly
-		# "in-place") and rollback (which is not supported for
-		# DEFERRED), until we determine those are required.
-		#
-		;;
+	DEFERRED | FULL | ROLLBACK) ;;
 	*)
-		die "rollback is not supported for upgrade type: '$UPGRADE_TYPE'"
+		die "finalize is not supported for upgrade type: '$UPGRADE_TYPE'"
 		;;
 	esac
 
-	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
-	[[ -n "$ROOTFS_DATASET" ]] ||
-		die "unable to determine mounted rootfs container dataset"
+	#
+	# This first pass checks for available "execute.upgrade" snapshots
+	# and deletes snapshots that are older than the base upgrade version.
+	# This pass takes care of cleanup after in-place and deferred upgrades.
+	#
+	SNAPSHOT_LIST=$(zfs list -t snapshot -r rpool/ROOT -d 2 -Ho name) ||
+		die "unable to determine available rollback snapshots"
 
-	SNAPSHOT_NAME=$(get_dataset_rollback_snapshot_name "$ROOTFS_DATASET")
-	[[ -n "$SNAPSHOT_NAME" ]] ||
-		die "unable to determine rollback snapshot name"
+	for snapshot in $SNAPSHOT_LIST; do
+		local SNAPSHOT_NAME
+		SNAPSHOT_NAME=$(echo "$snapshot" | awk -F@ '{print $2}')
+		#
+		# We skip container-delphix instances since `rootfs-container delete`
+		# handles them in the second pass below.
+		#
+		grep -qE "^container-delphix.[[:alnum:]]{7}$" <(echo "$SNAPSHOT_NAME") &&
+			continue
+		grep -qE "^execute-upgrade.[[:alnum:]]{7}$" <(echo "$SNAPSHOT_NAME") ||
+			die "unexpected snapshot name: '$snapshot'"
+		local SNAPSHOT_VERSION
+		SNAPSHOT_VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$snapshot") ||
+			die "failed to get snapshot version"
+		[[ "$SNAPSHOT_VERSION" != "-" ]] ||
+			die "failed to get current version for snapshot '$snapshot'"
+		if compare_versions \
+			"$SNAPSHOT_VERSION" "lt" "$UPGRADE_BASE_VERSION"; then
+			zfs destroy -r "$snapshot" ||
+				die "failed to destroy rollback snapshot"
+		fi
+	done
 
-	zfs destroy -r "$ROOTFS_DATASET@$SNAPSHOT_NAME" ||
-		die "failed to destroy rollback snapshots"
+	#
+	# This second pass checks for available filesystems and deletes those
+	# that are older than the base upgrade version. This pass takes care
+	# of cleanup following rollbacks and not-in-place upgrades.
+	#
+	FILESYSTEM_LIST=$(zfs list -t filesystem -r rpool/ROOT -d 1 -Ho name | tail -n +2) ||
+		die "unable to determine available filesystems"
+
+	for filesystem in $FILESYSTEM_LIST; do
+		local FILESYSTEM_VERSION
+		FILESYSTEM_VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$filesystem") ||
+			die "failed to get filesystem version"
+		[[ "$FILESYSTEM_VERSION" != "-" ]] ||
+			die "failed to get current version for filesystem '$filesystem'"
+		if compare_versions \
+			"$FILESYSTEM_VERSION" "lt" "$UPGRADE_BASE_VERSION"; then
+			local FILESYSTEM_NAME
+			FILESYSTEM_NAME=$(echo "$filesystem" | awk -F/ '{print $3}')
+			"$IMAGE_PATH/rootfs-container" delete "$FILESYSTEM_NAME" ||
+				die "failed to delete filesystem '$filesystem"
+		fi
+	done
 
 	rm -rf "$IMAGE_PATH" || die "failed to remove unpacked upgrade image"
 
@@ -434,12 +471,14 @@ deferred)
 	shift 1
 	verify_upgrade_is_allowed
 	verify_upgrade_in_place_is_allowed
+	verify_upgrade_not_in_progress
 	upgrade_in_place "$@"
 	;;
 full)
 	UPGRADE_TYPE="FULL"
 	shift 1
 	verify_upgrade_is_allowed
+	verify_upgrade_not_in_progress
 
 	#
 	# FULL upgrade always perform a reboot but can take on two
