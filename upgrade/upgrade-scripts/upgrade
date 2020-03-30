@@ -54,6 +54,7 @@ function usage() {
 	echo "$PREFIX_STRING [-n] [-v] deferred"
 	echo "$PREFIX_SPACES [-n] [-v] full"
 	echo "$PREFIX_SPACES rollback"
+	echo "$PREFIX_SPACES finalize"
 
 	exit 2
 }
@@ -296,7 +297,9 @@ function rollback() {
 
 	source_upgrade_properties
 
-	[[ -n "$UPGRADE_TYPE" ]] || die "variable UPGRADE_TYPE is not set"
+	[[ -n "$UPGRADE_TYPE" ]] ||
+		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+
 	[[ -n "$UPGRADE_BASE_CONTAINER" ]] ||
 		die "variable UPGRADE_BASE_CONTAINER is not set"
 	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
@@ -357,6 +360,94 @@ function rollback() {
 	systemctl reboot || die "'systemctl reboot' failed"
 }
 
+function finalize() {
+	if [[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]]; then
+		#
+		# If we're executing a dry-run of the finalize
+		# sub-command, we assume that we're running after a
+		# dry-run upgrade. Thus, in that case, we only need to
+		# remove the upgrade image, as all of the snapshots and
+		# datasets for the dry-run upgrade will have already
+		# been removed.
+		#
+		rm -rf "$IMAGE_PATH" ||
+			die "failed to remove unpacked upgrade image"
+		return
+	fi
+
+	source_upgrade_properties
+
+	[[ -n "$UPGRADE_TYPE" ]] ||
+		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
+		die "variable UPGRADE_BASE_VERSION is not set"
+
+	case "$UPGRADE_TYPE" in
+	DEFERRED | FULL | ROLLBACK) ;;
+	*)
+		die "finalize is not supported for upgrade type: '$UPGRADE_TYPE'"
+		;;
+	esac
+
+	#
+	# This first pass checks for available "execute.upgrade" snapshots
+	# and deletes snapshots that are older than the base upgrade version.
+	# This pass takes care of cleanup after in-place and deferred upgrades.
+	#
+	SNAPSHOT_LIST=$(zfs list -t snapshot -r rpool/ROOT -d 2 -Ho name) ||
+		die "unable to determine available rollback snapshots"
+
+	for snapshot in $SNAPSHOT_LIST; do
+		local SNAPSHOT_NAME
+		SNAPSHOT_NAME=$(echo "$snapshot" | awk -F@ '{print $2}')
+		#
+		# We skip container-delphix instances since `rootfs-container delete`
+		# handles them in the second pass below.
+		#
+		grep -qE "^container-delphix.[[:alnum:]]{7}$" <(echo "$SNAPSHOT_NAME") &&
+			continue
+		grep -qE "^execute-upgrade.[[:alnum:]]{7}$" <(echo "$SNAPSHOT_NAME") ||
+			die "unexpected snapshot name: '$snapshot'"
+		local SNAPSHOT_VERSION
+		SNAPSHOT_VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$snapshot") ||
+			die "failed to get snapshot version"
+		[[ "$SNAPSHOT_VERSION" != "-" ]] ||
+			die "failed to get current version for snapshot '$snapshot'"
+		if compare_versions \
+			"$SNAPSHOT_VERSION" "lt" "$UPGRADE_BASE_VERSION"; then
+			zfs destroy -r "$snapshot" ||
+				die "failed to destroy rollback snapshot"
+		fi
+	done
+
+	#
+	# This second pass checks for available filesystems and deletes those
+	# that are older than the base upgrade version. This pass takes care
+	# of cleanup following rollbacks and not-in-place upgrades.
+	#
+	FILESYSTEM_LIST=$(zfs list -t filesystem -r rpool/ROOT -d 1 -Ho name | tail -n +2) ||
+		die "unable to determine available filesystems"
+
+	for filesystem in $FILESYSTEM_LIST; do
+		local FILESYSTEM_VERSION
+		FILESYSTEM_VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$filesystem") ||
+			die "failed to get filesystem version"
+		[[ "$FILESYSTEM_VERSION" != "-" ]] ||
+			die "failed to get current version for filesystem '$filesystem'"
+		if compare_versions \
+			"$FILESYSTEM_VERSION" "lt" "$UPGRADE_BASE_VERSION"; then
+			local FILESYSTEM_NAME
+			FILESYSTEM_NAME=$(echo "$filesystem" | awk -F/ '{print $3}')
+			"$IMAGE_PATH/rootfs-container" delete "$FILESYSTEM_NAME" ||
+				die "failed to delete filesystem '$filesystem"
+		fi
+	done
+
+	rm -rf "$IMAGE_PATH" || die "failed to remove unpacked upgrade image"
+
+	remove_upgrade_properties
+}
+
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
 while getopts ':nv' c; do
@@ -380,12 +471,14 @@ deferred)
 	shift 1
 	verify_upgrade_is_allowed
 	verify_upgrade_in_place_is_allowed
+	verify_upgrade_not_in_progress
 	upgrade_in_place "$@"
 	;;
 full)
 	UPGRADE_TYPE="FULL"
 	shift 1
 	verify_upgrade_is_allowed
+	verify_upgrade_not_in_progress
 
 	#
 	# FULL upgrade always perform a reboot but can take on two
@@ -404,6 +497,10 @@ full)
 rollback)
 	shift 1
 	rollback "$@"
+	;;
+finalize)
+	shift 1
+	finalize "$@"
 	;;
 *)
 	usage "invalid option -- '$1'"
