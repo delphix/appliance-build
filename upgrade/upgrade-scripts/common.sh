@@ -305,7 +305,14 @@ function xargs_apt_get() {
 }
 
 function verify_upgrade_not_in_progress() {
-	. "$UPDATE_DIR/upgrade.properties"
+	#
+	# This function only works properly if the UPGRADE_TYPE variable
+	# is not set prior to this function being called. Thus, to help
+	# catch cases where this function is called incorrectly, we
+	# verify the variable is empty before proceeding.
+	#
+	[[ -z "$UPGRADE_TYPE" ]] || die "UPGRADE_TYPE already set"
 
+	. "$UPDATE_DIR/upgrade.properties" &>/dev/null
 	[[ -z "$UPGRADE_TYPE" ]] || die "upgrade currently in-progress"
 }

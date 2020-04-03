@@ -471,18 +471,20 @@ shift $((OPTIND - 1))
 
 case "$1" in
 deferred)
+	verify_upgrade_not_in_progress
+
 	UPGRADE_TYPE="DEFERRED"
 	shift 1
 	verify_upgrade_is_allowed
 	verify_upgrade_in_place_is_allowed
-	verify_upgrade_not_in_progress
 	upgrade_in_place "$@"
 	;;
 full)
+	verify_upgrade_not_in_progress
+
 	UPGRADE_TYPE="FULL"
 	shift 1
 	verify_upgrade_is_allowed
-	verify_upgrade_not_in_progress
 
 	#
 	# FULL upgrade always perform a reboot but can take on two
