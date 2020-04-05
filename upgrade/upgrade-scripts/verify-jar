@@ -20,6 +20,8 @@
 
 IMAGE_VERSION=$(get_image_version)
 [[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+IMAGE_PATH=$(get_image_path)
+[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
 function verify_jar_verify_cleanup() {
 	local rc="$?"
@@ -40,6 +42,11 @@ function verify_jar_verify_cleanup() {
 	if zfs list "domain0/${MDS_SNAPNAME}" &>/dev/null; then
 		/opt/delphix/server/bin/dx_manage_pg cleanup -s "${MDS_SNAPNAME}" ||
 			die "failed to cleanup postgres for snapshot '${MDS_SNAPNAME}'."
+	fi
+
+	if dpkg-query -W delphix-upgrade-verification &>/dev/null; then
+		apt_get remove --purge -y delphix-upgrade-verification ||
+			die "failed to uninstall delphix-upgrade-verification package"
 	fi
 
 	[[ $rc -eq 0 ]] &&
@@ -142,10 +149,26 @@ report_progress 10 "Started application upgrade verification"
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
+#
+# Install the delphix-upgrade-verification debian package from the
+# unpack directory. This package is not installed as part of
+# the execute script since no other package has a dependency on
+# the delphix-upgrade-verification package. This is by design.
+# This package is only meant to be used during upgrade verification
+# and will be un-installed once verification is complete. This allows
+# two engines that might have used different version of the
+# delphix-upgrade-verification package to still have identical software
+# post-upgrade.
+#
+
+find "$IMAGE_PATH" -name "delphix-upgrade-verification*.deb" |
+	xargs_apt_get install -y --allow-downgrades ||
+	die "failed to install delphix-upgrade-verification package"
+
 JAVA_PARAMETERS=(
 	"-Dlog.dir=/var/delphix/server/upgrade-verify"
 	"-Dmdsverify=true"
-	"-jar" "/opt/delphix/server/lib/exec/upgrade-verify/upgrade-verify.jar"
+	"-jar" "/opt/delphix-upgrade-verification/upgrade-verify.jar"
 )
 
 if [[ -n "$DLPX_DEBUG" ]] && $DLPX_DEBUG; then
