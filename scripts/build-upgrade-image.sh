@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+. "${BASH_SOURCE%/*}/common.sh"
+
 #
 # This script is intended to build an upgrade image that contains all of
 # the packages needed to upgrade a particular variant of the appliance,
@@ -25,8 +27,6 @@
 # combining all the deb.tar.gz tarballs produced by live build for this
 # variant (of which there will be one per supported platform).
 #
-
-TOP=$(git rev-parse --show-toplevel 2>/dev/null)
 
 if [[ -z "$TOP" ]]; then
 	echo "Must be run inside the git repsitory."
@@ -63,6 +63,20 @@ for deb_tarball in "$LIVE_BUILD_OUTPUT_DIR/$APPLIANCE_VARIANT"*.debs.tar.gz; do
 done
 
 #
+# Download the delphix upgrade verification debian package.
+# Note, we always pull from the "master" build of the verification
+# package, no matter what the UPSTREAM_BRANCH of the appliance is that
+# we're building; this is intentional.
+#
+
+AWS_S3_URI_UPGRADE_VERIFICATION=$(resolve_s3_uri \
+	"$AWS_S3_URI_UPGRADE_VERIFICATION" \
+	"$AWS_S3_PREFIX_UPGRADE_VERIFICATION" \
+	"devops-gate/master/upgrade-verify/master/post-push/release/latest")
+
+download_delphix_s3_debs "$TOP/upgrade/debs" "$AWS_S3_URI_UPGRADE_VERIFICATION"
+
+#
 # Generate an Aptly/APT repository
 #
 aptly repo create -distribution=bionic -component=delphix upgrade-repository
@@ -94,6 +108,18 @@ VERSION=$(dpkg -f "$(find debs/ -name 'delphix-entire-*' | head -n 1)" version)
 sed -i "s/@@VERSION@@/$VERSION/" version.info
 
 #
+# On 6.0 versions, the appliance stack expects to find the file
+# verification-version.info pre-upgrade. This necessitates the
+# packaging of this file in the upgrade image along with version.info.
+#
+cp verification-version.info.template verification-version.info
+
+# Include version information about this image.
+VERIFICATION_VERSION=$(dpkg -f "$(find debs/ -name 'delphix-upgrade-verification*.deb' | head -n 1)" version)
+sed -i "s/@@VERIFICATION_VERSION@@/$VERIFICATION_VERSION/" verification-version.info
+sed -i "s/@@VERIFICATION_VERSION@@/$VERIFICATION_VERSION/" version.info
+
+#
 # If we're running the build manually, and these variables are not
 # already set in the environment, we use an arbitrarily low falue to
 # allow upgrading to the produce upgrade image from any version.
@@ -115,7 +141,7 @@ else
 	sed -i "s/@@MINIMUM_REBOOT_OPTIONAL_VERSION@@/0.0.0.0/" version.info
 fi
 
-sha256sum payload.tar.gz version.info prepare >SHA256SUMS
+sha256sum payload.tar.gz version.info verification-version.info prepare >SHA256SUMS
 
 #
 # As a precaution, we disable "xtrace" so that we avoid exposing the
@@ -150,6 +176,7 @@ tar -cf "$APPLIANCE_VARIANT.upgrade.tar" \
 	$(ls SHA256SUMS.sig.* 2>/dev/null) \
 	SHA256SUMS \
 	version.info \
+	verification-version.info \
 	prepare \
 	payload.tar.gz
 
