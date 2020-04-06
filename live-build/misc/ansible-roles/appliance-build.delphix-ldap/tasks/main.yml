@@ -65,7 +65,7 @@
 
 - lineinfile:
     dest: etc/auto.master
-    line: "/home   auto_home    -nobrowse"
+    line: "/home   auto_home    -nobrowse,vers=3"
 
 - copy:
     src: 80-internal-ldap
