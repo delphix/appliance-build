@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+. "${BASH_SOURCE%/*}/common.sh"
+
 #
 # This script is intended to be used to build the "ancillary" repository
 # that is used when we run live-build to build our artifacts. Prior to
@@ -29,8 +31,6 @@
 # commands (e.g. apt install, apt download, etc).
 #
 
-TOP=$(git rev-parse --show-toplevel 2>/dev/null)
-
 if [[ -z "$TOP" ]]; then
 	echo "Must be run inside the git repsitory." 2>&1
 	exit 1
@@ -41,56 +41,6 @@ set -o errexit
 set -o pipefail
 
 OUTPUT_DIR=$TOP/live-build/build/ancillary-repository
-
-function resolve_s3_uri() {
-	local pkg_uri="$1"
-	local pkg_prefix="$2"
-	local latest_subprefix="$3"
-
-	local bucket="snapshot-de-images"
-	local jenkinsid="jenkins-ops"
-	local resolved_uri
-
-	if [[ -n "$pkg_uri" ]]; then
-		resolved_uri="$pkg_uri"
-	elif [[ "$pkg_prefix" == s3* ]]; then
-		resolved_uri="$pkg_prefix"
-	elif [[ -n "$pkg_prefix" ]]; then
-		resolved_uri="s3://$bucket/$pkg_prefix"
-	elif [[ -n "$latest_subprefix" ]]; then
-		aws s3 cp --quiet \
-			"s3://$bucket/builds/$jenkinsid/$latest_subprefix" .
-		resolved_uri="s3://$bucket/$(cat latest)"
-		rm -f latest
-	else
-		echo "Invalid arguments provided to resolve_s3_uri()" 2>&1
-		exit 1
-	fi
-
-	if aws s3 ls "$resolved_uri" &>/dev/null; then
-		echo "$resolved_uri"
-	else
-		echo "'$resolved_uri' not found." 1>&2
-		exit 1
-	fi
-}
-
-function download_delphix_s3_debs() {
-	local pkg_directory="$1"
-	local S3_URI="$2"
-	local tmp_directory
-
-	tmp_directory=$(mktemp -d -p "$TOP/build" tmp.s3-debs.XXXXXXXXXX)
-	pushd "$tmp_directory" &>/dev/null
-
-	aws s3 sync --only-show-errors "$S3_URI" .
-	sha256sum -c --strict SHA256SUMS
-
-	mv ./*deb "$pkg_directory/"
-
-	popd &>/dev/null
-	rm -rf "$tmp_directory"
-}
 
 function build_ancillary_repository() {
 	local pkg_directory="$1"

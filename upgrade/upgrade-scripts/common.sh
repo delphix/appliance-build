@@ -289,6 +289,20 @@ function set_upgrade_property() {
 		die "failed to read properties file after setting '$1=$2'"
 }
 
+function apt_get() {
+	DEBIAN_FRONTEND=noninteractive apt-get \
+		-o Dpkg::Options::="--force-confdef" \
+		-o Dpkg::Options::="--force-confold" \
+		"$@"
+}
+
+function xargs_apt_get() {
+	DEBIAN_FRONTEND=noninteractive xargs apt-get \
+		-o Dpkg::Options::="--force-confdef" \
+		-o Dpkg::Options::="--force-confold" \
+		"$@"
+}
+
 function verify_upgrade_not_in_progress() {
 	. "$UPDATE_DIR/upgrade.properties"
 
