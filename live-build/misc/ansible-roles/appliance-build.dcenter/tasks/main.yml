@@ -30,6 +30,7 @@
       - python-paramiko
       - python-pip
       - python-requests
+      - python-tenacity
       - python2.7
       - telnet
     state: present
@@ -86,5 +87,15 @@
     path: /etc/cloud/cloud.cfg
     regexp: '^preserve_hostname: false'
     line: 'preserve_hostname: true'
+
+#
+# The default setting for the number of nfs threads is too low. To
+# improve performance we reset the value to 64 which mimics what
+# we use on the delphix engine.
+#
+- lineinfile:
+    path: /etc/default/nfs-kernel-server
+    regexp: '^RPCNFSDCOUNT='
+    line: 'RPCNFSDCOUNT=64'
 
 - command: systemctl disable bind9.service
