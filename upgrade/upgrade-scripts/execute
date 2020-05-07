@@ -28,20 +28,6 @@ function usage() {
 	exit 2
 }
 
-function apt_get() {
-	DEBIAN_FRONTEND=noninteractive apt-get \
-		-o Dpkg::Options::="--force-confdef" \
-		-o Dpkg::Options::="--force-confold" \
-		"$@"
-}
-
-function xargs_apt_get() {
-	DEBIAN_FRONTEND=noninteractive xargs apt-get \
-		-o Dpkg::Options::="--force-confdef" \
-		-o Dpkg::Options::="--force-confold" \
-		"$@"
-}
-
 while getopts ':rlBfsp:' c; do
 	case $c in
 	r | l | B | f | s) ;; # LX-72: For now, silently ignore these.

@@ -204,16 +204,13 @@ zfs create \
 
 #
 # Initialize the crashdump dataset. This is used to store core files
-# from processes that have crashed. The configuration of the crashdump
-# dataset is split between appliance-build and delphix-platform.
-# The main reason for the split is that on initial image creation,
-# delphix-platform gets installed prior to the creation of rpool so we
-# can't create the zfs dataset from that package. We instead do the dataset
-# creation here and allow delphix-platform to reconfigure the service on
-# first boot or upgrade.
+# from processes that have crashed. Since we don't have control on how
+# many of these core files accumulate, we set a reasonable quota (50% of
+# the rpool's size) to keep these from running the rpool out of space.
 #
 zfs create \
 	-o mountpoint=legacy \
+	-o quota="$(echo "$(zpool list -Hpo size rpool) / 2" | bc)b" \
 	rpool/crashdump
 
 #

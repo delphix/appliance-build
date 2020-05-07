@@ -57,3 +57,8 @@ MINIMUM_VERSION=@@MINIMUM_VERSION@@
 # MINIMUM_VERSION above.
 #
 MINIMUM_REBOOT_OPTIONAL_VERSION=@@MINIMUM_REBOOT_OPTIONAL_VERSION@@
+
+#
+# The version of the upgrade verification package contained in the upgrade image.
+#
+VERIFICATION_VERSION=@@VERIFICATION_VERSION@@
