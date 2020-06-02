@@ -639,6 +639,7 @@ function migrate_configuration() {
 		/etc/ssh/ssh_host_rsa_key
 		/etc/ssh/ssh_host_rsa_key.pub
 		/etc/sudoers.d/90-cloud-init-users
+		/etc/systemd/resolved.conf.d/delphix-static.con
 		/etc/zfs/zpool.cache
 	EOF
 
