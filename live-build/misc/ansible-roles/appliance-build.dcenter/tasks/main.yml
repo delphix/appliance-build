@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2018,2020 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,7 +95,10 @@
 #
 - lineinfile:
     path: /etc/default/nfs-kernel-server
-    regexp: '^RPCNFSDCOUNT='
-    line: 'RPCNFSDCOUNT=64'
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^RPCNFSDCOUNT=', line: 'RPCNFSDCOUNT=64' }
+    - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
 
 - command: systemctl disable bind9.service
