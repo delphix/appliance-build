@@ -99,7 +99,7 @@ aptly publish repo -skip-contents -skip-signing upgrade-repository
 # be realtively small (and that file's size grows linearly with the
 # number of files contained in the "upgrade image" tarball).
 #
-tar -I pigz -cf "payload.tar.gz" -C upgrade-scripts . -C ~/.aptly .
+tar -I pigz -cf "payload.tar.gz" -C upgrade-scripts . -C ~/.aptly/public .
 
 cp version.info.template version.info
 
