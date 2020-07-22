@@ -47,7 +47,7 @@
 
 - git:
     repo: 'https://gitlab.delphix.com/devops/dcenter-gate.git'
-    version: projects/dx4linux
+    version: master
     dest: /opt/dcenter/lib/dcenter-gate
     accept_hostkey: yes
     update: no
