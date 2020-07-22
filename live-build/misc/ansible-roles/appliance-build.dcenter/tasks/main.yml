@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2018,2020 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -86,5 +86,18 @@
     path: /etc/cloud/cloud.cfg
     regexp: '^preserve_hostname: false'
     line: 'preserve_hostname: true'
+
+#
+# The default setting for the number of nfs threads is too low. To
+# improve performance we reset the value to 64 which mimics what
+# we use on the delphix engine.
+#
+- lineinfile:
+    path: /etc/default/nfs-kernel-server
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^RPCNFSDCOUNT=', line: 'RPCNFSDCOUNT=64' }
+    - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
 
 - command: systemctl disable bind9.service
