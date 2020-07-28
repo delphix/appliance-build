@@ -62,12 +62,12 @@ function build_ancillary_repository() {
 }
 
 #
-# The first-party packages produced by Delphix are stored in Amazon S3.
+# The packages produced by Delphix are stored in Amazon S3.
 # Thus, in order to populate the ancillary repository with these
 # packages, they must be downloaded from S3, so they can be then
 # inserted into the Aptly repository.
 #
-# Here, we determine the URI of each of the first-party packages, and
+# Here, we determine the URI of each of the Delphix packages, and
 # then use these URIs to download the packages later. Making this
 # determination is a little complex, and is dependent on the policy set
 # forth by the teams producing and storing the packages.
@@ -76,12 +76,12 @@ function build_ancillary_repository() {
 # which the packages are downloaded:
 #
 # 1. If the package specific AWS_S3_URI environment variable is provided
-#    (e.g. AWS_S3_URI_VIRTUALIZATION), then this URI will be used to
+#    (e.g. AWS_S3_URI_UPGRADE_VERIFICATION), then this URI will be used to
 #    download the package. This is the simplest case, and enables the
 #    user of this script to directly influence this script.
 #
 # 2. If the package specific AWS_S3_PREFIX environment variable is
-#    provided (e.g. AWS_S3_PREFIX_VIRTUALIZATION), then this value is
+#    provided (e.g. AWS_S3_PREFIX_UPGRADE_VERIFICATION), then this value is
 #    used to build the URI that will be used based on the default S3
 #    bucket that is used.
 #
@@ -115,25 +115,10 @@ else
 fi
 echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
 
-AWS_S3_URI_VIRTUALIZATION=$(resolve_s3_uri \
-	"$AWS_S3_URI_VIRTUALIZATION" \
-	"$AWS_S3_PREFIX_VIRTUALIZATION" \
-	"dlpx-app-gate/${UPSTREAM_BRANCH}/build-package/post-push/latest")
-
-AWS_S3_URI_MASKING=$(resolve_s3_uri \
-	"$AWS_S3_URI_MASKING" \
-	"$AWS_S3_PREFIX_MASKING" \
-	"dms-core-gate/${UPSTREAM_BRANCH}/build-package/post-push/latest")
-
-AWS_S3_URI_USERLAND_PKGS=$(resolve_s3_uri \
-	"$AWS_S3_URI_USERLAND_PKGS" \
-	"$AWS_S3_PREFIX_USERLAND_PKGS" \
-	"devops-gate/master/linux-pkg-build/${UPSTREAM_BRANCH}/userland/post-push/latest")
-
-AWS_S3_URI_KERNEL_PKGS=$(resolve_s3_uri \
-	"$AWS_S3_URI_KERNEL_PKGS" \
-	"$AWS_S3_PREFIX_KERNEL_PKGS" \
-	"devops-gate/master/linux-pkg-build/${UPSTREAM_BRANCH}/kernel/post-push/latest")
+AWS_S3_URI_COMBINED_PACKAGES=$(resolve_s3_uri \
+	"$AWS_S3_URI_COMBINED_PACKAGES" \
+	"$AWS_S3_URI_COMBINED_PACKAGES" \
+	"devops-gate/master/linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest")
 
 #
 # All package files will be placed into this temporary directory, such
@@ -144,13 +129,10 @@ mkdir -p "$TOP/build"
 PKG_DIRECTORY=$(mktemp -d -p "$TOP/build" tmp.pkgs.XXXXXXXXXX)
 
 #
-# Now that we've determined the URI of all first-party packages, we can
-# proceed to download these packages.
+# Now that we've determined the URI of the Delphix-built packages, we can
+# download them.
 #
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_VIRTUALIZATION"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_MASKING"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_USERLAND_PKGS"
-download_delphix_s3_debs "$PKG_DIRECTORY" "$AWS_S3_URI_KERNEL_PKGS"
+download_delphix_s3_debs_multidir "$PKG_DIRECTORY" "$AWS_S3_URI_COMBINED_PACKAGES/packages"
 
 #
 # Now that our temporary package directory has been populated with all
