@@ -275,6 +275,7 @@ LX_CMDLINE=(
 	'zfsforce=1'
 	'mitigations=off'
 	'elevator=noop'
+	'init_on_alloc=0'
 )
 
 #
