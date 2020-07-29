@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2020 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,14 +15,7 @@
 #
 
 ---
-- hosts: all
-  gather_facts: no
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-  roles:
-    - appliance-build.minimal-common
-    - appliance-build.minimal-internal
-    - appliance-build.masking-common
-    - appliance-build.qa-internal
-    - appliance-build.virtualization-common
-    - appliance-build.recovery-environment
+- apt:
+    name: recovery-environment
+    state: present
+
