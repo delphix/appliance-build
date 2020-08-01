@@ -276,6 +276,7 @@ LX_CMDLINE=(
 	'mitigations=off'
 	'elevator=noop'
 	'init_on_alloc=0'
+	'usbcore.nousb=1'
 )
 
 #
