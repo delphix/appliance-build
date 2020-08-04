@@ -18,6 +18,7 @@
 # shellcheck disable=SC2034
 UPDATE_DIR="/var/dlpx-update"
 LOG_DIRECTORY="/var/tmp/delphix-upgrade"
+HOTFIX_PATH="/etc/hotfix"
 
 #
 # We embed information as dataset properties in our rootfs containers.
