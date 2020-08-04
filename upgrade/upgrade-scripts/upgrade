@@ -446,6 +446,10 @@ function finalize() {
 	rm -rf "$IMAGE_PATH" || die "failed to remove unpacked upgrade image"
 
 	remove_upgrade_properties
+
+	if [[ -f "$HOTFIX_PATH" ]]; then
+		rm -f "$HOTFIX_PATH" || die "failed to remove hotfix file"
+	fi
 }
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
