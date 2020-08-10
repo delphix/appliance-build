@@ -30,6 +30,7 @@
       - python-paramiko
       - python-pip
       - python-requests
+      - python-six
       - python-tenacity
       - python2.7
       - telnet
