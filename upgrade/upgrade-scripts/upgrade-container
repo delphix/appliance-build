@@ -420,6 +420,13 @@ function stop() {
 
 	machinectl status "$CONTAINER" &>/dev/null &&
 		die "timeout waiting for container termination: '$CONTAINER'"
+
+	#
+	# We don't want to return the error code from the call to
+	# "machinectl status" above, so we explicitly return success if
+	# we've reached this far.
+	#
+	return 0
 }
 
 function destroy() {
