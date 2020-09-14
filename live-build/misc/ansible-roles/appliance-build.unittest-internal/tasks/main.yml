@@ -25,6 +25,7 @@
       - git
       - python-minimal
       - chromium-browser
+      - libxss1
     state: present
 
 - user:
