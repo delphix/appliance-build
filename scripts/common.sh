@@ -71,3 +71,24 @@ function download_delphix_s3_debs() {
 	popd &>/dev/null
 	rm -rf "$tmp_directory"
 }
+
+function download_delphix_s3_debs_multidir() {
+	local pkg_directory="$1"
+	local S3_URI="$2"
+	local tmp_directory
+
+	tmp_directory=$(mktemp -d -p "$TOP/build" tmp.s3-debs.XXXXXXXXXX)
+	pushd "$tmp_directory" &>/dev/null
+
+	aws s3 sync --only-show-errors "$S3_URI" .
+
+	for subdir in */; do
+		pushd "$subdir" &>/dev/null
+		sha256sum -c --strict SHA256SUMS
+		mv ./*deb "$pkg_directory/"
+		popd &>/dev/null
+	done
+
+	popd &>/dev/null
+	rm -rf "$tmp_directory"
+}
