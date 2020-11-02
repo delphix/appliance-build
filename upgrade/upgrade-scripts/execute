@@ -103,10 +103,11 @@ if [[ -n "$CURRENT_VERSION" ]]; then
 	# need to explicity set the property here. Otherwise, when the
 	# property changes on the dataset (i.e. when we change it later
 	# in this script), it'd change for this snapshot, even though
-	# the contents of the snapshot wouldn't change.
+	# the contents of the snapshot wouldn't change. Need to do this
+	# recursively for snapshots of descendent file systems.
 	#
-	copy_dataset_property "$PROP_CURRENT_VERSION" \
-		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
+	copy_dataset_property_to_snapshots_recursive "$PROP_CURRENT_VERSION" \
+		"$ROOTFS_CONTAINER" "execute-upgrade.$UNIQUE"
 fi
 
 if [[ -f /etc/apt/sources.list ]]; then

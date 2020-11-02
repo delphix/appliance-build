@@ -113,10 +113,11 @@ function create_upgrade_container() {
 		# from the parent dataset by default. Thus, in order for
 		# this property to reflect the version contained in this
 		# specific snapshot, we need to explicity set the
-		# property here.
+		# property here. Need to do this
+		# recursively for snapshots of descendent file systems.
 		#
-		copy_dataset_property "$PROP_CURRENT_VERSION" \
-			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
+		copy_dataset_property_to_snapshots_recursive "$PROP_CURRENT_VERSION" \
+			"$ROOTFS_DATASET" "$SNAPSHOT_NAME"
 		;;
 	rollback)
 		#

@@ -194,6 +194,17 @@ function copy_dataset_property() {
 		die "failed to set property '$PROP_NAME=$PROP_VALUE' for '$DST_DATASET'"
 }
 
+function copy_dataset_property_to_snapshots_recursive() {
+	local PROP_NAME="$1"
+	local SRC_DATASET="$2"
+	local SNAPSHOT_NAME="$3"
+
+	for dir in $(zfs list -rH -o name "$SRC_DATASET"); do
+		copy_dataset_property "$PROP_NAME" \
+			"$dir" "$dir@$SNAPSHOT_NAME"
+	done
+}
+
 function compare_versions() {
 	dpkg --compare-versions "$@"
 }
