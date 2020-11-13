@@ -25,7 +25,9 @@
       - isc-dhcp-server
       - libldap2-dev
       - libsasl2-dev
+      - nfs-common-dbgsym
       - nfs-kernel-server
+      - nfs-kernel-server-dbgsym
       - python-dbg
       - python-dev
       - python-ldap
@@ -34,18 +36,17 @@
       - python-pyvmomi
       - python-six
       - python-tenacity
-      - python-virtualenv
       - python2.7
       - python3
       - python3-dbg
       - python3-dev
       - python3-ldap
-      - python3-paramiko
       - python3-pip
       - python3-pyvmomi
       - python3-six
       - python3-tenacity
-      - python3-virtualenv
+      - python3-venv
+      - targetcli-fb
       - telnet
     state: present
   register: result
