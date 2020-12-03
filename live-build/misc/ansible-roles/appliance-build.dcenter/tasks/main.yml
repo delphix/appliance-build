@@ -67,11 +67,6 @@
     accept_hostkey: yes
     update: no
 
-- copy:
-    dest: "/etc/dcenter.conf"
-    content: |
-      [[ -z "$DC_ROOT" ]] && export DC_ROOT="dcenter"
-
 #
 # By default, ubuntu restricts directories where dhcpd and named
 # can operate. For dcenter, we maintain the dhcp configuration
