@@ -87,6 +87,15 @@ sed -i "s/@@VERSION@@/$VERSION/" version.info ||
 	die "failed to set VERSION in version.info file"
 
 #
+# The DELPHIX_HOTFIX_VERSION variable is optional, and thus it may not
+# be set at this point. That is by design, and when that's the case, we
+# still need to do this replacement, such that the version information
+# file properly reflects an empty value for the hotfix version.
+#
+sed -i "s/@@HOTFIX@@/$DELPHIX_HOTFIX_VERSION/" version.info ||
+	die "failed to set HOTFIX in version.info file"
+
+#
 # On 6.0 versions, the virtualization application expects to find the
 # "verification-version.info" file within the unpacked upgrade image
 # directory. Thus, to satisfy those requirements, we must provide that
