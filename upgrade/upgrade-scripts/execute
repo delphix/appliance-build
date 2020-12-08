@@ -446,6 +446,16 @@ zfs set "$PROP_CURRENT_VERSION=$VERSION" "$ROOTFS_CONTAINER" ||
 	die "failed to set property '$PROP_CURRENT_VERSION'" \
 		"to '$VERSION' for '$ROOTFS_CONTAINER'"
 
+if [[ -n "$HOTFIX" ]]; then
+	zfs set "$PROP_HOTFIX_VERSION=$HOTFIX" "$ROOTFS_CONTAINER" ||
+		die "failed to set property '$PROP_HOTFIX_VERSION'" \
+			"to '$HOTFIX' for '$ROOTFS_CONTAINER'"
+else
+	zfs inherit "$PROP_HOTFIX_VERSION" "$ROOTFS_CONTAINER" ||
+		die "failed to inherit property '$PROP_HOTFIX_VERSION'" \
+			"for '$ROOTFS_CONTAINER'"
+fi
+
 #
 # Before we exit, we want to ensure all of the changes made to the root
 # pool via the packaging operations above have made it to disk.
