@@ -390,6 +390,19 @@ function finalize() {
 	esac
 
 	#
+	# If we've reached this point, it means we're finalizing an
+	# ugprade from a linux-based release, to another linux-based
+	# release. Thus, we necessarily must be at least 2 versions
+	# beyond any illumos-based release, if this system started from
+	# an illumos-based release. Thus, at this point, we can safely
+	# perform the final cleanup of any illumos-based datasets.
+	#
+	if [[ -f /var/delphix/migration/final-illumos-cleanup-required ]]; then
+		/opt/delphix/server/bin/upgrade/illumos-cleanup final ||
+			die "failed to clean up illumos datasets"
+	fi
+
+	#
 	# This first pass checks for available "execute.upgrade" snapshots
 	# and deletes snapshots that are older than the base upgrade version.
 	# This pass takes care of cleanup after in-place and deferred upgrades.
