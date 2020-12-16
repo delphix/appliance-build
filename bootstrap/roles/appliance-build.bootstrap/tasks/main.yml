@@ -44,20 +44,6 @@
       - zfsutils-linux
     state: present
 
-#
-# See DLPX-72860 for more info on the custom package.
-#
-- name: Custom livecd-rootfs package | Download
-  get_url:
-    url: 'https://artifactory.delphix.com:443/artifactory/linux-pkg/livecd-rootfs/6.0.6.0/livecd-rootfs_2.525.47-delphix1_amd64.deb'
-    dest: '/var/tmp/livecd-rootfs_2.525.47-delphix1_amd64.deb'
-    checksum: 'sha256:9f090adf288d115b2eb10d2dced2a76113339eb95dc5db91fac4b89b2bef07a0'
-
-- name: Custom livecd-rootfs package | Install
-  apt:
-    deb: '/var/tmp/livecd-rootfs_2.525.47-delphix1_amd64.deb'
-    state: present
-
 - modprobe:
     name: zfs
     state: present
