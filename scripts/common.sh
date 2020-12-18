@@ -17,6 +17,11 @@
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null)
 
+function die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 2
+}
+
 function resolve_s3_uri() {
 	local pkg_uri="$1"
 	local pkg_prefix="$2"
