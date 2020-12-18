@@ -15,10 +15,13 @@
 #
 # This file is intended only for QA-specific testing items and frameworks.
 # Anything required by customers should not be added here.
+# snmptrapd pkg is added to test snmp traps feature.
 #
 
 - apt:
-    name: nftables
+    name:
+      - nftables
+      - snmptrapd
     state: present
   register: result
   until: result is not failed

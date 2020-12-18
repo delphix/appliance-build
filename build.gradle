@@ -53,8 +53,7 @@ for (variant in allVariants) {
 
         for (envVar in ["DELPHIX_PLATFORMS", 
                         "AWS_S3_URI_LIVEBUILD_ARTIFACTS",
-                        "AWS_S3_URI_UPGRADE_VERIFICATION",
-                        "AWS_S3_PREFIX_UPGRADE_VERIFICATION"]) {
+                        "AWS_S3_URI_COMBINED_PACKAGES"]) {
             inputs.property(envVar, System.getenv(envVar)).optional(true)
         }
 
