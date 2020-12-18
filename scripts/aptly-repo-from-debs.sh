@@ -61,18 +61,22 @@ for deb_tarball in "$LIVE_BUILD_OUTPUT_DIR/$APPLIANCE_VARIANT"*.debs.tar.gz; do
 done
 
 #
-# Download the delphix upgrade verification debian package.
-# Note, we always pull from the "master" build of the verification
-# package, no matter what the UPSTREAM_BRANCH of the appliance is that
-# we're building; this is intentional.
+# Download the delphix upgrade verification debian package, stored in the
+# combined-packages bundle.
 #
+AWS_S3_URI_COMBINED_PACKAGES=$(resolve_s3_uri \
+	"$AWS_S3_URI_COMBINED_PACKAGES" \
+	"devops-gate/master/linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest")
 
-AWS_S3_URI_UPGRADE_VERIFICATION=$(resolve_s3_uri \
-	"$AWS_S3_URI_UPGRADE_VERIFICATION" \
-	"$AWS_S3_PREFIX_UPGRADE_VERIFICATION" \
-	"devops-gate/master/upgrade-verify/master/post-push/release/latest")
+WORK_DIRECTORY=$(mktemp -d -p "$TOP/upgrade" tmp.pkgs.XXXXXXXXXX)
 
-download_delphix_s3_debs "$TOP/upgrade/debs" "$AWS_S3_URI_UPGRADE_VERIFICATION"
+download_combined_packages_artifacts "$AWS_S3_URI_COMBINED_PACKAGES" \
+	"$WORK_DIRECTORY" upgrade-verify
+
+extract_debs_into_dir "$WORK_DIRECTORY/packages/upgrade-verify" \
+	"$TOP/upgrade/debs"
+
+rm -rf "$WORK_DIRECTORY"
 
 #
 # Generate an Aptly/APT repository
