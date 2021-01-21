@@ -62,37 +62,6 @@ function build_ancillary_repository() {
 }
 
 #
-# The packages produced by Delphix are stored in Amazon S3.
-# Thus, in order to populate the ancillary repository with these
-# packages, they must be downloaded from S3, so they can be then
-# inserted into the Aptly repository.
-#
-# Here, we determine the URI of each of the Delphix packages, and
-# then use these URIs to download the packages later. Making this
-# determination is a little complex, and is dependent on the policy set
-# forth by the teams producing and storing the packages.
-#
-# With that said, there's three main methods of influencing the URI from
-# which the packages are downloaded:
-#
-# 1. If the package specific AWS_S3_URI environment variable is provided
-#    (e.g. AWS_S3_URI_UPGRADE_VERIFICATION), then this URI will be used to
-#    download the package. This is the simplest case, and enables the
-#    user of this script to directly influence this script.
-#
-# 2. If the package specific AWS_S3_PREFIX environment variable is
-#    provided (e.g. AWS_S3_PREFIX_UPGRADE_VERIFICATION), then this value is
-#    used to build the URI that will be used based on the default S3
-#    bucket that is used.
-#
-# 3. If nether the package specific AWS_S3_URI nor AWS_S3_PREFIX
-#    variables are provided, then logic kicks in to attempt to
-#    dynamically determine the URI of the most recently built package,
-#    and then uses that URI. This way, a naive user can not set any
-#    environment variables, and the script will work as expected.
-#
-
-#
 # Set UPSTREAM_BRANCH. This will determine which version of the linux package
 # mirror is used.
 #
@@ -115,32 +84,45 @@ else
 fi
 echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
 
+#
+# The packages produced by Delphix are stored in Amazon S3.
+# Thus, in order to populate the ancillary repository with these
+# packages, they must be downloaded from S3, so they can be then
+# inserted into the Aptly repository.
+#
+# All the Delphix-built packages consumed by appliance-build are compiled by
+# the combine-packages job. If a combine-packages URI is provided, fetch the
+# packages from there, otherwise determine the latest combined-packages URI
+# automatically.
+#
+
 AWS_S3_URI_COMBINED_PACKAGES=$(resolve_s3_uri \
-	"$AWS_S3_URI_COMBINED_PACKAGES" "" \
+	"$AWS_S3_URI_COMBINED_PACKAGES" \
 	"devops-gate/master/linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest")
 
-#
-# All package files will be placed into this temporary directory, such
-# that we can later point Aptly at this directory to build the Aptly/APT
-# repository.
-#
 mkdir -p "$TOP/build"
-PKG_DIRECTORY=$(mktemp -d -p "$TOP/build" tmp.pkgs.XXXXXXXXXX)
+WORK_DIRECTORY=$(mktemp -d -p "$TOP/build" tmp.pkgs.XXXXXXXXXX)
 
 #
-# Now that we've determined the URI of the Delphix-built packages, we can
-# download them.
+# Download all package artifacts built by Delphix, which includes debs and
+# metadata.
 #
-download_delphix_s3_debs_multidir "$PKG_DIRECTORY" "$AWS_S3_URI_COMBINED_PACKAGES/packages"
+mkdir -p "$WORK_DIRECTORY/artifacts"
+download_combined_packages_artifacts "$AWS_S3_URI_COMBINED_PACKAGES" \
+	"$WORK_DIRECTORY/artifacts"
 
 #
-# Now that our temporary package directory has been populated with all
-# first-party packages needed by live-build, we use this directory to
-# build up our Aptly/APT ancillary repository. After this function
+# Find all debs and put them into a directory that will be fed into Aptly.
+#
+mkdir -p "$WORK_DIRECTORY/debs"
+extract_debs_into_dir "$WORK_DIRECTORY/artifacts" "$WORK_DIRECTORY/debs"
+
+#
+# Build up our Aptly/APT ancillary repository. After this function
 # completes, there should be a directory named "ancillary-repository" at
 # the top level of the git repository, that can later be "aptly
 # serve"-ed and consumed by live-build.
 #
-build_ancillary_repository "$PKG_DIRECTORY"
+build_ancillary_repository "$WORK_DIRECTORY/debs"
 
-rm -rf "$PKG_DIRECTORY"
+rm -rf "$WORK_DIRECTORY"

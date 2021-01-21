@@ -21,7 +21,7 @@ apply from: "${rootProject.projectDir}/gradle-lib/util.gradle"
 task ancillaryRepository(type: Exec) {
     inputs.file "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
 
-    for (envVar in ["COMBINED_PACKAGES_S3_URL"]) {
+    for (envVar in ["AWS_S3_URI_COMBINED_PACKAGES"]) {
         inputs.property(envVar, System.getenv(envVar)).optional(true)
     }
 
