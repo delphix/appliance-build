@@ -136,6 +136,12 @@ zfs create \
 	-o "com.delphix:current-version=$DELPHIX_APPLIANCE_VERSION" \
 	"rpool/ROOT/$FSNAME"
 
+if [[ -n "$DELPHIX_HOTFIX_VERSION" ]]; then
+	zfs set \
+		"com.delphix:hotfix-version=$DELPHIX_HOTFIX_VERSION" \
+		"rpool/ROOT/$FSNAME"
+fi
+
 zfs create \
 	-o canmount=noauto \
 	-o mountpoint=/ \

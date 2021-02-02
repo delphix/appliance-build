@@ -115,7 +115,9 @@ function create_upgrade_container() {
 		# specific snapshot, we need to explicity set the
 		# property here.
 		#
-		copy_dataset_property "$PROP_CURRENT_VERSION" \
+		copy_required_dataset_property "$PROP_CURRENT_VERSION" \
+			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
+		copy_optional_dataset_property "$PROP_HOTFIX_VERSION" \
 			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
 		;;
 	rollback)
@@ -141,9 +143,11 @@ function create_upgrade_container() {
 		# Thus, for these, we want the new container's version
 		# properties to match the dataset being cloned.
 		#
-		copy_dataset_property "$PROP_INITIAL_VERSION" \
+		copy_required_dataset_property "$PROP_INITIAL_VERSION" \
 			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
-		copy_dataset_property "$PROP_CURRENT_VERSION" \
+		copy_required_dataset_property "$PROP_CURRENT_VERSION" \
+			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
+		copy_optional_dataset_property "$PROP_HOTFIX_VERSION" \
 			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
 
 		zfs clone \
