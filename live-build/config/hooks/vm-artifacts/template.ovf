@@ -42,7 +42,7 @@
         <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>
         <vssd:InstanceID>0</vssd:InstanceID>
         <vssd:VirtualSystemIdentifier>@@VM_NAME@@</vssd:VirtualSystemIdentifier>
-        <vssd:VirtualSystemType>vmx-10</vssd:VirtualSystemType>
+        <vssd:VirtualSystemType>vmx-11</vssd:VirtualSystemType>
       </System>
       <Item>
         <rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>
@@ -65,7 +65,7 @@
         <rasd:Description>SCSI Controller</rasd:Description>
         <rasd:ElementName>SCSI Controller 0</rasd:ElementName>
         <rasd:InstanceID>3</rasd:InstanceID>
-        <rasd:ResourceSubType>lsilogic</rasd:ResourceSubType>
+        <rasd:ResourceSubType>VirtualSCSI</rasd:ResourceSubType>
         <rasd:ResourceType>6</rasd:ResourceType>
       </Item>
       <Item>
@@ -151,7 +151,7 @@
     </VirtualHardwareSection>
     <AnnotationSection ovf:required="false">
       <Info>A human-readable annotation</Info>
-      <Annotation>Delphix Appliance, VM Hardware Version 10</Annotation>
+      <Annotation>Delphix Appliance, VM Hardware Version 11</Annotation>
     </AnnotationSection>
   </VirtualSystem>
 </Envelope>
