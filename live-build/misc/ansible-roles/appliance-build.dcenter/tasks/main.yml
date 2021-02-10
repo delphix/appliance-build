@@ -84,15 +84,6 @@
       /tmp/dcenter_dhcp_config/named.pid w,
 
 #
-# Dcenter systems use static addresses so modify cloud.cfg to preserve
-# their hostname.
-#
-- lineinfile:
-    path: /etc/cloud/cloud.cfg
-    regexp: '^preserve_hostname: false'
-    line: 'preserve_hostname: true'
-
-#
 # The default setting for the number of nfs threads is too low. To
 # improve performance we reset the value to 64 which mimics what
 # we use on the delphix engine.
