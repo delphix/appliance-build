@@ -90,4 +90,4 @@
     - { regexp: '^RPCNFSDCOUNT=', line: 'RPCNFSDCOUNT=64' }
     - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
 
-- command: systemctl disable bind9.service
+- command: systemctl disable bind9.service isc-dhcp-server.service isc-dhcp-server6.service
