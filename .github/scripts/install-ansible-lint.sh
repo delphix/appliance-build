@@ -4,6 +4,7 @@ git clone https://github.com/willthames/ansible-lint /opt/ansible-lint
 cd /opt/ansible-lint
 git checkout v3.4.21
 git branch -D master
+pip install .
 
 #
 # GitHub Actions exposes the GITHUB_ENV file that can be used to
