@@ -1,5 +1,6 @@
 #!/bin/bash -ex
 
+sudo apt-get install python-setuptools
 pip install ansible
 
 git clone https://github.com/willthames/ansible-lint /opt/ansible-lint
