@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+sudo apt-get install python-setuptools
+
 git clone https://github.com/willthames/ansible-lint /opt/ansible-lint
 cd /opt/ansible-lint
 git checkout v3.4.21
