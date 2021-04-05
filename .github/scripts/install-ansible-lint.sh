@@ -1,12 +1,12 @@
 #!/bin/bash -ex
 
-sudo apt-get install python-setuptools
+sudo apt-get install python3-setuptools
 
 git clone https://github.com/willthames/ansible-lint /opt/ansible-lint
 cd /opt/ansible-lint
 git checkout v5.0.6
 git branch -D master
-pip install .
+python3 -m pip install .
 
 #
 # GitHub Actions exposes the GITHUB_ENV file that can be used to
