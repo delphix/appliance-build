@@ -100,14 +100,15 @@ aptly repo search image-a | xargs aptly repo copy image-a upgrade-repository ||
 
 #
 # Here we're performing step 3 from the comment above, but since the
-# "delphix-upgrade-verification" package is a bit different than most
-# other packages on a Delphix appliance, we need to handle that package
-# uniquely here. Specifically, we want to ensure this package is always
-# contained in the resultant aptly repository (even if the package is
-# the same within both image A and image B).
+# "delphix-upgrade-verification" and "delphix-entire" packages are a bit
+# different than most other packages on a Delphix appliance, we need to
+# handle these packages uniquely here. Specifically, we want to ensure
+# these packages are always contained in the resultant aptly repository
+# (even if the package is the same within both image A and image B).
 #
 aptly repo search image-b |
 	grep -v "^delphix-upgrade-verification" |
+	grep -v "^delphix-entire" |
 	xargs aptly repo remove upgrade-repository ||
 	die "failed to remove packages from repository: 'upgrade-repository'"
 
