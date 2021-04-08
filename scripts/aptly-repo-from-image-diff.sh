@@ -102,9 +102,28 @@ aptly repo search image-a | xargs aptly repo copy image-a upgrade-repository ||
 # Here we're performing step 3 from the comment above, but since the
 # "delphix-upgrade-verification" and "delphix-entire" packages are a bit
 # different than most other packages on a Delphix appliance, we need to
-# handle these packages uniquely here. Specifically, we want to ensure
-# these packages are always contained in the resultant aptly repository
-# (even if the package is the same within both image A and image B).
+# handle these packages uniquely here. Specifically, we want to ensure these
+# packages are always contained in the resultant Aptly repository (even if
+# the package is the same within both image A and image B), as each package
+# is essential to the proper functioning of any Delphix appliance upgrade.
+#
+# The "delphix-upgrade-verification" package is used to perform upgrade
+# specific logic (and verification) during the upgrade process, such that we
+# can avoid common pitfalls that would result in the upgrade process
+# failing. Without this package being contained in the repository (and thus,
+# any upgrade image generated from the repository), the verification stage
+# of upgrade would fail, leading to the entire upgrade process failing. For
+# more details, see the "verify-jar" script within the "upgrade-scripts"
+# directory.
+#
+# Additionally, the "delphix-entire" package is used by the upgrade logic to
+# determine which packages constitute the Delphix version the appliance is
+# transitioning to, and ensure all of those packages are upgraded (or
+# downgraded) to the correct versions based on the information provided by
+# this package. Without this package, the upgrade logic would fail, as it
+# would not be able to determine what packages to upgrade (or downgrade).
+# For more details, see the "execute" script within the "upgrade-scripts"
+# directory.
 #
 aptly repo search image-b |
 	grep -v "^delphix-upgrade-verification" |
