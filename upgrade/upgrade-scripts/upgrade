@@ -375,20 +375,6 @@ function finalize() {
 		return
 	fi
 
-	source_upgrade_properties
-
-	[[ -n "$UPGRADE_TYPE" ]] ||
-		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
-	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
-		die "variable UPGRADE_BASE_VERSION is not set"
-
-	case "$UPGRADE_TYPE" in
-	DEFERRED | FULL | ROLLBACK) ;;
-	*)
-		die "finalize is not supported for upgrade type: '$UPGRADE_TYPE'"
-		;;
-	esac
-
 	#
 	# If we've reached this point, it means we're finalizing an
 	# ugprade from a linux-based release, to another linux-based
