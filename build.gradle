@@ -78,39 +78,10 @@ for (variant in allVariants) {
     }
 }
 
-def shellScripts = fileTree("scripts") +
-                   fileTree("live-build/config/hooks").include({ details ->
-                        details.file.canExecute()
-                   }) +
-                   fileTree("upgrade", {
-                       include "prepare"
-                   }) +
-                   fileTree("upgrade/upgrade-scripts", {
-                       exclude "README.md"
-                   })
-
-task shfmt(type: Exec) {
-    commandLine(["shfmt", "-w"] + shellScripts.getFiles())
-}
-
-task shfmtCheck(type: Exec) {
-    commandLine(["shfmt", "-d"] + shellScripts.getFiles())
-}
-
-task shellCheck(type: Exec) {
-    commandLine(["shellcheck", "--exclude=SC1090,SC1091"] + shellScripts.getFiles())
-}
-
 task ansibleCheck(type: Exec) {
     def ansibleFiles = fileTree("bootstrap").include("**/playbook.yml") +
                        fileTree("live-build/variants").include("**/playbook.yml")
     commandLine(["ansible-lint", "--exclude=SC1090,SC1091"] + ansibleFiles.getFiles())
 }
 
-tasks.check.dependsOn shellCheck, shfmtCheck, ansibleCheck
-
-task format() {
-    dependsOn shfmt
-    group = "Formatting"
-    description "Runs all auto-formatting tasks"
-}
+tasks.check.dependsOn ansibleCheck
