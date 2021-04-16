@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+
+import os
+import re
+import subprocess
+from typing import Any, List, Type
+
+IMAGE_PATH = os.path.dirname(os.path.realpath(__file__))
+
+
+#
+# Helper to compare two version strings using "dpkg --compare-versions".
+#
+def dpkgcmp(vers1: str, op: str, vers2: str) -> bool:
+    return subprocess.run(["dpkg", "--compare-versions", vers1, op,
+                           vers2]).returncode == 0
+
+
+#
+# Helper to obtain the "current-version" of a rootfs filesytem/snapshot.
+#
+def version(rootfs: str) -> str:
+    return str(
+        subprocess.check_output([
+            "zfs", "get", "-Hpo", "value", "com.delphix:current-version", rootfs
+        ]).decode("UTF-8").strip())
+
+
+#
+# Helper class used when sorting rootfs filesystems and snapshots. This allows
+# us to use the "sorted" builtin, to build a list of all rootfs filesystems and
+# snapshots on the system, sorted baseed on the "current-version" property.
+#
+class rootfscmp(object):
+
+    def __init__(self, rootfs: str, *args: List[Any]):
+        self.rootfs = rootfs
+
+    def __lt__(self, other: Type["rootfscmp"]) -> bool:
+        return dpkgcmp(version(self.rootfs), "lt", version(other.rootfs))
+
+    def __gt__(self, other: Type["rootfscmp"]) -> bool:
+        return dpkgcmp(version(self.rootfs), "gt", version(other.rootfs))
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, rootfscmp):
+            return NotImplemented
+        return dpkgcmp(version(self.rootfs), "eq", version(other.rootfs))
+
+    def __le__(self, other: Type["rootfscmp"]) -> bool:
+        return dpkgcmp(version(self.rootfs), "le", version(other.rootfs))
+
+    def __ge__(self, other: Type["rootfscmp"]) -> bool:
+        return dpkgcmp(version(self.rootfs), "ge", version(other.rootfs))
+
+    def __ne__(self, other: object) -> bool:
+        if not isinstance(other, rootfscmp):
+            return NotImplemented
+        return dpkgcmp(version(self.rootfs), "ne", version(other.rootfs))
+
+
+def main() -> None:
+    snapshots = subprocess.check_output([
+        "zfs", "list", "-r", "rpool/ROOT", "-d", "2", "-Ho", "name", "-t",
+        "snapshot"
+    ]).decode("UTF-8").splitlines()
+
+    for snap in snapshots:
+        name = snap.split("@")[1]
+
+        #
+        # We filter out any container-delphix snapshots, as those removed by
+        # the calls to "rootfs-container delete", on the relevant filesystems.
+        #
+        if re.search(r"^container-delphix.\w{7}$", name):
+            snapshots.remove(snap)
+            continue
+
+        #
+        # Out of an abundance of caution, verify the snapshot name matches
+        # our expectations.
+        #
+        if not re.search(r"^execute-upgrade.\w{7}$", name):
+            raise SystemExit("unexpected snapshot name: '{}'".format(name))
+
+    filesystems = subprocess.check_output([
+        "zfs", "list", "-r", "rpool/ROOT", "-d", "1", "-Ho", "name", "-t",
+        "filesystem"
+    ]).decode("UTF-8").splitlines()
+
+    #
+    # The "rpool/ROOT" dataset is not versioned and also not eligible
+    # for deletion, so we must remove it from the list before we attempt
+    # to sort and remove rootfs snapshots and filesystems.
+    #
+    filesystems.remove('rpool/ROOT')
+
+    current = subprocess.check_output(["get-appliance-version"
+                                      ]).decode("UTF-8").strip()
+
+    #
+    # Our policy is to keep two delphix versions at any given time; the
+    # currently running version, and the version used prior to the
+    # current one.
+    #
+    # By sorting the list of all filesystems and snapshots on the sytem,
+    # we can easily determine the highest two versions on the system,
+    # and skip those versions (to maintain the policy described above);
+    # this is based on the assumption that the versions of an appliance
+    # will always increase (or remain constant, in the case of rollback)
+    # after an upgrade (i.e. we never upgrade to a lower version).
+    #
+    for rootfs in sorted(filesystems + snapshots, key=rootfscmp)[:-2]:
+        #
+        # In the event of a rollback, we want to be careful to not
+        # delete the currently running version, as well as any versions
+        # that may have failed to upgrade resulting in the rollback
+        # event to begin with.
+        #
+        # Additionally, we want to keep all rootfs snapshots that map to
+        # hotfixes for the currently running version. This way, we don't
+        # inadvertently remove a rootfs snapshot that we may need for
+        # root-causing a given problem; at least, not until we upgraded
+        # off of the problematic delphix version.
+        #
+        # Thus, to account for these cases, we skip any version that's
+        # equal to or greater than what's currently running.
+        #
+        #
+        if dpkgcmp(version(rootfs), "ge", current):
+            break
+
+        #
+        # If a rollback event has occured, it's possible that we'll be
+        # unable to delete a snapshot or filesystem; e.g. if it's still
+        # being used as the "origin" of another filesystem. Rather than
+        # adding more complicated logic to handle this situation, we
+        # simply allow the commands to throw an error.
+        #
+        # If we fail to remove a snapshot or filesystem, this shouldn't
+        # negatively impact the appliance, apart from potentially
+        # consuming some more storage than strictly necessary.
+        #
+        # Further, as the appliance continues to be upgraded to new
+        # versions over time, these error conditions will subside; it
+        # just might take a couple upgrades to allow the previously
+        # "pinned" version to be removed and cleaned up.
+        #
+        # Lastly, it's possible for us to delete an entire rootfs
+        # container early in the iteration, and then attempt to delete
+        # some of that container's snapshots later in the iteration.
+        # Since deleting the container will either delete (or promote)
+        # all of that container's snapshots, the attempt (later) to
+        # delete the snapshots individually will silently fail.
+        #
+        if rootfs in filesystems:
+            subprocess.run([
+                "{}/rootfs-container".format(IMAGE_PATH), "delete",
+                rootfs.split('/')[2]
+            ])
+        elif rootfs in snapshots:
+            subprocess.run(["zfs", "destroy", "-r", rootfs])
+        else:
+            raise SystemExit(
+                "rootfs not found in filesystems or snapshots: '{}'".format(
+                    rootfs))
+
+
+if __name__ == "__main__":
+    main()
