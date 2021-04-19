@@ -47,6 +47,7 @@ umask 0022
 #
 PROP_CURRENT_VERSION="com.delphix:current-version"
 PROP_INITIAL_VERSION="com.delphix:initial-version"
+PROP_HOTFIX_VERSION="com.delphix:hotfix-version"
 
 #
 # To better enable root cause analysis of any upgrade failures, we
@@ -174,29 +175,67 @@ function get_snapshot_clones() {
 	zfs get clones -Hpo value "$1"
 }
 
-function get_current_version() {
+function get_version_property() {
+	[[ -n "$1" ]] || die "version property not specified"
+
 	local DATASET
 	DATASET="$(get_mounted_rootfs_container_dataset)"
 	[[ -n "$DATASET" ]] ||
 		die "could not determine mounted rootfs container dataset"
 
 	local VERSION
-	VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$DATASET")
+	VERSION=$(zfs get -Hpo value "$1" "$DATASET")
 	[[ -n "$VERSION" && "$VERSION" != "-" ]] ||
-		die "could not determine current version for '$DATASET'"
+		die "could not get version property '$1' for dataset '$DATASET'"
 
 	echo "$VERSION"
 }
 
-function copy_dataset_property() {
+function get_current_version() {
+	get_version_property "$PROP_CURRENT_VERSION"
+}
+
+function get_hotfix_version() {
+	get_version_property "$PROP_HOTFIX_VERSION"
+}
+
+function copy_required_dataset_property() {
 	local PROP_NAME="$1"
 	local SRC_DATASET="$2"
 	local DST_DATASET="$3"
 	local PROP_VALUE
 
 	PROP_VALUE=$(zfs get -Hpo value "$PROP_NAME" "$SRC_DATASET")
+
+	#
+	# Unlike the "copy_optional_dataset_property" function, if the
+	# property does not exist on the dataset, we return an error.
+	# This is useful for properties that should always exist on the
+	# dataset, in which case failing to retrieve the original value
+	# should always be treated as an exception.
+	#
 	[[ -n "$PROP_VALUE" && "$PROP_VALUE" != "-" ]] ||
 		die "failed to get property '$PROP_NAME' for '$SRC_DATASET'"
+
+	zfs set "$PROP_NAME=$PROP_VALUE" "$DST_DATASET" ||
+		die "failed to set property '$PROP_NAME=$PROP_VALUE' for '$DST_DATASET'"
+}
+
+function copy_optional_dataset_property() {
+	local PROP_NAME="$1"
+	local SRC_DATASET="$2"
+	local DST_DATASET="$3"
+	local PROP_VALUE
+
+	PROP_VALUE=$(zfs get -Hpo value "$PROP_NAME" "$SRC_DATASET")
+
+	#
+	# Unlike the "copy_required_dataset_property" function, if the
+	# property does not exist on the dataset, we return without
+	# copying the property. This is useful if the property needs to
+	# be copied when it exists, and ignored otherwise.
+	#
+	[[ -n "$PROP_VALUE" && "$PROP_VALUE" != "-" ]] || return
 
 	zfs set "$PROP_NAME=$PROP_VALUE" "$DST_DATASET" ||
 		die "failed to set property '$PROP_NAME=$PROP_VALUE' for '$DST_DATASET'"

@@ -35,6 +35,11 @@
 VERSION=@@VERSION@@
 
 #
+# The hotfix version contained in the upgrade image (if any)
+#
+HOTFIX=@@HOTFIX@@
+
+#
 # The minimum product version an engine must have installed, in order to
 # upgrade using this upgrade image.
 #
