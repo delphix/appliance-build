@@ -648,6 +648,7 @@ function migrate_configuration() {
 		/etc/hostid
 		/etc/hostname
 		/etc/hosts
+		/etc/iscsi/initiatorname.iscsi
 		/etc/machine-id
 		/etc/netplan/10-delphix.yaml
 		/etc/resolv.conf
@@ -708,6 +709,7 @@ function migrate_configuration() {
 	while read -r dir; do
 		migrate_dir "$dir"
 	done <<-EOF
+		/etc/iscsi/nodes
 		/var/lib/nfs
 		/var/target/pr
 	EOF
