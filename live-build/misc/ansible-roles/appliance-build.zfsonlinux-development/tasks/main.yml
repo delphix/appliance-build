@@ -23,6 +23,7 @@
       - alien
       - autoconf
       - build-essential
+      - cargo
       - cppcheck
       - curl
       - emacs-nox
@@ -43,7 +44,9 @@
       - mandoc
       - nfs-kernel-server
       - parted
+      - pkg-config
       - python-minimal
+      - rustc
       - shellcheck
       - targetcli-fb
       - unzip
