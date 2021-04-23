@@ -22,6 +22,7 @@ IMAGE_VERSION=$(get_image_version)
 [[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
+HOTFIX=$(get-hotfix-version)
 
 function verify_jar_verify_cleanup() {
 	local rc="$?"
@@ -183,6 +184,7 @@ VERIFY_OPTIONS=(
 	"-f" "${opt_f:-1}"
 	"-l" "${opt_l:-en-US}"
 	"-v" "$IMAGE_VERSION"
+	"-h" "$HOTFIX"
 	"-pl" "25"
 	"-ph" "80"
 )

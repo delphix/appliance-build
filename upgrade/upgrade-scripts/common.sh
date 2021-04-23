@@ -142,7 +142,14 @@ function get_image_path() {
 }
 
 function get_image_version() {
-	basename "$(get_image_path)"
+#	basename "$(get_image_path)"
+  source_version_information
+  echo "$VERSION"
+}
+
+function get_image_hotfix() {
+  source_version_information
+  echo "$HOTFIX"
 }
 
 function get_mounted_rootfs_container_dataset() {
@@ -256,9 +263,6 @@ function source_version_information() {
 	local IMAGE_PATH="${IMAGE_PATH:-$(get_image_path)}"
 	[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
-	local IMAGE_VERSION="${IMAGE_VERSION:-$(get_image_version)}"
-	[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
-
 	[[ -f "$IMAGE_PATH/version.info" ]] ||
 		die "image for version '$IMAGE_VERSION' missing version.info"
 	. "$IMAGE_PATH/version.info" ||
@@ -268,6 +272,7 @@ function source_version_information() {
 	[[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION is empty"
 	[[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
 		die "MINIMUM_REBOOT_OPTIONAL_VERSION is empty"
+	IMAGE_VERSION="$VERSION"
 }
 
 function verify_upgrade_is_allowed() {
