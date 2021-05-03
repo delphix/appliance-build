@@ -87,6 +87,7 @@ def shellScripts = fileTree("scripts") +
                    }) +
                    fileTree("upgrade/upgrade-scripts", {
                        exclude "README.md"
+                       exclude "rootfs-cleanup"
                    })
 
 task shfmt(type: Exec) {
