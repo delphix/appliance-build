@@ -18,11 +18,16 @@
 # shellcheck disable=SC1090
 . "${BASH_SOURCE%/*}/common.sh"
 
-IMAGE_VERSION=$(get_image_version)
-[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
+# We source the version information to bring in values from
+# the version.info file, such as
+#   - VERSION : the appliance version
+#   - HOTFIX : the hotfix version if any
+
+source_version_information
+
+[[ -n "$VERSION" ]] || die "failed to determine image version"
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
-HOTFIX=$(get-hotfix-version)
 
 function verify_jar_verify_cleanup() {
 	local rc="$?"
@@ -183,7 +188,7 @@ VERIFY_OPTIONS=(
 	"-d" "${opt_o:-${LOG_DIRECTORY}/${CONTAINER}/upgrade_verify.json}"
 	"-f" "${opt_f:-1}"
 	"-l" "${opt_l:-en-US}"
-	"-v" "$IMAGE_VERSION"
+	"-v" "$VERSION"
 	"-h" "$HOTFIX"
 	"-pl" "25"
 	"-ph" "80"

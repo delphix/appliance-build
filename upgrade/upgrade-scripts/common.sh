@@ -141,17 +141,6 @@ function get_image_path() {
 	readlink -f "${BASH_SOURCE%/*}"
 }
 
-function get_image_version() {
-#	basename "$(get_image_path)"
-  source_version_information
-  echo "$VERSION"
-}
-
-function get_image_hotfix() {
-  source_version_information
-  echo "$HOTFIX"
-}
-
 function get_mounted_rootfs_container_dataset() {
 	dirname "$(zfs list -Hpo name /)"
 }
@@ -264,15 +253,14 @@ function source_version_information() {
 	[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
 	[[ -f "$IMAGE_PATH/version.info" ]] ||
-		die "image for version '$IMAGE_VERSION' missing version.info"
+		die "image missing version.info for $IMAGE_PATH"
 	. "$IMAGE_PATH/version.info" ||
-		die "failed to source version.info for version '$IMAGE_VERSION'"
+		die "failed to source version.info for $IMAGE_PATH"
 
 	[[ -n "$VERSION" ]] || die "VERSION is empty"
 	[[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION is empty"
 	[[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
 		die "MINIMUM_REBOOT_OPTIONAL_VERSION is empty"
-	IMAGE_VERSION="$VERSION"
 }
 
 function verify_upgrade_is_allowed() {

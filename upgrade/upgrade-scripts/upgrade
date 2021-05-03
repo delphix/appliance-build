@@ -20,8 +20,6 @@
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
-IMAGE_VERSION=$(get_image_version)
-[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
 
 #
 # This variable is used to determine if a "dry run" of the upgrade
