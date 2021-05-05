@@ -445,6 +445,15 @@ while getopts ':nv' c; do
 done
 shift $((OPTIND - 1))
 
+#
+# Currently, we don't want to run upgrade verification for hotfixes, as
+# we haven't yet implemented all the work necessary for the verification
+# to behave properly for hotfixes. Thus, for now, if we detect this is a
+# hotfix image, we disable upgrade verification.
+#
+source_version_information
+[[ -n "$HOTFIX" ]] && DLPX_UPGRADE_SKIP_VERIFY="true"
+
 case "$1" in
 deferred)
 	verify_upgrade_not_in_progress
