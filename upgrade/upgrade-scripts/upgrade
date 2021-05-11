@@ -20,7 +20,6 @@
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
-
 #
 # This variable is used to determine if a "dry run" of the upgrade
 # should be performed, as opposed to an actual upgrade of the system.
