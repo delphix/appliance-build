@@ -43,12 +43,17 @@ die() {
 # We want to use different sized rpool depending on if we're building a
 # disk image meant for internal use, or external (i.e. customer) use.
 #
+# The only exception to this is our "dcenter" variant. While that
+# variant is only used internally, we use it in a way that more
+# resembles our external variants, so we want the rpool size for
+# the dcenter images to match our external images.
+#
 case "$APPLIANCE_VARIANT" in
+external-* | internal-dcenter)
+	RAW_DISK_SIZE_GB=127
+	;;
 internal-*)
 	RAW_DISK_SIZE_GB=70
-	;;
-external-*)
-	RAW_DISK_SIZE_GB=127
 	;;
 *)
 	die "Invalid variant specified: '$APPLIANCE_VARIANT'"
@@ -130,6 +135,12 @@ zfs create \
 	-o "com.delphix:initial-version=$DELPHIX_APPLIANCE_VERSION" \
 	-o "com.delphix:current-version=$DELPHIX_APPLIANCE_VERSION" \
 	"rpool/ROOT/$FSNAME"
+
+if [[ -n "$DELPHIX_HOTFIX_VERSION" ]]; then
+	zfs set \
+		"com.delphix:hotfix-version=$DELPHIX_HOTFIX_VERSION" \
+		"rpool/ROOT/$FSNAME"
+fi
 
 zfs create \
 	-o canmount=noauto \
