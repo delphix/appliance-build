@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
 
 function die() {
@@ -106,6 +105,10 @@ if $opt_x; then
 fi
 
 popd &>/dev/null || die "'popd' failed"
+
+if [[ -n "$HOTFIX" ]]; then
+        VERSION="$VERSION-$HOTFIX"
+fi
 
 $opt_f && rm -rf "${UPDATE_DIR:?}/$VERSION" >/dev/null 2>&1
 
