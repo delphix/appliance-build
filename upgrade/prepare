@@ -107,7 +107,7 @@ fi
 popd &>/dev/null || die "'popd' failed"
 
 if [[ -n "$HOTFIX" ]]; then
-        VERSION="$VERSION-$HOTFIX"
+	VERSION="$VERSION-$HOTFIX"
 fi
 
 $opt_f && rm -rf "${UPDATE_DIR:?}/$VERSION" >/dev/null 2>&1
