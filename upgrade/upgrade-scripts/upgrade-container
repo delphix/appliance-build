@@ -235,7 +235,7 @@ function create_upgrade_container() {
 		#
 		debootstrap --no-check-gpg \
 			--components=delphix --include=systemd-container \
-			bionic "$DIRECTORY" "file://$IMAGE_PATH" 1>&2 ||
+			focal "$DIRECTORY" "file://$IMAGE_PATH" 1>&2 ||
 			die "failed to debootstrap upgrade filesystem"
 
 		#
