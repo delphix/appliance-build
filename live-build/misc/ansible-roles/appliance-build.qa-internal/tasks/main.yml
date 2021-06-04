@@ -48,7 +48,6 @@
       - git
       - libcrypt-blowfish-dev
       - libcurl4-openssl-dev
-      - libnss3-dbg
       - libnss3-dev
       - libnss3-tools
       - libpam0g-dev
