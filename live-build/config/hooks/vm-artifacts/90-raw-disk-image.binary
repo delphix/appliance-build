@@ -299,7 +299,12 @@ chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
 chroot "$DIRECTORY" umount /mnt
 
 for dir in /dev /proc /sys; do
-	umount -R "${DIRECTORY}${dir}"
+	for attempt in {1..5}; do
+		umount -R "${DIRECTORY}${dir}" && break
+		[[ "$attempt" == 5 ]] && die "Too many failed attempts, aborting."
+		echo "Attempt $attempt failed, trying again after a small nap."
+		sleep 10
+	done
 done
 
 umount "$DIRECTORY/var/log"
