@@ -45,7 +45,7 @@
       - nfs-kernel-server
       - parted
       - pkg-config
-      - python-minimal
+      - python3-minimal
       - rustc
       - shellcheck
       - targetcli-fb

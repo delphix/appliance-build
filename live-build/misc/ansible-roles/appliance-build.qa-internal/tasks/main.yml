@@ -52,7 +52,7 @@
       - libnss3-tools
       - libpam0g-dev
       - libssl-dev
-      - python-pip
+      - python3-pip
     state: present
   register: result
   until: result is not failed
