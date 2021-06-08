@@ -19,6 +19,7 @@
 - apt:
     name:
       - adoptopenjdk-java8-jdk
+      - awscli
       - bind9
       - dnsutils
       - git
