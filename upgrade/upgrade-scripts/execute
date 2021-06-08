@@ -353,7 +353,17 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 KVERS=$(apt-mark showauto 'delphix-kernel-.*' | sed 's/^delphix-kernel-//') ||
 	die "failed to determine list of kernel versions to remove"
 for KVER in $KVERS; do
-	apt_get purge -y "delphix-kernel-$KVER" "linux-image-$KVER" ||
+	apt_get purge -y \
+		"delphix-kernel-$KVER" \
+		"linux-image-$KVER" \
+		"linux-image-$KVER-dbgsym" \
+		"linux-modules-extra-$KVER" \
+		"linux-headers-$KVER" \
+		"linux-tools-$KVER" \
+		"zfs-modules-$KVER" \
+		"zfs-modules-$KVER-dbg" \
+		"zfs-headers-$KVER" \
+		"connstat-module-$KVER" ||
 		die "failed to remove kernel packages for version '$KVER'"
 done
 
