@@ -242,32 +242,19 @@ dpkg-query -Wf '${Package}\n' | xargs apt-mark auto ||
 
 #
 # While we marked all packages to "auto" above, so they'd be removed
-# when they're no longer required, we treat kernel packages slightly
-# differently. For disaster recovery type situations (e.g. the new
-# kernel fails to boot), we always want to keep a "known good" kernel
-# installed on the system. This way, if we have problems with the new
-# kernel installed as part of this upgrade, we'll hopefully have the old
-# one still available, to help recover us out of a failed upgrade.
+# when they're no longer required, we want to prevent the removal of old
+# kernel packages. This is so that we can boot into the old kernel(s)
+# if we ever need to; e.g. after a failed kernel upgrade. We accomplish
+# this by marking all "delphix-kernel-*" packages as "manual"-ly
+# installed. The "delphix-kernel-*" package(s) will have package
+# dependencies on the linux kernel package(s), and all other kernel
+# packages that're required for that specific kernel (e.g. zfs kernel
+# module package, connstat kernel module package, etc.). Thus, as long
+# as the "delphix-kernel-*" package remains installed, all other
+# dependent packages should also remain installed.
 #
-# Thus, the logic here ensures that the currently running kernel is not
-# removed when we run the "apt-get autoremove" logic later in this
-# script. Further, we only need to preserve the "delphix-kernel" package
-# here, as this will preserve all other packages it depends on; e.g. all
-# kernel module packages, etc.
-#
-# Lastly, we use the currently running kernel as the "known good"
-# version that we want to preserve, since the fact that we're currently
-# running on it means it's been verified to (at the very least) boot up
-# properly. We don't track which of the installed kernels have been
-# verified to work (e.g. booted from), and due to deferred upgrades,
-# it's possible to install new kernels and never actually use them.
-# Thus, of all the currently installed kernels, the only one that we
-# know to function properly, is the currently running one; which is why
-# we explicitly choose to keep the currently running version.
-#
-dpkg-query -Wf '${Package}\n' "delphix-kernel-$(uname -r)" |
-	xargs apt-mark manual ||
-	die "failed to mark delphix-kernel packages as 'manual' installed"
+dpkg-query -Wf '${Package}\n' "delphix-kernel-*" | xargs apt-mark manual ||
+	die "failed to mark 'delphix-kernel-*' packages as 'manual' installed"
 
 #
 # In order to perform an upgrade of the Delphix appliance, we must first
@@ -345,33 +332,8 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 # all packages that are no longer required. For example, if the old
 # "delphix-entire" version required a package, and the new version no
 # longer requires that package, the commands run above will not remove
-# the package.
-#
-# First, since "apt-get autoremove" does not work properly for the
-# kernel packages, we have to handle the removal of those here.
-#
-KVERS=$(apt-mark showauto 'delphix-kernel-.*' | sed 's/^delphix-kernel-//') ||
-	die "failed to determine list of kernel versions to remove"
-for KVER in $KVERS; do
-	apt_get purge -y "delphix-kernel-$KVER" "linux-image-$KVER" ||
-		die "failed to remove kernel packages for version '$KVER'"
-done
-
-#
-# Next, APT will automatically try to prevent kernel packages from being
-# removed via "apt-get autoremove", in an attempt to be "helpful". Since
-# we're already taking the necessary precautions that make sense for our
-# appliance w.r.t. kernel packages, we need to disable those native APT
-# protections by removing this "01autoremove" file.
-#
-rm -rf /etc/apt/apt.conf.d/01autoremove ||
-	die "failed to remove '/etc/apt/apt.conf.d/01autoremove' file"
-
-#
-# Finally, now that we've handled the two complications above, we can
-# use "apt-get autoremove" to properly remove all old packages; i.e.
-# ones that are no longer needed on the currently installed version of
-# the appliance.
+# the package. Thus, we need to run "autoremove" to ensure all packages
+# that fall into this category are removed.
 #
 apt_get autoremove --purge -y || die "autoremove after upgrade failed"
 
