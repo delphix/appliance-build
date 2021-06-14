@@ -20,9 +20,6 @@
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
-IMAGE_VERSION=$(get_image_version)
-[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
-
 #
 # This variable is used to determine if a "dry run" of the upgrade
 # should be performed, as opposed to an actual upgrade of the system.
@@ -320,11 +317,14 @@ function rollback() {
 	ROLLBACK_BASE_VERSION="$(get_current_version)"
 	[[ -n "$ROLLBACK_BASE_VERSION" ]] ||
 		die "unable to determine current appliance version"
+	ROLLBACK_BASE_HOTFIX="$(get_current_hotfix)"
 
 	set_upgrade_property "ROLLBACK_BASE_CONTAINER" "$ROLLBACK_BASE_CONTAINER" ||
 		die "failed setting 'ROLLBACK_BASE_CONTAINER' property"
 	set_upgrade_property "ROLLBACK_BASE_VERSION" "$ROLLBACK_BASE_VERSION" ||
 		die "failed setting 'ROLLBACK_BASE_VERSION' property"
+	set_upgrade_property "ROLLBACK_BASE_HOTFIX" "$ROLLBACK_BASE_HOTFIX" ||
+		die "failed setting 'ROLLBACK_BASE_HOTFIX' property"
 
 	if [[ "$UPGRADE_BASE_CONTAINER" == "$ROLLBACK_BASE_CONTAINER" ]]; then
 		#
@@ -361,6 +361,41 @@ function rollback() {
 }
 
 function finalize() {
+	source_upgrade_properties
+
+	[[ -n "$UPGRADE_TYPE" ]] ||
+		die "variable UPGRADE_TYPE is not set; is upgrade in progress?"
+	[[ -n "$UPGRADE_BASE_VERSION" ]] ||
+		die "variable UPGRADE_BASE_VERSION is not set"
+
+	case "$UPGRADE_TYPE" in
+	DEFERRED | FULL | ROLLBACK) ;;
+	*)
+		die "finalize is not supported for upgrade type: '$UPGRADE_TYPE'"
+		;;
+	esac
+
+	remove_upgrade_properties
+
+	#
+	# We only want to remove this hotfix file after a successful
+	# upgrade attempt; at which point the old hotfix file will no
+	# longer be representative of the new rootfs contents.
+	#
+	# If a rollback occured, then we do not want to remove this
+	# file, since the currently running rootfs will be the "old"
+	# version, and still should match the hotfix file. We detect if
+	# a rollback occurred by the presence of this field (which would
+	# be set in the upgrade properites file).
+	#
+	if [[ -z "$ROLLBACK_BASE_VERSION" ]]; then
+		if [[ -f "$HOTFIX_PATH" ]]; then
+			rm -f "$HOTFIX_PATH" || die "failed to remove hotfix file"
+		fi
+	fi
+}
+
+function cleanup() {
 	if [[ "$DLPX_UPGRADE_DRY_RUN" == "true" ]]; then
 		#
 		# If we're executing a dry-run of the finalize
@@ -388,67 +423,9 @@ function finalize() {
 			die "failed to clean up illumos datasets"
 	fi
 
-	#
-	# This first pass checks for available "execute.upgrade" snapshots
-	# and deletes snapshots that are older than the base upgrade version.
-	# This pass takes care of cleanup after in-place and deferred upgrades.
-	#
-	SNAPSHOT_LIST=$(zfs list -t snapshot -r rpool/ROOT -d 2 -Ho name) ||
-		die "unable to determine available rollback snapshots"
-
-	for snapshot in $SNAPSHOT_LIST; do
-		local SNAPSHOT_NAME
-		SNAPSHOT_NAME=$(echo "$snapshot" | awk -F@ '{print $2}')
-		#
-		# We skip container-delphix instances since `rootfs-container delete`
-		# handles them in the second pass below.
-		#
-		grep -qE "^container-delphix.[[:alnum:]]{7}$" <(echo "$SNAPSHOT_NAME") &&
-			continue
-		grep -qE "^execute-upgrade.[[:alnum:]]{7}$" <(echo "$SNAPSHOT_NAME") ||
-			die "unexpected snapshot name: '$snapshot'"
-		local SNAPSHOT_VERSION
-		SNAPSHOT_VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$snapshot") ||
-			die "failed to get snapshot version"
-		[[ "$SNAPSHOT_VERSION" != "-" ]] ||
-			die "failed to get current version for snapshot '$snapshot'"
-		if compare_versions \
-			"$SNAPSHOT_VERSION" "lt" "$UPGRADE_BASE_VERSION"; then
-			zfs destroy -r "$snapshot" ||
-				die "failed to destroy rollback snapshot"
-		fi
-	done
-
-	#
-	# This second pass checks for available filesystems and deletes those
-	# that are older than the base upgrade version. This pass takes care
-	# of cleanup following rollbacks and not-in-place upgrades.
-	#
-	FILESYSTEM_LIST=$(zfs list -t filesystem -r rpool/ROOT -d 1 -Ho name | tail -n +2) ||
-		die "unable to determine available filesystems"
-
-	for filesystem in $FILESYSTEM_LIST; do
-		local FILESYSTEM_VERSION
-		FILESYSTEM_VERSION=$(zfs get -Hpo value "$PROP_CURRENT_VERSION" "$filesystem") ||
-			die "failed to get filesystem version"
-		[[ "$FILESYSTEM_VERSION" != "-" ]] ||
-			die "failed to get current version for filesystem '$filesystem'"
-		if compare_versions \
-			"$FILESYSTEM_VERSION" "lt" "$UPGRADE_BASE_VERSION"; then
-			local FILESYSTEM_NAME
-			FILESYSTEM_NAME=$(echo "$filesystem" | awk -F/ '{print $3}')
-			"$IMAGE_PATH/rootfs-container" delete "$FILESYSTEM_NAME" ||
-				die "failed to delete filesystem '$filesystem"
-		fi
-	done
+	"$IMAGE_PATH/rootfs-cleanup" || die "failed to cleanup rootfs versions"
 
 	rm -rf "$IMAGE_PATH" || die "failed to remove unpacked upgrade image"
-
-	remove_upgrade_properties
-
-	if [[ -f "$HOTFIX_PATH" ]]; then
-		rm -f "$HOTFIX_PATH" || die "failed to remove hotfix file"
-	fi
 }
 
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
@@ -506,6 +483,12 @@ rollback)
 finalize)
 	shift 1
 	finalize "$@"
+	;;
+cleanup)
+	verify_upgrade_not_in_progress
+
+	shift 1
+	cleanup "$@"
 	;;
 *)
 	usage "invalid option -- '$1'"

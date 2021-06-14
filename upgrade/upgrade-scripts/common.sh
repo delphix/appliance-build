@@ -141,10 +141,6 @@ function get_image_path() {
 	readlink -f "${BASH_SOURCE%/*}"
 }
 
-function get_image_version() {
-	basename "$(get_image_path)"
-}
-
 function get_mounted_rootfs_container_dataset() {
 	dirname "$(zfs list -Hpo name /)"
 }
@@ -256,13 +252,10 @@ function source_version_information() {
 	local IMAGE_PATH="${IMAGE_PATH:-$(get_image_path)}"
 	[[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
-	local IMAGE_VERSION="${IMAGE_VERSION:-$(get_image_version)}"
-	[[ -n "$IMAGE_VERSION" ]] || die "failed to determine image version"
-
 	[[ -f "$IMAGE_PATH/version.info" ]] ||
-		die "image for version '$IMAGE_VERSION' missing version.info"
+		die "image missing version.info for $IMAGE_PATH"
 	. "$IMAGE_PATH/version.info" ||
-		die "failed to source version.info for version '$IMAGE_VERSION'"
+		die "failed to source version.info for $IMAGE_PATH"
 
 	[[ -n "$VERSION" ]] || die "VERSION is empty"
 	[[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION is empty"
