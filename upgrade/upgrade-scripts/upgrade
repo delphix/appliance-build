@@ -323,8 +323,11 @@ function rollback() {
 		die "failed setting 'ROLLBACK_BASE_CONTAINER' property"
 	set_upgrade_property "ROLLBACK_BASE_VERSION" "$ROLLBACK_BASE_VERSION" ||
 		die "failed setting 'ROLLBACK_BASE_VERSION' property"
-	set_upgrade_property "ROLLBACK_BASE_HOTFIX" "$ROLLBACK_BASE_HOTFIX" ||
-		die "failed setting 'ROLLBACK_BASE_HOTFIX' property"
+
+	if [[ -n "$ROLLBACK_BASE_HOTFIX" ]]; then
+		set_upgrade_property "ROLLBACK_BASE_HOTFIX" "$ROLLBACK_BASE_HOTFIX" ||
+			die "failed setting 'ROLLBACK_BASE_HOTFIX' property"
+	fi
 
 	if [[ "$UPGRADE_BASE_CONTAINER" == "$ROLLBACK_BASE_CONTAINER" ]]; then
 		#
