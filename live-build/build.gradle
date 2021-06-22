@@ -41,7 +41,8 @@ def artifactTypes = ["aws": "vmdk",
                      "gcp": "gcp.tar.gz",
                      "hyperv": "vhdx",
                      "kvm": "qcow2",
-                     "oci": "qcow2"]
+                     "oci": "qcow2",
+                     "ibm": "qcow2"]
 
 def configDir = "configuration"
 

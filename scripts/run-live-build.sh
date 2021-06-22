@@ -242,6 +242,7 @@ gcp) vm_artifact_ext=gcp.tar.gz ;;
 hyperv) vm_artifact_ext=vhdx ;;
 kvm) vm_artifact_ext=qcow2 ;;
 oci) vm_artifact_ext=qcow2 ;;
+ibm) vm_artifact_ext=qcow2 ;;
 *)
 	echo "Invalid platform"
 	exit 1
