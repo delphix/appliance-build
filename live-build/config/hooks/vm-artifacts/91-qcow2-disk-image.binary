@@ -21,7 +21,7 @@
 # assumed to be a "raw" disk image, into a qcow2 formated disk image.
 #
 
-[[ "$APPLIANCE_PLATFORM" == kvm ]] || [[ "$APPLIANCE_PLATFORM" == oci ]] ||
+[[ "$APPLIANCE_PLATFORM" == kvm ]] || [[ "$APPLIANCE_PLATFORM" == oci ]] || [[ "$APPLIANCE_PLATFORM" == ibm ]]
 	exit 0
 
 source /usr/share/livecd-rootfs/live-build/functions
