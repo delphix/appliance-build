@@ -317,7 +317,7 @@ function rollback() {
 	ROLLBACK_BASE_VERSION="$(get_current_version)"
 	[[ -n "$ROLLBACK_BASE_VERSION" ]] ||
 		die "unable to determine current appliance version"
-	ROLLBACK_BASE_HOTFIX="$(get_current_hotfix)"
+	ROLLBACK_BASE_HOTFIX="$(get_hotfix_version)"
 
 	set_upgrade_property "ROLLBACK_BASE_CONTAINER" "$ROLLBACK_BASE_CONTAINER" ||
 		die "failed setting 'ROLLBACK_BASE_CONTAINER' property"
