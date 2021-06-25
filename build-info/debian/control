@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 Delphix
+# Copyright 2020 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,38 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+Source: delphix-build-info
+Section: misc
+Priority: optional
+Maintainer: Delphix Engineering <eng@delphix.com>
+Build-Depends: debhelper (>= 10), devscripts
+Standards-Version: 4.1.2
 
----
-- apt:
-    update_cache: yes
-
-- apt:
-    name:
-      - ansible
-      - aptly
-      - awscli
-      - bc
-      - coreutils
-      - devscripts
-      - equivs
-      - gdisk
-      - git
-      - java-package
-      - jq
-      - kpartx
-      - libxt6
-      - livecd-rootfs
-      - make
-      - man
-      - openjdk-8-jre-headless
-      - pigz
-      - qemu
-      - rename
-      - shellcheck
-      - vim
-      - zfsutils-linux
-    state: present
-
-- modprobe:
-    name: zfs
-    state: present
+Package: delphix-build-info
+Architecture: all
+Description: Provides build metadata for packages built by Delphix.

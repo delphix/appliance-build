@@ -1,5 +1,6 @@
+#!/usr/bin/make -f
 #
-# Copyright 2018-2019 Delphix
+# Copyright 2021 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,37 +15,5 @@
 # limitations under the License.
 #
 
----
-- apt:
-    update_cache: yes
-
-- apt:
-    name:
-      - ansible
-      - aptly
-      - awscli
-      - bc
-      - coreutils
-      - devscripts
-      - equivs
-      - gdisk
-      - git
-      - java-package
-      - jq
-      - kpartx
-      - libxt6
-      - livecd-rootfs
-      - make
-      - man
-      - openjdk-8-jre-headless
-      - pigz
-      - qemu
-      - rename
-      - shellcheck
-      - vim
-      - zfsutils-linux
-    state: present
-
-- modprobe:
-    name: zfs
-    state: present
+%:
+	dh $@
