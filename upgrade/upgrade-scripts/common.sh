@@ -233,6 +233,13 @@ function copy_optional_dataset_property() {
 	#
 	[[ -n "$PROP_VALUE" && "$PROP_VALUE" != "-" ]] || return
 
+	#
+	# Additionally, we only want to copy the dataset property when
+	# it's a local value, rather than a potentially inherited value.
+	#
+	PROP_SOURCE=$(zfs get -Hpo source "$PROP_NAME" "$SRC_DATASET")
+	[[ "$PROP_SOURCE" == "local" ]] || return
+
 	zfs set "$PROP_NAME=$PROP_VALUE" "$DST_DATASET" ||
 		die "failed to set property '$PROP_NAME=$PROP_VALUE' for '$DST_DATASET'"
 }
