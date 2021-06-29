@@ -81,6 +81,11 @@ EOF
 rename 's/\%3a/:/g' binary/packages/*.deb
 
 #
+# Copy over the generated hotfix metadata.
+#
+cp ../scripts/generate-hotfix-metadata/hotfix_metadata  hotfix_metadata
+
+#
 # Now we need to create the "delphix-entire" metapackage that will
 # depend on all of the packages that have been installed in the binary
 # chroot environment.
