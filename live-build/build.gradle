@@ -1,3 +1,5 @@
+import java.util.stream.Collectors
+
 /*
  * Copyright 2019, 2020 Delphix
  *
@@ -52,6 +54,50 @@ def runTypesAndSuffixes = [[upgradeArtifactsRunType, "UpgradeArtifacts"],
                            [vmArtifactsRunType, "VmArtifacts"],
                            [allRunType, ""]]
 
+
+
+task generateHotfixMetaData(type: Exec) {
+
+    def env = System.getenv()
+
+    def errors = []
+
+    for (envVar in ["DELPHIX_APPLIANCE_VERSION",
+                    "JIRA_URL",
+                    "JIRA_USER",
+                    "JIRA_PASSWORD"
+    ]) {
+        def envVarValue = env.getOrDefault(envVar, "")
+
+        if (envVarValue == "") {
+            errors.add("Environment variable " + envVar + " is undefined or empty." )
+        }
+
+        inputs.property(envVar, envVarValue).optional(true)
+    }
+
+    if (!errors.isEmpty()) {
+        throw new InvalidUserDataException(errors.stream().collect(Collectors.joining("\n")))
+    }
+
+    def releaseVersion = env.getOrDefault("DELPHIX_APPLIANCE_VERSION", "")
+
+    def outPath ="${buildDir}/scripts/generate-hotfix-metadata/hotfix_metadata"
+    outputs.file outPath
+
+    commandLine "${rootProject.projectDir}/scripts/generate-hotfix-metadata/run.sh", releaseVersion, outPath
+}
+
+
+task cleanGenerateHotfixMetaData(type: Exec) {
+    def outPath ="${buildDir}/scripts/genhotfixmetadata/metadata.txt"
+    commandLine "rm", "-rf", "${outPath}"
+}
+
+
+tasks.clean.dependsOn  "cleanGenerateHotfixMetaData"
+
+
 /*
  * Create tasks to the upgrade artifacts only, VM artifacts only, or everything.
  */
@@ -74,6 +120,7 @@ for (variant in allVariants) {
                         break
                 }
 
+                dependsOn generateHotfixMetaData
                 dependsOn ancillaryRepository
                 dependsOn mkArtifactsDir
 
@@ -105,7 +152,8 @@ for (variant in allVariants) {
                                 "DELPHIX_PACKAGE_MIRROR_MAIN",
                                 "DELPHIX_PACKAGE_MIRROR_SECONDARY",
                                 "DELPHIX_SIGNATURE_URL",
-                                "DELPHIX_SIGNATURE_TOKEN"]) {
+                                "DELPHIX_SIGNATURE_TOKEN"
+                ]) {
                     inputs.property(envVar, System.getenv(envVar)).optional(true)
                 }
 
