@@ -122,6 +122,8 @@ if [[ -n "$DELPHIX_UPGRADE_MINIMUM_VERSION" ]]; then
 		"s/@@MINIMUM_VERSION@@/$DELPHIX_UPGRADE_MINIMUM_VERSION/" \
 		version.info ||
 		die "failed to set MINIMUM_VERSION in version.info"
+elif [[ -n "$JENKINS_URL" ]]; then
+	die "DELPHIX_UPGRADE_MINIMUM_VERSION not specified"
 else
 	sed -i "s/@@MINIMUM_VERSION@@/0.0.0.0/" version.info ||
 		die "failed to set MINIMUM_VERSION in version.info"
@@ -132,6 +134,8 @@ if [[ -n "$DELPHIX_UPGRADE_MINIMUM_REBOOT_OPTIONAL_VERSION" ]]; then
 		"s/@@MINIMUM_REBOOT_OPTIONAL_VERSION@@/$DELPHIX_UPGRADE_MINIMUM_REBOOT_OPTIONAL_VERSION/" \
 		version.info ||
 		die "failed to set MINIMUM_REBOOT_OPTIONAL_VERSION in version.info"
+elif [[ -n "$JENKINS_URL" ]]; then
+	die "DELPHIX_UPGRADE_MINIMUM_REBOOT_OPTIONAL_VERSION not specified"
 else
 	sed -i "s/@@MINIMUM_REBOOT_OPTIONAL_VERSION@@/0.0.0.0/" version.info ||
 		die "failed to set MINIMUM_REBOOT_OPTIONAL_VERSION in version.info"
@@ -147,6 +151,12 @@ sha256sum payload.tar.gz version.info verification-version.info prepare >SHA256S
 # DELPHIX_SIGNATURE_TOKEN environment variable contents to stdout.
 #
 set +o xtrace
+if [[ -n "$JENKINS_URL" ]]; then
+	[[ -n "$DELPHIX_SIGNATURE_VERSIONS" ]] || die "DELPHIX_SIGNATURE_VERSIONS not specified"
+	[[ -n "$DELPHIX_SIGNATURE_TOKEN" ]] || die "DELPHIX_SIGNATURE_TOKEN not specified"
+	[[ -n "$DELPHIX_SIGNATURE_URL" ]] || die "DELPHIX_SIGNATURE_URL not specified"
+fi
+
 if [[ -n "${DELPHIX_SIGNATURE_TOKEN:-}" ]] && [[ -n "${DELPHIX_SIGNATURE_URL:-}" ]]; then
 	echo "{\"data\": \"$(base64 -w 0 SHA256SUMS)\"}" >sign-request.payload ||
 		die "failed to generate sigh-request.payload file"
