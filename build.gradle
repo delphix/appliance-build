@@ -78,7 +78,8 @@ for (variant in allVariants) {
     }
 }
 
-def shellScripts = fileTree("scripts") +
+def shellScripts = fileTree("scripts").include({ details ->
+                         details.file.getName().endsWith(".sh") }) +
                    fileTree("live-build/config/hooks").include({ details ->
                         details.file.canExecute()
                    }) +
