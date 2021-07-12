@@ -121,7 +121,7 @@ for (variant in allVariants) {
                         break
                 }
 
-                //dependsOn generateHotfixMetaData
+                dependsOn generateHotfixMetaData
                 dependsOn ancillaryRepository
                 dependsOn mkArtifactsDir
 
