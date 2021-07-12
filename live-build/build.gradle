@@ -57,7 +57,6 @@ def runTypesAndSuffixes = [[upgradeArtifactsRunType, "UpgradeArtifacts"],
 
 
 task generateHotfixMetaData(type: Exec) {
-
     def env = System.getenv()
 
     def errors = []
@@ -76,26 +75,28 @@ task generateHotfixMetaData(type: Exec) {
         inputs.property(envVar, envVarValue).optional(true)
     }
 
-    if (!errors.isEmpty()) {
-        throw new InvalidUserDataException(errors.stream().collect(Collectors.joining("\n")))
-    }
-
-    def releaseVersion = env.getOrDefault("DELPHIX_APPLIANCE_VERSION", "")
-
     def outPath ="${buildDir}/scripts/generate-hotfix-metadata/hotfix_metadata"
     outputs.file outPath
+    def releaseVersion = env.getOrDefault("DELPHIX_APPLIANCE_VERSION", "")
 
-    commandLine "${rootProject.projectDir}/scripts/generate-hotfix-metadata/run.sh", releaseVersion, outPath
+    doFirst {
+
+        if (!errors.isEmpty()) {
+            throw new InvalidUserDataException(errors.stream().collect(Collectors.joining("\n")))
+        }
+
+        commandLine "${rootProject.projectDir}/scripts/generate-hotfix-metadata/run.sh", releaseVersion, outPath
+    }
 }
 
 
 task cleanGenerateHotfixMetaData(type: Exec) {
-    def outPath ="${buildDir}/scripts/genhotfixmetadata/metadata.txt"
+    def outPath ="${buildDir}/scripts/generate-hotfix-metadata/metadata.txt"
     commandLine "rm", "-rf", "${outPath}"
 }
 
 
-tasks.clean.dependsOn  "cleanGenerateHotfixMetaData"
+tasks.clean.dependsOn  "generate-hotfix-metadata"
 
 
 /*
@@ -120,7 +121,7 @@ for (variant in allVariants) {
                         break
                 }
 
-                dependsOn generateHotfixMetaData
+                //dependsOn generateHotfixMetaData
                 dependsOn ancillaryRepository
                 dependsOn mkArtifactsDir
 
