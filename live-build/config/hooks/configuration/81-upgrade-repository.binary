@@ -83,7 +83,7 @@ rename 's/\%3a/:/g' binary/packages/*.deb
 #
 # Copy over the generated hotfix metadata.
 #
-cp ../scripts/generate-hotfix-metadata/hotfix_metadata  hotfix_metadata
+cp ../scripts/generate-hotfix-metadata/hotfix_metadata hotfix_metadata
 
 #
 # Now we need to create the "delphix-entire" metapackage that will
