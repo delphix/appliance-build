@@ -56,49 +56,6 @@ def runTypesAndSuffixes = [[upgradeArtifactsRunType, "UpgradeArtifacts"],
 
 
 
-task generateHotfixMetaData(type: Exec) {
-    def env = System.getenv()
-
-    def errors = []
-
-    for (envVar in ["DELPHIX_APPLIANCE_VERSION",
-                    "JIRA_URL",
-                    "JIRA_USER",
-                    "JIRA_PASSWORD"
-    ]) {
-        def envVarValue = env.getOrDefault(envVar, "")
-
-        if (envVarValue == "") {
-            errors.add("Environment variable " + envVar + " is undefined or empty." )
-        }
-
-        inputs.property(envVar, envVarValue).optional(true)
-    }
-
-    def outPath ="${buildDir}/scripts/generate-hotfix-metadata/hotfix_metadata"
-    outputs.file outPath
-    def releaseVersion = env.getOrDefault("DELPHIX_APPLIANCE_VERSION", "")
-
-    doFirst {
-
-        if (!errors.isEmpty()) {
-            throw new InvalidUserDataException(errors.stream().collect(Collectors.joining("\n")))
-        }
-
-        commandLine "${rootProject.projectDir}/scripts/generate-hotfix-metadata/run.sh", releaseVersion, outPath
-    }
-}
-
-
-task cleanGenerateHotfixMetaData(type: Exec) {
-    def outPath ="${buildDir}/scripts/generate-hotfix-metadata/metadata.txt"
-    commandLine "rm", "-rf", "${outPath}"
-}
-
-
-tasks.clean.dependsOn  "generate-hotfix-metadata"
-
-
 /*
  * Create tasks to the upgrade artifacts only, VM artifacts only, or everything.
  */
@@ -121,7 +78,6 @@ for (variant in allVariants) {
                         break
                 }
 
-                dependsOn generateHotfixMetaData
                 dependsOn ancillaryRepository
                 dependsOn mkArtifactsDir
 

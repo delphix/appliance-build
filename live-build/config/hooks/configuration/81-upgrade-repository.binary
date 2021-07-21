@@ -83,7 +83,18 @@ rename 's/\%3a/:/g' binary/packages/*.deb
 #
 # Copy over the generated hotfix metadata.
 #
-cp ../scripts/generate-hotfix-metadata/hotfix_metadata hotfix_metadata
+if [[-z "$HOTFIX_METDATA" ]]; then
+   touch hotfix_metadata
+else
+   aws s3 cp --only-show-errors "$HOTFIX_METDATA" hotfix_metadata
+fi
+
+
+if [[ ! -f "hotfix_metadata" ]]; then
+   echo "Could not generate hotfix_metadata file."
+   exit 1
+fi
+
 
 #
 # Now we need to create the "delphix-entire" metapackage that will

@@ -301,7 +301,7 @@ def main():
         dlpx_version = LooseVersion(dlpx.fields.customfield_10500.name)
         if dlpx_version.__str__() == "Jocacean":
           dlpx_version = LooseVersion("5.2.0.0")
-        if  dlpx_version <= LooseVersion(args.version):
+        if  dlpx_version <= LooseVersion(version):
           continue
         else:
 
@@ -315,7 +315,7 @@ def main():
           assert len(backport.fields.customfield_10500.name.replace('Jocacean'
                                                                     , '5.2.0.0').split('.')) == 4
           if LooseVersion(backport.fields.customfield_10500.name) \
-              <= LooseVersion(args.version):
+              <= LooseVersion(version):
             break
       else:
         break
