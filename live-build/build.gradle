@@ -1,5 +1,3 @@
-import java.util.stream.Collectors
-
 /*
  * Copyright 2019, 2020 Delphix
  *
@@ -54,8 +52,6 @@ def runTypesAndSuffixes = [[upgradeArtifactsRunType, "UpgradeArtifacts"],
                            [vmArtifactsRunType, "VmArtifacts"],
                            [allRunType, ""]]
 
-
-
 /*
  * Create tasks to the upgrade artifacts only, VM artifacts only, or everything.
  */
@@ -109,8 +105,7 @@ for (variant in allVariants) {
                                 "DELPHIX_PACKAGE_MIRROR_MAIN",
                                 "DELPHIX_PACKAGE_MIRROR_SECONDARY",
                                 "DELPHIX_SIGNATURE_URL",
-                                "DELPHIX_SIGNATURE_TOKEN"
-                ]) {
+                                "DELPHIX_SIGNATURE_TOKEN"]) {
                     inputs.property(envVar, System.getenv(envVar)).optional(true)
                 }
 
