@@ -95,7 +95,6 @@ echo "$DELPHIX_APPLIANCE_VERSION" >"$target/appliance-build/DELPHIX_APPLIANCE_VE
 check_env HOTFIX_METDATA
 echo "$HOTFIX_METDATA" >"$target/appliance-build/HOTFIX_METDATA"
 
-
 #
 # Build the package
 #
