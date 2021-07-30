@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 Delphix
+# Copyright 2018-2021 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@
       - livecd-rootfs
       - make
       - man
+      - openjdk-11-jre-headless
       - openjdk-8-jre-headless
       - pigz
       - qemu

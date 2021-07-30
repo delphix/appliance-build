@@ -1,5 +1,5 @@
 #
-# Copyright 2018,2020 Delphix
+# Copyright 2018,2021 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@
       - nfs-common-dbgsym
       - nfs-kernel-server
       - nfs-kernel-server-dbgsym
+      - openjdk-11-jdk-headless
       - python3
       - python3-dbg
       - python3-dev
@@ -47,6 +48,10 @@
   until: result is not failed
   retries: 3
   delay: 60
+
+- alternatives:
+    name: java
+    path: /usr/lib/jvm/adoptopenjdk-java8-jdk-amd64/bin/java
 
 - git:
     repo: 'https://gitlab.delphix.com/devops/dcenter-gate.git'
