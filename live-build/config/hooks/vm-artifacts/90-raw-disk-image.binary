@@ -312,5 +312,17 @@ umount "$DIRECTORY/var/delphix"
 umount "$DIRECTORY/export/home"
 umount "/var/crash"
 zfs umount "rpool/ROOT/$FSNAME/root"
-zpool export rpool
+
+failure=false
+for attempt in {1..5}; do
+	zpool export rpool && break
+	[[ "$attempt" == 5 ]] && die "Too many failed attempts, aborting."
+	echo "Attempt $attempt failed, trying again after a small nap."
+	sleep 10
+	failure=true
+done
+
 kpartx -d "$ARTIFACT_NAME.img"
+
+$failure && exit 1
+exit 0
