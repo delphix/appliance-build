@@ -382,6 +382,17 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 		dpkg-query -W "$package" &>/dev/null ||
 			die "package '$package' is not installed"
 
+		#
+		# If the configuration file was moved to another package it
+		# will be listed for the original package as "obsolete" while
+		# also being listed as non-obsolete for the destination package.
+		#
+		if [[ $(dpkg-query -Wf '${Conffiles}\n' "$package" |
+			awk '$1 == "'"$file"'" {print $3}') != "obsolete" ]]; then
+			echo "configuration file '$file' has moved to package '$package'"
+			continue
+		fi
+
 		rm -f "$file" ||
 			die "failed to remove file '$file' of package '$package'"
 
