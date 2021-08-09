@@ -42,7 +42,6 @@
     #
     - appliance-build.delphix-ldap
     - appliance-build.minimal-development
-    - appliance-build.masking-common
     - appliance-build.masking-development
     - appliance-build.qa-internal
     - appliance-build.virtualization-common
