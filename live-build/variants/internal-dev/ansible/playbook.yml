@@ -47,4 +47,3 @@
     - appliance-build.virtualization-common
     - appliance-build.virtualization-development
     - appliance-build.zfsonlinux-development
-    - appliance-build.recovery-environment

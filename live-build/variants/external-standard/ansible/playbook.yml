@@ -22,4 +22,3 @@
   roles:
     - appliance-build.minimal-common
     - appliance-build.virtualization-common
-    - appliance-build.recovery-environment

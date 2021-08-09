@@ -24,4 +24,3 @@
     - appliance-build.minimal-internal
     - appliance-build.qa-internal
     - appliance-build.virtualization-common
-    - appliance-build.recovery-environment
