@@ -6,7 +6,7 @@ Standards-Version: 3.9.2
 Package: delphix-entire-@@PLATFORM@@
 Provides: delphix-entire
 Version: @@VERSION@@
-Extra-Files: packages.list, variant
+Extra-Files: packages.list, variant, hotfix_metadata
 Description: Entirety of Delphix Appliance
  This package depends on all of the packages that constitute the entirety of
  the Delphix Appliance. This set of packages provide the necessary tools to run
