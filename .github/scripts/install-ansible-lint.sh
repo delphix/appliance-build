@@ -5,7 +5,6 @@ sudo apt-get install ansible
 git clone https://github.com/willthames/ansible-lint /opt/ansible-lint
 cd /opt/ansible-lint
 git checkout v3.4.21
-git branch -D master
 
 #
 # GitHub Actions exposes the GITHUB_ENV file that can be used to
