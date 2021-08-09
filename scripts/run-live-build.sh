@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018, 2020 Delphix
+# Copyright 2018, 2021 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -93,13 +93,24 @@ if [[ "$RUN_TYPE" == "$ALL_RUN_TYPE" || "$RUN_TYPE" == "$VM_RUN_TYPE" ]]; then
 	cp -r "$TOP/live-build/config/hooks/$VM_RUN_TYPE/." "$build_dir/config/hooks"
 fi
 
+sed "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/" \
+	<"$build_dir/config/package-lists/delphix-platform.list.chroot.in" \
+	>"$build_dir/config/package-lists/delphix-platform.list.chroot"
+
+if [[ -d "$TOP/live-build/variants/$APPLIANCE_VARIANT/package-lists" ]]; then
+	for list in "$TOP/live-build/variants/$APPLIANCE_VARIANT/package-lists/"*; do
+		[[ -f $list ]] || continue
+		if [[ -f "$build_dir/config/package-lists/$(basename "$list")" ]]; then
+			echo "Duplicate package list: $(basename "$list")" >&2
+			exit 1
+		fi
+		cp "$list" "$build_dir/config/package-lists"
+	done
+fi
+
 cp -r "$TOP/live-build/variants/$APPLIANCE_VARIANT/ansible" "$build_dir"
 
 cd "$build_dir"
-
-sed "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/" \
-	<config/package-lists/delphix-platform.list.chroot.in \
-	>config/package-lists/delphix-platform.list.chroot
 
 #
 # The ancillary repository contains all of the first-party Delphix
