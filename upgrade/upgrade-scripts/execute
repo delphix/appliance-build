@@ -395,18 +395,6 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 
 		rm -f "$file" ||
 			die "failed to remove file '$file' of package '$package'"
-
-		#
-		# Since we run this each time a file is removed, if a
-		# package has multiple obsolete files, we'll end up
-		# reinstalling the package multiple times. Currently
-		# this isn't a problem, since we haven't hit a case
-		# where a package has multiple obsolete files; but
-		# perhaps this will change in the future, at which point
-		# we can optimize this better to handle that case.
-		#
-		apt_get install -y --reinstall "$package" ||
-			die "failed to reinstall package '$package'"
 	done || die "failed to remove obsolete package configuration files"
 
 stop_stdout_redirect_to_system_log
