@@ -303,8 +303,22 @@ dpkg-query -Wf '${Package}\n' "delphix-kernel-*" | xargs apt-mark manual ||
 #
 
 # shellcheck disable=SC2153
-apt_get install -y --allow-downgrades "delphix-entire-$platform=$VERSION" ||
+apt_get install \
+	-y --allow-downgrades --reinstall \
+	"delphix-entire-$platform=$VERSION" ||
 	die "upgrade failed; from '$CURRENT_VERSION' to '$VERSION'"
+
+#
+# Since we mark all currently installed packages as "auto" earlier in
+# this script, we need to ensure the delphix-entire package that we just
+# installed is marked "manual", to avoid it being removed later in this
+# script. We must explicitly do this here, as it seems this isn't
+# automatially done when installing or upgrading the package;
+# particularly in the case of "--reinstall", which replaces the current
+# package with a new package of the same version (i.e. for hotfixes).
+#
+apt-mark manual "delphix-entire-$platform" ||
+	die "failed to mark 'delphix-entire' package as 'manual' installed"
 
 [[ -f "/usr/share/doc/delphix-entire-$platform/packages.list.gz" ]] ||
 	die "delphix-entire's packages.list.gz file is missing"

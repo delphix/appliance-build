@@ -25,6 +25,7 @@
       - awscli
       - bc
       - coreutils
+      - devscripts
       - equivs
       - gdisk
       - git

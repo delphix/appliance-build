@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/make -f
 #
-# Copyright 2018 Delphix
+# Copyright 2021 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +15,5 @@
 # limitations under the License.
 #
 
-#
-# This script is a no-op and only exist to satisfy dx_unpack.sh
-# from illumos.
-#
-
-exit 0
+%:
+	dh $@
