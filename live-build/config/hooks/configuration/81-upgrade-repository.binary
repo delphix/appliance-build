@@ -81,6 +81,20 @@ EOF
 rename 's/\%3a/:/g' binary/packages/*.deb
 
 #
+# Copy over the generated hotfix metadata.
+#
+if [[ -z "$AWS_S3_HOTFIX_METADATA" ]]; then
+	touch hotfix_metadata
+else
+	aws s3 cp --only-show-errors "$AWS_S3_HOTFIX_METADATA" hotfix_metadata
+fi
+
+if [[ ! -f "hotfix_metadata" ]]; then
+	echo "Could not generate hotfix_metadata file."
+	exit 1
+fi
+
+#
 # Now we need to create the "delphix-entire" metapackage that will
 # depend on all of the packages that have been installed in the binary
 # chroot environment.

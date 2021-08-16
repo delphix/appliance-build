@@ -92,6 +92,8 @@ check_env AWS_S3_OUTPUT
 echo "$AWS_S3_OUTPUT" >"$target/appliance-build/ARTIFACTS_S3_LOCATION"
 check_env DELPHIX_APPLIANCE_VERSION
 echo "$DELPHIX_APPLIANCE_VERSION" >"$target/appliance-build/DELPHIX_APPLIANCE_VERSION"
+check_env AWS_S3_HOTFIX_METADATA
+echo "$AWS_S3_HOTFIX_METADATA" >"$target/appliance-build/HOTFIX_METDATA"
 
 #
 # Build the package

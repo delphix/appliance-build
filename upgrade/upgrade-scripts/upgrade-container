@@ -469,6 +469,29 @@ function stop() {
 		sleep 1
 	done
 
+	#
+	# Starting the upgrade container would have enabled ip forwarding
+	# on the host (and in turn disabled LRO). Reset these settings
+	# on a best effor basis.
+	#
+	sysctl -w net.ipv4.ip_forward=0 || warn "failed to disable ip port forwarding"
+
+	#
+	# Find all the interfaces configured on the host and set
+	# lro on where possible. The sed command retrieves the names of the
+	# interfaces. The name of the virtual interfaces of containers could
+	# have an @ symbol followed by device name in the output of the ethtool
+	# and this needs to be trimmed off.
+	#
+
+	for i in $(ip -br link | sed 's/^\([^ @]\+\).*/\1/'); do
+		fixed=$(ethtool -k "$i" | grep large-receive-offload | grep -i fixed)
+		if [[ -z "$fixed" ]]; then
+			echo "updating lro setting for nic $i"
+			ethtool -K "$i" lro on || warn "failed to set lro ON for nic '$i'"
+		fi
+	done
+
 	machinectl status "$CONTAINER" &>/dev/null &&
 		die "timeout waiting for container termination: '$CONTAINER'"
 
