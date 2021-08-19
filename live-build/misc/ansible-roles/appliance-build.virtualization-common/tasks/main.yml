@@ -53,3 +53,11 @@
       - rpc-statd.service
       - rpcbind.service
       - rpcbind.socket
+
+#
+# We do not want to run those services unless explicitly enabled in the
+# product by the user, in which case the default configuration of the services
+# will also be modified.
+#
+- name: Disable services that should not start by default
+  command: systemctl disable ntp.service snmpd.service
