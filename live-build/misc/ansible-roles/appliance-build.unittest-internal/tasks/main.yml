@@ -15,6 +15,9 @@
 #
 
 ---
+# libxss1 and libgtk-3-0 are required dependencies for 
+# chromium-browser. They are missing in the chromium-browser
+# package. Manually install them here.
 - apt:
     name:
       - adoptopenjdk-java8-jdk
@@ -25,9 +28,6 @@
       - git
       - python-minimal
       - chromium-browser
-      # libxss1 and libgtk-3-0 are required dependencies for 
-      # chromium-browser. They are missing in the chromium-browser
-      # package. Manually install them here.
       - libxss1
       - libgtk-3-0
     state: present
