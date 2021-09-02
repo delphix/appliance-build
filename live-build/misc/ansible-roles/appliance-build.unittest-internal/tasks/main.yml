@@ -26,6 +26,7 @@
       - python-minimal
       - chromium-browser
       - libxss1
+      - libgtk-3-0
     state: present
 
 - user:
