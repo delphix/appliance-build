@@ -443,6 +443,29 @@ function stop() {
 		sleep 1
 	done
 
+	#
+	# Starting the upgrade container would have enabled ip forwarding
+	# on the host (and in turn disabled LRO). Reset these settings
+	# on a best effor basis.
+	#
+	sysctl -w net.ipv4.ip_forward=0 || warn "failed to disable ip port forwarding"
+
+	#
+	# Find all the interfaces configured on the host and set
+	# lro on where possible. The sed command retrieves the names of the
+	# interfaces. The name of the virtual interfaces of containers could
+	# have an @ symbol followed by device name in the output of the ethtool
+	# and this needs to be trimmed off.
+	#
+
+	for i in $(ip -br link | sed 's/^\([^ @]\+\).*/\1/'); do
+		fixed=$(ethtool -k "$i" | grep large-receive-offload | grep -i fixed)
+		if [[ -z "$fixed" ]]; then
+			echo "updating lro setting for nic $i"
+			ethtool -K "$i" lro on || warn "failed to set lro ON for nic '$i'"
+		fi
+	done
+
 	machinectl status "$CONTAINER" &>/dev/null &&
 		die "timeout waiting for container termination: '$CONTAINER'"
 
@@ -506,6 +529,10 @@ function run() {
 		--machine="$CONTAINER" \
 		--setenv=CONTAINER="$CONTAINER" \
 		--quiet --wait --pipe -- "$@"
+}
+
+function shell() {
+	machinectl shell "$CONTAINER"
 }
 
 function convert_to_rootfs() {
@@ -843,6 +870,7 @@ function usage() {
 	echo "$PREFIX_SPACES stop <container>"
 	echo "$PREFIX_SPACES destroy <container>"
 	echo "$PREFIX_SPACES run <container> <command>"
+	echo "$PREFIX_SPACES shell <container>"
 	echo "$PREFIX_SPACES upgrade <container>"
 	echo "$PREFIX_SPACES convert-to-rootfs <container>"
 	echo "$PREFIX_SPACES get-type <container>"
@@ -890,6 +918,12 @@ run)
 	CONTAINER="$2"
 	shift 2
 	run "$@"
+	;;
+shell)
+	[[ $# -lt 2 ]] && usage "too few arguments specified"
+	CONTAINER="$2"
+	shift 2
+	shell
 	;;
 upgrade)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"

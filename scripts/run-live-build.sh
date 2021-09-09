@@ -94,7 +94,6 @@ if [[ "$RUN_TYPE" == "$ALL_RUN_TYPE" || "$RUN_TYPE" == "$VM_RUN_TYPE" ]]; then
 fi
 
 cp -r "$TOP/live-build/variants/$APPLIANCE_VARIANT/ansible" "$build_dir"
-cp -r "$TOP/live-build/misc/migration-scripts" "$build_dir"
 
 cd "$build_dir"
 
@@ -256,7 +255,7 @@ esac
 # user (e.g. other software); this is most useful when multiple variants
 # are built via a single call to "make" (e.g. using the "all" target).
 #
-for ext in debs.tar.gz migration.tar.gz $vm_artifact_ext; do
+for ext in debs.tar.gz $vm_artifact_ext; do
 	if [[ -f "$ARTIFACT_NAME.$ext" ]]; then
 		mv "$ARTIFACT_NAME.$ext" "$TOP/live-build/build/artifacts/"
 	fi

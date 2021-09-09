@@ -16,8 +16,8 @@
 #
 
 #
-# To reduce the size of our VM and migration images, we clean the APT
-# cache, and remove its "lists" files.
+# To reduce the size of our VM images, we clean the APT cache and remove its
+# "lists" files.
 #
 chroot binary apt-get clean
 chroot binary rm -rf /var/lib/apt/lists/*

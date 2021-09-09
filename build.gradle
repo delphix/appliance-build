@@ -78,12 +78,10 @@ for (variant in allVariants) {
     }
 }
 
-def shellScripts = fileTree("scripts") +
+def shellScripts = fileTree("scripts").include({ details ->
+                         details.file.getName().endsWith(".sh") }) +
                    fileTree("live-build/config/hooks").include({ details ->
                         details.file.canExecute()
-                   }) +
-                   fileTree("live-build/misc/migration-scripts", {
-                       exclude "etc_system_whitelist"
                    }) +
                    fileTree("upgrade", {
                        include "prepare"

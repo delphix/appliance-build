@@ -125,18 +125,10 @@ for (variant in allVariants) {
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
                         break
                     case vmArtifactsRunType:
-                        if (variant != "internal-minimal") {
-                            // We don't bother creating a migration image for internal-minimal
-                            outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
-                        }
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
                         break
                     case allRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
-                        if (variant != "internal-minimal") {
-                            // We don't bother creating a migration image for internal-minimal
-                            outputs.file "${buildDir}/artifacts/${variant}-${platform}.migration.tar.gz"
-                        }
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
                         break
                 }
