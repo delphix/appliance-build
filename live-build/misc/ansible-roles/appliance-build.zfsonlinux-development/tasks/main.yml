@@ -23,9 +23,9 @@
       - alien
       - autoconf
       - build-essential
-      - cargo
       - cppcheck
       - curl
+      - delphix-rust
       - emacs-nox
       - fakeroot
       - flake8
@@ -46,7 +46,6 @@
       - parted
       - pkg-config
       - python3-minimal
-      - rustc
       - shellcheck
       - targetcli-fb
       - unzip
