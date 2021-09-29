@@ -84,6 +84,10 @@
     - { repo: 'https://gitlab.delphix.com/app/dlpx-app-gate.git',
         version: master,
         dest: dlpx-app-gate }
+  retries: 3
+  delay: 30
+  register: result
+  until: result is not failed
 
 - file:
     path: "/export/home/delphix/{{ item }}"

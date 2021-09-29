@@ -34,6 +34,10 @@
     - { repo: 'https://gitlab.delphix.com/masking/dms-core-gate.git',
         version: master,
         dest: dms-core-gate }
+  retries: 3
+  delay: 30
+  register: result
+  until: result is not failed
 
 - file:
     path: "/export/home/delphix/{{ item }}"
