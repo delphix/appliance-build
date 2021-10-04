@@ -314,9 +314,9 @@ umount "/var/crash"
 zfs umount "rpool/ROOT/$FSNAME/root"
 
 failure=false
-for attempt in {1..5}; do
+for attempt in {1..50}; do
 	zpool export rpool && break
-	[[ "$attempt" == 5 ]] && die "Too many failed attempts, aborting."
+	[[ "$attempt" == 50 ]] && die "Too many failed attempts, aborting."
 	echo "Attempt $attempt failed, trying again after a small nap."
 	sleep 10
 	failure=true
