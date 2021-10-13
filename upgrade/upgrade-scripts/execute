@@ -175,11 +175,20 @@ DELPHIX_FLUENTD_IS_ENABLED=$(systemctl is-enabled delphix-fluentd.service)
 apt_get update || die "failed to update apt sources"
 
 #
-# If we are performing a not-in-place upgrade, the delphix-platform
-# package will not have been installed yet. During appliance-build
-# we install delphix-platform first, and the appliance relies on that
-# fact (for instance, the delphix-platform's postinst script must be run
-# before installing the postgresql package).
+# Currently, we need to run the delphix-platform's "postinst" packaging hook
+# prior to the installation of the postgresql package. Further, right now,
+# the postgresql package is pulled in as a dependency of the
+# delphix-virtualization package. Thus, for the case of not-in-place upgrades,
+# we accomplish this goal (of installing the delphix-platform package prior
+# to the installation of the postgresql package) by first installing the
+# delphix-platform package here, and then installing all other packages later.
+# For the case of in-place upgrades, we can skip this step, as we assume the
+# postgresql package is already installed, and simply upgrade all packages
+# below.
+#
+# Note that we have the same issue during appliance-build, and it is solved
+# by installing delphix-virtualization at a later stage of the build via
+# ansible hooks, when the delphix-platform package has already been installed.
 #
 if ! dpkg-query -l "delphix-platform-$platform" &>/dev/null; then
 	apt_get install -y "delphix-platform-$platform" ||
