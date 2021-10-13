@@ -269,10 +269,7 @@ function create_upgrade_container() {
 	# is started, those NFS services will not run (no matter the
 	# version of Delphix we're upgrading from).
 	#
-	for svc in "nfs-mountd" "nfs-server" "rpc-statd" "rpc-statd-notify"; do
-		[[ -e "$DIRECTORY/lib/systemd/system/$svc.service.d/override.conf" ]] &&
-			continue
-
+	for svc in "nfs-mountd" "nfs-server" "rpc-statd" "rpc-statd-notify" "docker"; do
 		mkdir -p "$DIRECTORY/lib/systemd/system/$svc.service.d" ||
 			die "failed to create override directory for '$svc' service"
 
