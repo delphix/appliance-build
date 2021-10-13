@@ -175,59 +175,25 @@ DELPHIX_FLUENTD_IS_ENABLED=$(systemctl is-enabled delphix-fluentd.service)
 apt_get update || die "failed to update apt sources"
 
 #
-# First make sure delphix-platform-<platform> is installed. This package
-# is required by delphix-entire-<platform>, and would be installed even
-# if we just relied on the packages.list.gz file log below. However,
-# there are problems related to virtual packages that arise if we just
-# did that. In particular, the following could happen (using AWS as the
-# example for the platform on which the upgrade is being done):
+# Currently, we need to run the delphix-platform's "postinst" packaging hook
+# prior to the installation of the postgresql package. Further, right now,
+# the postgresql package is pulled in as a dependency of the
+# delphix-virtualization package. Thus, for the case of not-in-place upgrades,
+# we accomplish this goal (of installing the delphix-platform package prior
+# to the installation of the postgresql package) by first installing the
+# delphix-platform package here, and then installing all other packages later.
+# For the case of in-place upgrades, we can skip this step, as we assume the
+# postgresql package is already installed, and simply upgrade all packages
+# below.
 #
-#  - We install the package requirements for "delphix-entire-aws" using
-#    the packages.list.gz file.
+# Note that we have the same issue during appliance-build, and it is solved
+# by installing delphix-virtualization at a later stage of the build via
+# ansible hooks, when the delphix-platform package has already been installed.
 #
-#  - One of the packages in that list is the "delphix-virtualization"
-#    package, so it marks that package and its dependencies for
-#    installation. One of its dependencies is the virtual package
-#    "delphix-platform".
-#
-#  - Apt then sees that there are multiple concrete packages which
-#    provide the "delphix-platform" virtual package. It chooses one of
-#    these arbitrarily, say "delphix-platform-kvm".
-#
-#  - Apt marks all transitive dependencies of "delphix-platform-kvm" for
-#    installation, including, say, "linux-image-4.15.0-1028-kvm".
-#
-#  - After processing the dependencies of "delphix-virtualization", Apt
-#    continues to process the other dependencies of "delphix-entire-aws",
-#    including "delphix-platform-aws".
-#
-#  - Apt then sees that "delphix-platform-aws" conflicts with
-#    "delphix-platform-kvm", so it un-marks "delphix-platform-kvm" for
-#    installation, allowing "delphix-platform-aws" to satisfy the
-#    "delphix-virtualization" dependency on "delphix-platform". However,
-#    it does _not_ unmark all of the dependencies of
-#    "delphix-platform-kvm", so some unnecessary kvm-related packages
-#    end up being installed, such as "linux-image-4.15.0-1028-kvm"
-#
-# In short, we can end up with some unwanted packages installed because
-# Apt marked and then unmarked some package for installation while
-# trying to satisfy a dependency on a virtual package.
-#
-# To avoid this we install the delphix-platform-<platform> package that
-# we want before installing delphix-entire-<platform> and it's required
-# packages. If some delphix-platform package is already installed, that
-# dependency is already satisfied and Apt doesn't need to choose an
-# arbitrary one to satisfy the dependency.
-#
-# In general, we don't want upgrade to need know too much about the set
-# of packages to be installed. However, it seems reasonable to make an
-# exception for delphix-platform because delphix-platform is a
-# fundemental piece of the architecture of the appliance. Among other
-# things, it is the mechanism that we use to orchestrate the installation
-# all of the platform-dependant bits of the appliance.
-#
-apt_get install -y "delphix-platform-$platform" ||
-	die "failed to install delphix-platform"
+if ! dpkg-query -l "delphix-platform-$platform" &>/dev/null; then
+	apt_get install -y "delphix-platform-$platform" ||
+		die "failed to install delphix-platform"
+fi
 
 #
 # To enable the use of "autoremove" later in this script to remove all
