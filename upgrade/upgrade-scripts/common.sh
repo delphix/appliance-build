@@ -362,3 +362,145 @@ function verify_upgrade_not_in_progress() {
 	. "$UPDATE_DIR/upgrade.properties" &>/dev/null
 	[[ -z "$UPGRADE_TYPE" ]] || die "upgrade currently in-progress"
 }
+
+function mask_service() {
+	local svc="$1"
+	local container="$2"
+
+	#
+	# Note that masking should succeed even if service doesn't exist
+	#
+	if [[ -n "$container" ]]; then
+		chroot "/var/lib/machines/$container" systemctl mask "$svc" ||
+			die "failed to mask '$svc' in container '$container'"
+	else
+		systemctl mask "$svc" || die "failed to mask '$svc'"
+	fi
+}
+
+function is_svc_masked_or_disabled() {
+	local svc="$1"
+
+	state=$(systemctl is-enabled "$svc")
+	if [[ "$state" == masked || "$state" == disabled ]]; then
+		return 0
+	fi
+
+	return 1
+}
+
+#
+# This function has 2 tasks:
+#  1. Fix/update the state of some services to be in line with what is expected
+#     in this version of the appliance.
+#  2. If we are doing a not-in-plaace upgrade, then migrate the state of the
+#     services into the upgrade container.
+#
+# It can be called from 2 different contexts:
+#  1. When creating upgrade container. In this case the container must be
+#     passed as first argument.
+#  2. When executing the in-place upgrade. In this case the function takes no
+#     arguments.
+#
+function fix_and_migrate_services() {
+	local container="$1"
+
+	#
+	# This function can be called from the execute script, however in that
+	# case we only want it to run when called on the running system and not
+	# in the upgrade container.
+	#
+	if systemd-detect-virt --container --quiet; then
+		echo "fix_and_migrate_services: should not run inside container"
+		return
+	fi
+
+	#
+	# We only want to run this logic on the Delphix Appliance variants.
+	# We especially want to avoid running it on the internal-dcenter
+	# variant, which has a different set of requirements for which
+	# services should be enabled / disabled. For instance, the
+	# dcenter-internal variant relies on either systemd-timesyncd.service
+	# or ntp.service to be enabled.
+	#
+	if ! dpkg -l delphix-virtualization &>/dev/null; then
+		echo "fix_and_migrate_services: should only run on the" \
+			"Delphix Appliance"
+		return
+	fi
+
+	#
+	# In versions prior to 6.0.13.0, snmpd.service was always enabled.
+	# Disable (mask) it here if we detect that it should have been disabled.
+	#
+	if compare_versions "$(get_current_version)" lt "6.0.13.0"; then
+		if [[ "$(systemctl is-enabled snmpd)" == enabled ]] &&
+			! grep -q "Delphix" /etc/snmp/snmpd.conf; then
+			mask_service snmpd "$container"
+		fi
+	fi
+
+	#
+	# Some services should be always masked.
+	#
+	while read -r svc; do
+		mask_service "$svc" "$container"
+	done <<-EOF
+		nginx.service
+		postgresql.service
+		systemd-timesyncd.service
+	EOF
+
+	#
+	# docker is a special case. It needs to be masked for the duration
+	# of the upgrade so that it does not get restarted automatically on
+	# upgrade, which would also force a restart of the delphix-mgmt
+	# service (since the latter has a dependency on docker.service), and
+	# thus interrupt the upgrade.
+	#
+	# Once the upgrade is done we restart delphix.target, which will
+	# attempt to restart both delphix-mgmt and docker, so docker
+	# needs to be unmasked before that point. As such, docker is
+	# unmasked at the end of the execute script.
+	#
+	mask_service docker.service "$container"
+
+	#
+	# The services listed below can be dynamically modified by the
+	# application(s) running on the appliance, so we need to ensure
+	# we migrate the state of these services when performing a
+	# not-in-place upgrade. Otherwise, we'd wind up with the default
+	# state of these services on initial install, which is to stay
+	# enabled and unmasked.
+	#
+	# If we are performing an in-place upgrade instead, then we want
+	# to make sure that the state of those services conforms to the new
+	# logic, which requires that the services are also masked when they
+	# are disabled.
+	#
+	# The reason we want to mask services instead of just disabling them
+	# is because when upgrading some of those packages, the services can
+	# be automatically enabled by postinst scripts; this is especially
+	# true for not-in-place upgrade, which creates a fresh debootstrap
+	# image on which the new packages are installed for the first time.
+	#
+	# Finally, some of the services that are masked may be both masked
+	# and disabled, while others would be only masked. This is okay
+	# given that masked services will not run whether they are enabled
+	# or disabled, and that the logic that unmasks them will also
+	# enable them.
+	#
+	while read -r svc; do
+		is_svc_masked_or_disabled "$svc" &&
+			mask_service "$svc" "$container"
+	done <<-EOF
+		delphix-fluentd.service
+		delphix-masking.service
+		nfs-mountd.service
+		ntp.service
+		rpc-statd.service
+		rpcbind.service
+		rpcbind.socket
+		snmpd.service
+	EOF
+}
