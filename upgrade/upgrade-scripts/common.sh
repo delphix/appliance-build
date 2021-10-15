@@ -393,7 +393,7 @@ function is_svc_masked_or_disabled() {
 # This function has 2 tasks:
 #  1. Fix/update the state of some services to be in line with what is expected
 #     in this version of the appliance.
-#  2. If we are doing a not-in-plaace upgrade, then migrate the state of the
+#  2. If we are doing a not-in-place upgrade, then migrate the state of the
 #     services into the upgrade container.
 #
 # It can be called from 2 different contexts:
@@ -406,26 +406,16 @@ function fix_and_migrate_services() {
 	local container="$1"
 
 	#
-	# This function can be called from the execute script, however in that
-	# case we only want it to run when called on the running system and not
-	# in the upgrade container.
+	# This function must be called from outside an upgrade container as it
+	# uses the state of the services on the running system as the source of
+	# truth. Since we want the logic in this script to apply both to an
+	# upgrade container and to the running system (in case of an in-place
+	# upgrade), we call it from two places: create_upgrade_container() and
+	# the execute script. The former will apply this logic on a container
+	# while the latter will apply this logic to the running system.
 	#
 	if systemd-detect-virt --container --quiet; then
 		echo "fix_and_migrate_services: should not run inside container"
-		return
-	fi
-
-	#
-	# We only want to run this logic on the Delphix Appliance variants.
-	# We especially want to avoid running it on the internal-dcenter
-	# variant, which has a different set of requirements for which
-	# services should be enabled / disabled. For instance, the
-	# dcenter-internal variant relies on either systemd-timesyncd.service
-	# or ntp.service to be enabled.
-	#
-	if ! dpkg -l delphix-virtualization &>/dev/null; then
-		echo "fix_and_migrate_services: should only run on the" \
-			"Delphix Appliance"
 		return
 	fi
 
@@ -439,17 +429,6 @@ function fix_and_migrate_services() {
 			mask_service snmpd "$container"
 		fi
 	fi
-
-	#
-	# Some services should be always masked.
-	#
-	while read -r svc; do
-		mask_service "$svc" "$container"
-	done <<-EOF
-		nginx.service
-		postgresql.service
-		systemd-timesyncd.service
-	EOF
 
 	#
 	# docker is a special case. It needs to be masked for the duration
@@ -466,11 +445,11 @@ function fix_and_migrate_services() {
 	mask_service docker.service "$container"
 
 	#
-	# The services listed below can be dynamically modified by the
-	# application(s) running on the appliance, so we need to ensure
-	# we migrate the state of these services when performing a
-	# not-in-place upgrade. Otherwise, we'd wind up with the default
-	# state of these services on initial install, which is to stay
+	# The services listed below are either permanently disabled or can be
+	# dynamically modified by the application(s) running on the appliance,
+	# so we need to ensure we migrate the state of these services when
+	# performing a not-in-place upgrade. Otherwise, we'd wind up with the
+	# default state of these services on initial install, which is to stay
 	# enabled and unmasked.
 	#
 	# If we are performing an in-place upgrade instead, then we want
@@ -497,10 +476,13 @@ function fix_and_migrate_services() {
 		delphix-fluentd.service
 		delphix-masking.service
 		nfs-mountd.service
+		nginx.service
 		ntp.service
+		postgresql.service
 		rpc-statd.service
 		rpcbind.service
 		rpcbind.socket
 		snmpd.service
+		systemd-timesyncd.service
 	EOF
 }

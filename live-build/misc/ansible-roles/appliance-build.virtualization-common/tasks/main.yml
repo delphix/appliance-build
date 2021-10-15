@@ -74,15 +74,10 @@
 #
 # The services in this section should always remain disabled & masked.
 #
-- name: Disable services that should never run
-  command: "systemctl disable {{ item }}"
-  with_items:
-    - nginx.service
-    - postgresql.service
-    - systemd-timesyncd.service
-
-- name: Mask services that should never run
-  command: "systemctl mask {{ item }}"
+- name: Disable and mask services that should never run
+  shell: |
+    systemctl disable {{ item }}
+    systemctl mask {{ item }}
   with_items:
     - nginx.service
     - postgresql.service
@@ -92,16 +87,10 @@
 # The services in this section should be disabled & masked initially, but
 # can be later dynamically enabled by the appliance.
 #
-- name: Disable services that should not be running by default
-  command: "systemctl disable {{ item }}"
-  with_items:
-    - delphix-fluentd.service
-    - delphix-masking.service
-    - ntp.service
-    - snmpd.service
-
-- name: Mask services that should not be running by default
-  command: "systemctl mask {{ item }}"
+- name: Disable and mask services that should not be running by default
+  shell: |
+    systemctl disable {{ item }}
+    systemctl mask {{ item }}
   with_items:
     - delphix-fluentd.service
     - delphix-masking.service
@@ -119,7 +108,7 @@
   with_items:
     - rpcbind.service
     - rpcbind.socket
-    - snmpd.service
+    - rpc-statd.service
 
 #
 # We disable docker. Instead of being started automatically by systemd, it
