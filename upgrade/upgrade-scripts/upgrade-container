@@ -304,6 +304,15 @@ function create_upgrade_container() {
 	#   container can use ports without conflicting with ports that
 	#   are already in used by the host.
 	#
+	# * VirtualEthernet: Since we're using private networking (see
+	#   above), if we enable a virtual NIC, that will automatically
+	#   result in IP forwarding being enabled, and LRO being disabled.
+	#   We've found that with IP forwarding on and LRO off, network
+	#   throughput can become up to 15% slower, adversely affecting
+	#   workloads such as replication, DB sync, etc. Thus, we
+	#   intentionally disable this setting, to avoid the network
+	#   performance impact.
+	#
 	# * Bind=/dev/zfs: We set this so that zfs/zpool/libzpool/etc.
 	#   is usable from within the container.
 	#
@@ -312,7 +321,7 @@ function create_upgrade_container() {
 		PrivateUsers=no
 		[Network]
 		Private=yes
-		VirtualEthernet=yes
+		VirtualEthernet=no
 		[Files]
 		PrivateUsersChown=no
 		Bind=/dev/zfs
