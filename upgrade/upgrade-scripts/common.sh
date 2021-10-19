@@ -431,20 +431,6 @@ function fix_and_migrate_services() {
 	fi
 
 	#
-	# docker is a special case. It needs to be masked for the duration
-	# of the upgrade so that it does not get restarted automatically on
-	# upgrade, which would also force a restart of the delphix-mgmt
-	# service (since the latter has a dependency on docker.service), and
-	# thus interrupt the upgrade.
-	#
-	# Once the upgrade is done we restart delphix.target, which will
-	# attempt to restart both delphix-mgmt and docker, so docker
-	# needs to be unmasked before that point. As such, docker is
-	# unmasked at the end of the execute script.
-	#
-	mask_service docker.service "$container"
-
-	#
 	# The services listed below are either permanently disabled or can be
 	# dynamically modified by the application(s) running on the appliance,
 	# so we need to ensure we migrate the state of these services when

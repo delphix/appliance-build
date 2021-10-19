@@ -127,6 +127,20 @@ start_stderr_redirect_to_system_log
 fix_and_migrate_services
 
 #
+# Due to DLPX-77949, docker needs to be masked for the duration
+# of the upgrade so that it does not get restarted automatically on
+# upgrade, which would also force a restart of the delphix-mgmt
+# service (since the latter has a dependency on docker.service), and
+# thus interrupt the upgrade.
+#
+# Once the upgrade is done we restart delphix.target, which will
+# attempt to restart both delphix-mgmt and docker, so docker
+# needs to be unmasked before that point. As such, docker is
+# unmasked at the end of this script.
+#
+systemctl mask docker.service
+
+#
 # Older versions (i.e. the 6.0.0.0 release) of the "nfs-kernel-server"
 # package had "etab" file delivered as part of the package. Thus, when
 # upgrading the package, the existing "etab" file would get replaced
@@ -355,8 +369,8 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 	done || die "failed to remove obsolete package configuration files"
 
 #
-# Unmask docker, which was masked at the beginning of the upgrade in
-# fix_and_migrate_services().
+# Unmask docker, which was masked at the beginning of the upgrade due
+# to DLPX-77949.
 #
 systemctl unmask docker.service
 
