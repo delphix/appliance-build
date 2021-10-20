@@ -39,17 +39,82 @@
     state: link
 
 #
+# The section below deals with disabling and masking services that need to be
+# disabled on initial install. Some of those services will remain disabled
+# forever, while others could be enabled by the various applications running
+# on the Delphix Appliance.
+#
+# Our approach is to mask services that need to be disabled. Masking a service
+# instead of just disabling it has 2 advantages:
+#  1. A service that is just disabled will not be started automatically by
+#     systemd on boot, however it can be started by another service if it has
+#     a certain set of dependencies on it (such as "Requires", "PartOf"). A
+#     service that is masked cannot be started in any case (although a
+#     service that is already running and has just been masked will not be
+#     stopped automatically).
+#  2. A service that is disabled can get re-enabled by dpkg maintenance scripts
+#     when the package that provides that service is upgraded. A service that
+#     is masked will not be unmasked.
+#
+# While masking a service is sufficient, we also disable most of the services
+# that we mask. This is not strictly necessary, but is done to remain
+# consistent with how we did things in the past. Our current logic that deals
+# with re-enabling those services will both unmask and enable # them.
+#
+# We have divided the disabling and masking of the services in multiple
+# code blocks to group together services that are handled in the same way by
+# the appliance.
+#
+# Note that if you want to modify this list make sure to also update
+# the logic in fix_and_migrate_services() that is invoked during upgrade.
+# You may also want to look at the logic that handles enabling disabling
+# services in dlpx-app-gate.
+#
+
+#
+# The services in this section should always remain disabled & masked.
+#
+- name: Disable and mask services that should never run
+  shell: |
+    systemctl disable {{ item }}
+    systemctl mask {{ item }}
+  with_items:
+    - nginx.service
+    - postgresql.service
+    - systemd-timesyncd.service
+
+#
+# The services in this section should be disabled & masked initially, but
+# can be later dynamically enabled by the appliance.
+#
+- name: Disable and mask services that should not be running by default
+  shell: |
+    systemctl disable {{ item }}
+    systemctl mask {{ item }}
+  with_items:
+    - delphix-fluentd.service
+    - delphix-masking.service
+    - ntp.service
+    - snmpd.service
+
+#
 # Because we want an NFSv4-only configuration out of the box, we need to mask
 # NFSv3 services so that they don't get automatically started at boot via
 # dependencies. The virtualization software is responsible for unmasking and
 # starting these services if NFSv3 needed at runtime.
 #
-- name: Mask NFSv3 services
-  file:
-    src: "/dev/null"
-    dest: "/etc/systemd/system/{{ item }}"
-    state: link
+- name: Mask NFSv3 services that should not be started automatically
+  command: "systemctl mask {{ item }}"
   with_items:
-      - rpc-statd.service
-      - rpcbind.service
-      - rpcbind.socket
+    - rpcbind.service
+    - rpcbind.socket
+    - rpc-statd.service
+
+#
+# We disable docker. Instead of being started automatically by systemd, it
+# gets started via a dependency of delphix-virtualization.
+#
+- name: Disable docker
+  command: "systemctl disable {{ item }}"
+  with_items:
+    - docker.service
