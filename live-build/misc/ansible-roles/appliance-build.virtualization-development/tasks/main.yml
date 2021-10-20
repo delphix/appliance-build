@@ -73,6 +73,11 @@
       [Service]
       Environment=DLPX_PG_DEBUG=true
 
+#
+# We are wrapping this in a retry block because the Gitlab server sometimes
+# hangs up unexpectedly. We haven't seen this with GitHub, so we should
+# probably remove the retry once we switch to GitHub.
+#
 - git:
     repo: "{{ item.repo }}"
     dest:
