@@ -119,6 +119,13 @@ function create_upgrade_container() {
 			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
 		copy_optional_dataset_property "$PROP_HOTFIX_VERSION" \
 			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
+		#
+		# The minimum version property was introduced in 6.0.12.0.
+		#
+		if compare_versions "$(get_current_version)" ge "6.0.12.0"; then
+			copy_required_dataset_property "$PROP_MINIMUM_VERSION" \
+				"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
+		fi
 		;;
 	rollback)
 		#
@@ -149,6 +156,13 @@ function create_upgrade_container() {
 			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
 		copy_optional_dataset_property "$PROP_HOTFIX_VERSION" \
 			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
+		#
+		# The minimum version property was introduced in 6.0.12.0.
+		#
+		if compare_versions "$(get_current_version)" ge "6.0.12.0"; then
+			copy_required_dataset_property "$PROP_MINIMUM_VERSION" \
+				"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
+		fi
 
 		zfs clone \
 			-o canmount=noauto \
