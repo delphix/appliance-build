@@ -28,7 +28,7 @@
       - build-essential
       - docker.io
       - git
-      - python-minimal
+      - python3-minimal
       - chromium-browser
       - libxss1
       - libgtk-3-0
