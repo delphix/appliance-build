@@ -261,7 +261,7 @@ function create_upgrade_container() {
 		#
 		debootstrap --no-check-gpg --variant=minbase \
 			--components=delphix --include=ntp,systemd-container \
-			bionic "$DIRECTORY" "file://$IMAGE_PATH" 1>&2 ||
+			focal "$DIRECTORY" "file://$IMAGE_PATH" 1>&2 ||
 			die "failed to debootstrap upgrade filesystem"
 
 		#

@@ -14,5 +14,6 @@
 # limitations under the License.
 #
 
-deb @@URL@@ bionic main multiverse universe
-deb @@URL@@ bionic-updates main multiverse universe
+deb @@URL@@ focal main multiverse universe
+deb @@URL@@ focal-updates main multiverse universe
+deb @@URL@@ focal-pgdg main
