@@ -233,8 +233,34 @@ function create_upgrade_container() {
 		# communicate and later run commands in the container with
 		# "systemd-run".
 		#
-		debootstrap --no-check-gpg \
-			--components=delphix --include=systemd-container \
+		# On Ubuntu 20.04, in-order to satisfy some package
+		# dependencies, we must set the variant to "minbase" and list
+		# "ntp" in the include list before "systemd-container".
+		# Setting the variant to minbase removes systemd from the
+		# packages being installed by default. Systemd will still
+		# be installed, but in a later pass, as a dependency of
+		# systemd-container. The reason we need to go through those
+		# hoops is the following:
+		#  - systemd has a package dependency on a "time-daemon"
+		#    virtual package, which is provided by either "ntp" or
+		#    "systemd-timesyncd".
+		#  - If a time-deamon is not already installed when
+		#    installing systemd, then systemd will try to
+		#    install systemd-timesyncd.
+		#  - systemd-timesyncd is not available in our upgrade
+		#    images because we install ntp and ntp conflicts with
+		#    systemd-timesyncd.
+		#  - Setting variant as minbase and list ntp before
+		#    systemd-container in the include list allows debootstrap
+		#    to install ntp before systemd, thus satisfying the
+		#    package dependencies.
+		# Note that we do not run into those problems during live-build
+		# because debootstrap is already run with variant=minbase and
+		# systemd is not installed by debootstrap, but rather by
+		# delphix-platform which pulls both ntp and systemd.
+		#
+		debootstrap --no-check-gpg --variant=minbase \
+			--components=delphix --include=ntp,systemd-container \
 			bionic "$DIRECTORY" "file://$IMAGE_PATH" 1>&2 ||
 			die "failed to debootstrap upgrade filesystem"
 
