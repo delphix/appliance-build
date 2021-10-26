@@ -39,3 +39,4 @@ python3-toml
 python3-venv
 targetcli-fb
 telnet
+unixodbc-dev
