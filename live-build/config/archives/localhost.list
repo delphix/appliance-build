@@ -22,4 +22,4 @@
 # used to serve the repository.
 #
 
-deb [trusted=yes] http://localhost:8080 bionic main
+deb [trusted=yes] http://localhost:8080 focal main
