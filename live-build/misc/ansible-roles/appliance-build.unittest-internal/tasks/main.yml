@@ -15,11 +15,6 @@
 #
 
 ---
-#
-# libxss1 and libgtk-3-0 are required dependencies for
-# chromium-browser. They are missing in the chromium-browser
-# package. Manually install them here.
-#
 - apt:
     name:
       - adoptopenjdk-java8-jdk
@@ -29,9 +24,56 @@
       - docker.io
       - git
       - python3-minimal
-      - chromium-browser
-      - libxss1
+    state: present
+
+#
+# The UI-precommit suite requires some chromium-browser dependendencies to be
+# installed. However on 20.04 chromium is provided by a snap, and the
+# "chromium-browser" package neither provides any dependencies nor the actual
+# chromium browser, but rather directs users to install the chromium snap.
+# While we could get chromium from a thrid party PPA, we do not actually need
+# chromium for UI-precommit to work, but only some of the libraries that
+# came as dependencies. As such we install here all the lib dependencies
+# that were brought in by the chromium-browser package on 18.04 as per:
+# https://packages.ubuntu.com/bionic/chromium-browser.
+#
+- apt:
+    name:
+      - libasound2
+      - libatk-bridge2.0-0
+      - libatk-bridge2.0-0
+      - libatspi2.0-0
+      - libc6
+      - libcairo2
+      - libcups2
+      - libdbus-1-3
+      - libdrm2
+      - libexpat1
+      - libgbm1
+      - libgcc1
+      - libgdk-pixbuf2.0-0
+      - libglib2.0-0
       - libgtk-3-0
+      - libnspr4
+      - libnss3
+      - libpango-1.0-0
+      - libpangocairo-1.0-0
+      - libwayland-client0
+      - libx11-6
+      - libx11-xcb1
+      - libxcb1
+      - libxcomposite1
+      - libxcursor1
+      - libxdamage1
+      - libxext6
+      - libxfixes3
+      - libxi6
+      - libxkbcommon0
+      - libxrandr2
+      - libxrender1
+      - libxshmfence1
+      - libxss1
+      - libxtst6
     state: present
 
 - user:
