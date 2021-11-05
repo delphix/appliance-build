@@ -59,12 +59,13 @@
   delay: 60
 
 - git:
-    repo: "https://github.com/delphix/zfs.git"
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/zfs.git"
     dest:
       "/export/home/delphix/zfs"
     version: master
     accept_hostkey: yes
     update: no
+  when: lookup('env', 'GITHUB_TOKEN') != ''
 
 - file:
     path: "/export/home/delphix/zfs"
