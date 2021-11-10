@@ -342,6 +342,11 @@ function create_upgrade_container() {
 	# * Bind=/dev/zfs: We set this so that zfs/zpool/libzpool/etc.
 	#   is usable from within the container.
 	#
+	# * Bind=/sys/module: Starting with Ubuntu 20.04, /sys is mounted
+	#   as tmpfs rather than sysfs and it seems like some sub-drectories
+	#   are excluded by default, such as /sys/module. We need that
+	#   directory to be present to run some commands (such as zfs).
+	#
 	cat >"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
 		[Exec]
 		PrivateUsers=no
@@ -351,6 +356,7 @@ function create_upgrade_container() {
 		[Files]
 		PrivateUsersChown=no
 		Bind=/dev/zfs
+		Bind=/sys/module
 	EOF
 		die "failed to create container configuration file"
 
