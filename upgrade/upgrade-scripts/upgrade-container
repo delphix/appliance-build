@@ -421,6 +421,8 @@ function create_upgrade_container() {
 	EOF
 		die "failed to create container service override file"
 
+	fix_and_migrate_services "$CONTAINER"
+
 	echo "$CONTAINER"
 }
 
@@ -639,33 +641,6 @@ function migrate_dir() {
 	fi
 }
 
-#
-# Preserve the persistent service state of the service named as an argument.
-#
-function migrate_svc() {
-	local svc="$1"
-	local state
-	state=$(systemctl is-enabled "$svc")
-
-	if [[ $state == "masked" ]]; then
-		chroot "/var/lib/machines/$CONTAINER" systemctl mask "$svc"
-	else
-		#
-		# The service may be masked by default, so always unmask before
-		# doing anything else. Otherwise, systemctl will ignore the new
-		# setting.
-		#
-		chroot "/var/lib/machines/$CONTAINER" systemctl unmask "$svc"
-		if systemctl is-enabled -q "$svc"; then
-			chroot "/var/lib/machines/$CONTAINER" systemctl \
-				enable "$svc"
-		else
-			chroot "/var/lib/machines/$CONTAINER" systemctl \
-				disable "$svc"
-		fi
-	fi
-}
-
 function migrate_configuration() {
 	#
 	# When performing a not-in-place upgrade, the root and delphix
@@ -676,26 +651,6 @@ function migrate_configuration() {
 	#
 	migrate_password_for_user delphix
 	migrate_password_for_user root
-
-	#
-	# The services listed here can be dynamically modified by the
-	# application(s) running on the appliance, so we need to ensure
-	# we migrate the state of these services when performing a
-	# not-in-place upgrade. Otherwise, we'd wind up with the default
-	# state of these services after the upgrade, which could be
-	# different than the current state of these services.
-	#
-	while read -r svc; do
-		migrate_svc "$svc"
-	done <<-EOF
-		delphix-fluentd.service
-		delphix-masking.service
-		nfs-mountd.service
-		ntp.service
-		rpc-statd.service
-		rpcbind.service
-		rpcbind.socket
-	EOF
 
 	#
 	# These files are generic OS files that are required for the
