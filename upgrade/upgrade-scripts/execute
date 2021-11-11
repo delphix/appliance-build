@@ -382,6 +382,17 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 		dpkg-query -W "$package" &>/dev/null ||
 			die "package '$package' is not installed"
 
+		#
+		# If the configuration file was moved to another package it
+		# will be listed for the original package as "obsolete" while
+		# also being listed as non-obsolete for the destination package.
+		#
+		if [[ $(dpkg-query -Wf '${Conffiles}\n' "$package" |
+			awk '$1 == "'"$file"'" {print $3}') != "obsolete" ]]; then
+			echo "configuration file '$file' has moved to package '$package'"
+			continue
+		fi
+
 		rm -f "$file" ||
 			die "failed to remove file '$file' of package '$package'"
 
@@ -417,6 +428,14 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" | sed 's/=/ /' |
 if [[ -f /etc/apt/sources.list.orig ]]; then
 	mv /etc/apt/sources.list.orig /etc/apt/sources.list ||
 		die "failed to restore /etc/apt/sources.list"
+else
+	#
+	# If "/etc/apt/sources.list.orig" does not exist, then it likely
+	# means the system didn't have a "/etc/apt/sources.list" file to
+	# begin with; so we restore that state by simply removing our
+	# dynamically generated "sources.list" file (generated earlier).
+	#
+	rm /etc/apt/sources.list
 fi
 
 #
