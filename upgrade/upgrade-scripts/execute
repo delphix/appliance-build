@@ -297,6 +297,10 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 	xargs_apt_get install -y --allow-downgrades ||
 	die "failed to install packages listed in packages.list.gz file"
 
+zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
+	cut -d= -f1 | xargs apt-mark manual ||
+	die "failed to mark as manual packages listed in packages.list.gz file"
+
 #
 # After we've successfully installed the new packages, we need to remove
 # all packages that are no longer required. For example, if the old
