@@ -66,7 +66,7 @@ done
 #
 AWS_S3_URI_COMBINED_PACKAGES=$(resolve_s3_uri \
 	"$AWS_S3_URI_COMBINED_PACKAGES" \
-	"devops-gate/master/linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest")
+	"linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest")
 
 WORK_DIRECTORY=$(mktemp -d -p "$TOP/upgrade" tmp.pkgs.XXXXXXXXXX)
 
