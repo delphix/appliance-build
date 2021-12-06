@@ -53,6 +53,7 @@
       - libpam0g-dev
       - libssl-dev
       - python3-pip
+      - python3.8
     state: present
   register: result
   until: result is not failed
