@@ -200,31 +200,15 @@ if ! dpkg-query -l "delphix-platform-$platform" &>/dev/null; then
 fi
 
 #
-# To enable the use of "autoremove" later in this script to remove all
-# packages that are no longer required after the upgrade, we need to
-# mark all packages currently installed as "auto" installed. This way,
-# after explicitly installing all packages for the new "delphix-entire"
-# version, the only "auto" installed packages still remaining on the
-# system will be ones that aren't required by the new "delphix-entire".
+# To accomplish the removal of packages that are no longer required
+# after the upgrade, we need to mark all packages currently installed as
+# "auto" installed. This way, after explicitly installing all packages
+# for the new "delphix-entire" version, the only "auto" installed
+# packages still remaining on the system will be ones that aren't
+# required by the new "delphix-entire".
 #
 dpkg-query -Wf '${Package}\n' | xargs apt-mark auto ||
 	die "failed to mark packages as 'auto' installed"
-
-#
-# While we marked all packages to "auto" above, so they'd be removed
-# when they're no longer required, we want to prevent the removal of old
-# kernel packages. This is so that we can boot into the old kernel(s)
-# if we ever need to; e.g. after a failed kernel upgrade. We accomplish
-# this by marking all "delphix-kernel-*" packages as "manual"-ly
-# installed. The "delphix-kernel-*" package(s) will have package
-# dependencies on the linux kernel package(s), and all other kernel
-# packages that're required for that specific kernel (e.g. zfs kernel
-# module package, connstat kernel module package, etc.). Thus, as long
-# as the "delphix-kernel-*" package remains installed, all other
-# dependent packages should also remain installed.
-#
-dpkg-query -Wf '${Package}\n' "delphix-kernel-*" | xargs apt-mark manual ||
-	die "failed to mark 'delphix-kernel-*' packages as 'manual' installed"
 
 #
 # In order to perform an upgrade of the Delphix appliance, we must first
@@ -302,14 +286,27 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 	die "failed to mark as manual packages listed in packages.list.gz file"
 
 #
-# After we've successfully installed the new packages, we need to remove
-# all packages that are no longer required. For example, if the old
-# "delphix-entire" version required a package, and the new version no
-# longer requires that package, the commands run above will not remove
-# the package. Thus, we need to run "autoremove" to ensure all packages
-# that fall into this category are removed.
+# After we've successfully installed the new packages and marked them
+# all as manual-ly installed, we need to remove all packages that are no
+# longer required. For example, if the old "delphix-entire" version
+# required a package, and the new version no longer requires that
+# package, the commands run above will not remove the package.
 #
-apt_get autoremove --purge -y || die "autoremove after upgrade failed"
+# Thus, we need to explicitly remove all these "leaked" packages here,
+# and we rely on the fact that we apt-mark'ed all "old" packages as
+# "auto" installed, and apt-mark'ed all "new" packages as "manual"
+# installed. This way, we can easily determine which packages need to be
+# removed, by simply removing all packages that're still labelled as
+# "auto" installed.
+#
+# Additionally, we want to keep all packages relating to the currently
+# running kernel. This way, in the event that the new kernel does not
+# work properly, we'll still have the currently running kernel available
+# to use as a fallback.
+#
+# shellcheck disable=SC2046
+apt_get purge -y $(apt-mark showauto | grep -v "$(uname -r)") ||
+	die "failed to remove no-longer-needed packages"
 
 #
 # Package configuration files are only automatically removed by the
