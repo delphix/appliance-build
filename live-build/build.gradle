@@ -105,7 +105,8 @@ for (variant in allVariants) {
                                 "DELPHIX_PACKAGE_MIRROR_MAIN",
                                 "DELPHIX_PACKAGE_MIRROR_SECONDARY",
                                 "DELPHIX_SIGNATURE_URL",
-                                "DELPHIX_SIGNATURE_TOKEN"]) {
+                                "DELPHIX_SIGNATURE_TOKEN",
+                                "DELPHIX_MINIMUM_VERSION"]) {
                     inputs.property(envVar, System.getenv(envVar)).optional(true)
                 }
 
