@@ -445,6 +445,10 @@ zfs set "$PROP_CURRENT_VERSION=$VERSION" "$ROOTFS_CONTAINER" ||
 	die "failed to set property '$PROP_CURRENT_VERSION'" \
 		"to '$VERSION' for '$ROOTFS_CONTAINER'"
 
+zfs set "$PROP_MINIMUM_VERSION=$MINIMUM_VERSION" "$ROOTFS_CONTAINER" ||
+	die "failed to set property '$PROP_MINIMUM_VERSION'" \
+		"to '$MINIMUM_VERSION' for '$ROOTFS_CONTAINER'"
+
 if [[ -n "$HOTFIX" ]]; then
 	zfs set "$PROP_HOTFIX_VERSION=$HOTFIX" "$ROOTFS_CONTAINER" ||
 		die "failed to set property '$PROP_HOTFIX_VERSION'" \

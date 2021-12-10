@@ -48,6 +48,7 @@ umask 0022
 PROP_CURRENT_VERSION="com.delphix:current-version"
 PROP_INITIAL_VERSION="com.delphix:initial-version"
 PROP_HOTFIX_VERSION="com.delphix:hotfix-version"
+PROP_MINIMUM_VERSION="com.delphix:minimum-version"
 
 #
 # To better enable root cause analysis of any upgrade failures, we
