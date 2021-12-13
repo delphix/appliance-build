@@ -40,6 +40,9 @@
 # can move the build dependencies from the list below back into the
 # "internal-dev" playbook.
 #
+- apt_repository:
+    repo: 'ppa:deadsnakes/ppa'
+
 - apt:
     name:
       - ant
@@ -48,12 +51,12 @@
       - git
       - libcrypt-blowfish-dev
       - libcurl4-openssl-dev
-      - libnss3-dbg
       - libnss3-dev
       - libnss3-tools
       - libpam0g-dev
       - libssl-dev
-      - python-pip
+      - python3-pip
+      - python3.8
     state: present
   register: result
   until: result is not failed

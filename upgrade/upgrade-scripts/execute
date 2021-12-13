@@ -124,6 +124,22 @@ EOF
 start_stdout_redirect_to_system_log
 start_stderr_redirect_to_system_log
 
+fix_and_migrate_services
+
+#
+# Due to DLPX-77949, docker needs to be masked for the duration
+# of the upgrade so that it does not get restarted automatically on
+# upgrade, which would also force a restart of the delphix-mgmt
+# service (since the latter has a dependency on docker.service), and
+# thus interrupt the upgrade.
+#
+# Once the upgrade is done we restart delphix.target, which will
+# attempt to restart both delphix-mgmt and docker, so docker
+# needs to be unmasked before that point. As such, docker is
+# unmasked at the end of this script.
+#
+systemctl mask docker.service
+
 #
 # Older versions (i.e. the 6.0.0.0 release) of the "nfs-kernel-server"
 # package had "etab" file delivered as part of the package. Thus, when
@@ -160,101 +176,39 @@ start_stderr_redirect_to_system_log
 [[ -e /var/lib/dpkg/info/nfs-kernel-server.list ]] &&
 	sed -i '/\/var\/lib\/nfs\/etab/d' /var/lib/dpkg/info/nfs-kernel-server.list
 
-#
-# Older versions (i.e. the 6.0.0.0 release) of the virtualization
-# package would disable the "delphix-fluentd" service in that package's
-# "prerm" package hook. This meant that if the service was enabled prior
-# to the upgrade, it would be disabled after the upgrade. Since we can't
-# easily stop this behavior on systems already running 6.0.0.0, we have
-# to workaround this issue. Thus, before we upgrade the packages below,
-# we check to see if this service is currently enabled, and will
-# re-enable it after all packages have been upgraded.
-#
-DELPHIX_FLUENTD_IS_ENABLED=$(systemctl is-enabled delphix-fluentd.service)
-
 apt_get update || die "failed to update apt sources"
 
 #
-# First make sure delphix-platform-<platform> is installed. This package
-# is required by delphix-entire-<platform>, and would be installed even
-# if we just relied on the packages.list.gz file log below. However,
-# there are problems related to virtual packages that arise if we just
-# did that. In particular, the following could happen (using AWS as the
-# example for the platform on which the upgrade is being done):
+# Currently, we need to run the delphix-platform's "postinst" packaging hook
+# prior to the installation of the postgresql package. Further, right now,
+# the postgresql package is pulled in as a dependency of the
+# delphix-virtualization package. Thus, for the case of not-in-place upgrades,
+# we accomplish this goal (of installing the delphix-platform package prior
+# to the installation of the postgresql package) by first installing the
+# delphix-platform package here, and then installing all other packages later.
+# For the case of in-place upgrades, we can skip this step, as we assume the
+# postgresql package is already installed, and simply upgrade all packages
+# below.
 #
-#  - We install the package requirements for "delphix-entire-aws" using
-#    the packages.list.gz file.
+# Note that we have the same issue during appliance-build, and it is solved
+# by installing delphix-virtualization at a later stage of the build via
+# ansible hooks, when the delphix-platform package has already been installed.
 #
-#  - One of the packages in that list is the "delphix-virtualization"
-#    package, so it marks that package and its dependencies for
-#    installation. One of its dependencies is the virtual package
-#    "delphix-platform".
-#
-#  - Apt then sees that there are multiple concrete packages which
-#    provide the "delphix-platform" virtual package. It chooses one of
-#    these arbitrarily, say "delphix-platform-kvm".
-#
-#  - Apt marks all transitive dependencies of "delphix-platform-kvm" for
-#    installation, including, say, "linux-image-4.15.0-1028-kvm".
-#
-#  - After processing the dependencies of "delphix-virtualization", Apt
-#    continues to process the other dependencies of "delphix-entire-aws",
-#    including "delphix-platform-aws".
-#
-#  - Apt then sees that "delphix-platform-aws" conflicts with
-#    "delphix-platform-kvm", so it un-marks "delphix-platform-kvm" for
-#    installation, allowing "delphix-platform-aws" to satisfy the
-#    "delphix-virtualization" dependency on "delphix-platform". However,
-#    it does _not_ unmark all of the dependencies of
-#    "delphix-platform-kvm", so some unnecessary kvm-related packages
-#    end up being installed, such as "linux-image-4.15.0-1028-kvm"
-#
-# In short, we can end up with some unwanted packages installed because
-# Apt marked and then unmarked some package for installation while
-# trying to satisfy a dependency on a virtual package.
-#
-# To avoid this we install the delphix-platform-<platform> package that
-# we want before installing delphix-entire-<platform> and it's required
-# packages. If some delphix-platform package is already installed, that
-# dependency is already satisfied and Apt doesn't need to choose an
-# arbitrary one to satisfy the dependency.
-#
-# In general, we don't want upgrade to need know too much about the set
-# of packages to be installed. However, it seems reasonable to make an
-# exception for delphix-platform because delphix-platform is a
-# fundemental piece of the architecture of the appliance. Among other
-# things, it is the mechanism that we use to orchestrate the installation
-# all of the platform-dependant bits of the appliance.
-#
-apt_get install -y "delphix-platform-$platform" ||
-	die "failed to install delphix-platform"
+if ! dpkg-query -l "delphix-platform-$platform" &>/dev/null; then
+	apt_get install -y "delphix-platform-$platform" ||
+		die "failed to install delphix-platform"
+fi
 
 #
-# To enable the use of "autoremove" later in this script to remove all
-# packages that are no longer required after the upgrade, we need to
-# mark all packages currently installed as "auto" installed. This way,
-# after explicitly installing all packages for the new "delphix-entire"
-# version, the only "auto" installed packages still remaining on the
-# system will be ones that aren't required by the new "delphix-entire".
+# To accomplish the removal of packages that are no longer required
+# after the upgrade, we need to mark all packages currently installed as
+# "auto" installed. This way, after explicitly installing all packages
+# for the new "delphix-entire" version, the only "auto" installed
+# packages still remaining on the system will be ones that aren't
+# required by the new "delphix-entire".
 #
 dpkg-query -Wf '${Package}\n' | xargs apt-mark auto ||
 	die "failed to mark packages as 'auto' installed"
-
-#
-# While we marked all packages to "auto" above, so they'd be removed
-# when they're no longer required, we want to prevent the removal of old
-# kernel packages. This is so that we can boot into the old kernel(s)
-# if we ever need to; e.g. after a failed kernel upgrade. We accomplish
-# this by marking all "delphix-kernel-*" packages as "manual"-ly
-# installed. The "delphix-kernel-*" package(s) will have package
-# dependencies on the linux kernel package(s), and all other kernel
-# packages that're required for that specific kernel (e.g. zfs kernel
-# module package, connstat kernel module package, etc.). Thus, as long
-# as the "delphix-kernel-*" package remains installed, all other
-# dependent packages should also remain installed.
-#
-dpkg-query -Wf '${Package}\n' "delphix-kernel-*" | xargs apt-mark manual ||
-	die "failed to mark 'delphix-kernel-*' packages as 'manual' installed"
 
 #
 # In order to perform an upgrade of the Delphix appliance, we must first
@@ -327,26 +281,32 @@ zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
 	xargs_apt_get install -y --allow-downgrades ||
 	die "failed to install packages listed in packages.list.gz file"
 
-#
-# After we've successfully installed the new packages, we need to remove
-# all packages that are no longer required. For example, if the old
-# "delphix-entire" version required a package, and the new version no
-# longer requires that package, the commands run above will not remove
-# the package. Thus, we need to run "autoremove" to ensure all packages
-# that fall into this category are removed.
-#
-apt_get autoremove --purge -y || die "autoremove after upgrade failed"
+zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
+	cut -d= -f1 | xargs apt-mark manual ||
+	die "failed to mark as manual packages listed in packages.list.gz file"
 
 #
-# As mentioned in a comment above, if the "delphix-fluentd" service is
-# enabled prior to upgrading all of the packages, we need to ensure it
-# remains enabled after upgrading all of the packages. Due to a bug in
-# 6.0.0.0 this might not be the case, so we explicitly enable it here.
+# After we've successfully installed the new packages and marked them
+# all as manual-ly installed, we need to remove all packages that are no
+# longer required. For example, if the old "delphix-entire" version
+# required a package, and the new version no longer requires that
+# package, the commands run above will not remove the package.
 #
-if [[ "$DELPHIX_FLUENTD_IS_ENABLED" == "enabled" ]]; then
-	systemctl enable "delphix-fluentd.service" ||
-		die "failed to enable 'delphix-fluend.service'"
-fi
+# Thus, we need to explicitly remove all these "leaked" packages here,
+# and we rely on the fact that we apt-mark'ed all "old" packages as
+# "auto" installed, and apt-mark'ed all "new" packages as "manual"
+# installed. This way, we can easily determine which packages need to be
+# removed, by simply removing all packages that're still labelled as
+# "auto" installed.
+#
+# Additionally, we want to keep all packages relating to the currently
+# running kernel. This way, in the event that the new kernel does not
+# work properly, we'll still have the currently running kernel available
+# to use as a fallback.
+#
+# shellcheck disable=SC2046
+apt_get purge -y $(apt-mark showauto | grep -v "$(uname -r)") ||
+	die "failed to remove no-longer-needed packages"
 
 #
 # Package configuration files are only automatically removed by the
@@ -408,6 +368,12 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 		apt_get install -y --reinstall "$package" ||
 			die "failed to reinstall package '$package'"
 	done || die "failed to remove obsolete package configuration files"
+
+#
+# Unmask docker, which was masked at the beginning of the upgrade due
+# to DLPX-77949.
+#
+systemctl unmask docker.service
 
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
@@ -478,6 +444,10 @@ fi
 zfs set "$PROP_CURRENT_VERSION=$VERSION" "$ROOTFS_CONTAINER" ||
 	die "failed to set property '$PROP_CURRENT_VERSION'" \
 		"to '$VERSION' for '$ROOTFS_CONTAINER'"
+
+zfs set "$PROP_MINIMUM_VERSION=$MINIMUM_VERSION" "$ROOTFS_CONTAINER" ||
+	die "failed to set property '$PROP_MINIMUM_VERSION'" \
+		"to '$MINIMUM_VERSION' for '$ROOTFS_CONTAINER'"
 
 if [[ -n "$HOTFIX" ]]; then
 	zfs set "$PROP_HOTFIX_VERSION=$HOTFIX" "$ROOTFS_CONTAINER" ||

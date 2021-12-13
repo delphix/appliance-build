@@ -73,6 +73,11 @@
       [Service]
       Environment=DLPX_PG_DEBUG=true
 
+#
+# We are wrapping this in a retry block because the Gitlab server sometimes
+# hangs up unexpectedly. We haven't seen this with GitHub, so we should
+# probably remove the retry once we switch to GitHub.
+#
 - git:
     repo: "{{ item.repo }}"
     dest:
@@ -84,6 +89,10 @@
     - { repo: 'https://gitlab.delphix.com/app/dlpx-app-gate.git',
         version: master,
         dest: dlpx-app-gate }
+  retries: 3
+  delay: 30
+  register: result
+  until: result is not failed
 
 - file:
     path: "/export/home/delphix/{{ item }}"

@@ -119,6 +119,13 @@ function create_upgrade_container() {
 			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
 		copy_optional_dataset_property "$PROP_HOTFIX_VERSION" \
 			"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
+		#
+		# The minimum version property was introduced in 6.0.12.0.
+		#
+		if compare_versions "$(get_current_version)" ge "6.0.12.0"; then
+			copy_required_dataset_property "$PROP_MINIMUM_VERSION" \
+				"$ROOTFS_DATASET" "$ROOTFS_DATASET@$SNAPSHOT_NAME"
+		fi
 		;;
 	rollback)
 		#
@@ -149,6 +156,13 @@ function create_upgrade_container() {
 			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
 		copy_optional_dataset_property "$PROP_HOTFIX_VERSION" \
 			"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
+		#
+		# The minimum version property was introduced in 6.0.12.0.
+		#
+		if compare_versions "$(get_current_version)" ge "6.0.12.0"; then
+			copy_required_dataset_property "$PROP_MINIMUM_VERSION" \
+				"$ROOTFS_DATASET@$SNAPSHOT_NAME" "rpool/ROOT/$CONTAINER"
+		fi
 
 		zfs clone \
 			-o canmount=noauto \
@@ -233,8 +247,34 @@ function create_upgrade_container() {
 		# communicate and later run commands in the container with
 		# "systemd-run".
 		#
-		debootstrap --no-check-gpg \
-			--components=delphix --include=systemd-container \
+		# On Ubuntu 20.04, in-order to satisfy some package
+		# dependencies, we must set the variant to "minbase" and list
+		# "ntp" in the include list before "systemd-container".
+		# Setting the variant to minbase removes systemd from the
+		# packages being installed by default. Systemd will still
+		# be installed, but in a later pass, as a dependency of
+		# systemd-container. The reason we need to go through those
+		# hoops is the following:
+		#  - systemd has a package dependency on a "time-daemon"
+		#    virtual package, which is provided by either "ntp" or
+		#    "systemd-timesyncd".
+		#  - If a time-deamon is not already installed when
+		#    installing systemd, then systemd will try to
+		#    install systemd-timesyncd.
+		#  - systemd-timesyncd is not available in our upgrade
+		#    images because we install ntp and ntp conflicts with
+		#    systemd-timesyncd.
+		#  - Setting variant as minbase and list ntp before
+		#    systemd-container in the include list allows debootstrap
+		#    to install ntp before systemd, thus satisfying the
+		#    package dependencies.
+		# Note that we do not run into those problems during live-build
+		# because debootstrap is already run with variant=minbase and
+		# systemd is not installed by debootstrap, but rather by
+		# delphix-platform which pulls both ntp and systemd.
+		#
+		debootstrap --no-check-gpg --variant=minbase \
+			--components=delphix --include=ntp,systemd-container \
 			bionic "$DIRECTORY" "file://$IMAGE_PATH" 1>&2 ||
 			die "failed to debootstrap upgrade filesystem"
 
@@ -269,7 +309,11 @@ function create_upgrade_container() {
 	# is started, those NFS services will not run (no matter the
 	# version of Delphix we're upgrading from).
 	#
-	for svc in "nfs-mountd" "nfs-server" "rpc-statd" "rpc-statd-notify"; do
+	# DLPX-78307 - Similarly, we must disable "google-guest-agent".
+	#
+	for svc in \
+		"nfs-mountd" "nfs-server" "rpc-statd" "rpc-statd-notify" \
+		"google-guest-agent"; do
 		[[ -e "$DIRECTORY/lib/systemd/system/$svc.service.d/override.conf" ]] &&
 			continue
 
@@ -316,6 +360,11 @@ function create_upgrade_container() {
 	# * Bind=/dev/zfs: We set this so that zfs/zpool/libzpool/etc.
 	#   is usable from within the container.
 	#
+	# * Bind=/sys/module: Starting with Ubuntu 20.04, /sys is mounted
+	#   as tmpfs rather than sysfs and it seems like some sub-drectories
+	#   are excluded by default, such as /sys/module. We need that
+	#   directory to be present to run some commands (such as zfs).
+	#
 	cat >"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
 		[Exec]
 		PrivateUsers=no
@@ -325,6 +374,7 @@ function create_upgrade_container() {
 		[Files]
 		PrivateUsersChown=no
 		Bind=/dev/zfs
+		Bind=/sys/module
 	EOF
 		die "failed to create container configuration file"
 
@@ -394,6 +444,8 @@ function create_upgrade_container() {
 		ExecStart=/usr/bin/systemd-nspawn --quiet --boot --capability=all --machine=%i
 	EOF
 		die "failed to create container service override file"
+
+	fix_and_migrate_services "$CONTAINER"
 
 	echo "$CONTAINER"
 }
@@ -613,33 +665,6 @@ function migrate_dir() {
 	fi
 }
 
-#
-# Preserve the persistent service state of the service named as an argument.
-#
-function migrate_svc() {
-	local svc="$1"
-	local state
-	state=$(systemctl is-enabled "$svc")
-
-	if [[ $state == "masked" ]]; then
-		chroot "/var/lib/machines/$CONTAINER" systemctl mask "$svc"
-	else
-		#
-		# The service may be masked by default, so always unmask before
-		# doing anything else. Otherwise, systemctl will ignore the new
-		# setting.
-		#
-		chroot "/var/lib/machines/$CONTAINER" systemctl unmask "$svc"
-		if systemctl is-enabled -q "$svc"; then
-			chroot "/var/lib/machines/$CONTAINER" systemctl \
-				enable "$svc"
-		else
-			chroot "/var/lib/machines/$CONTAINER" systemctl \
-				disable "$svc"
-		fi
-	fi
-}
-
 function migrate_configuration() {
 	#
 	# When performing a not-in-place upgrade, the root and delphix
@@ -650,26 +675,6 @@ function migrate_configuration() {
 	#
 	migrate_password_for_user delphix
 	migrate_password_for_user root
-
-	#
-	# The services listed here can be dynamically modified by the
-	# application(s) running on the appliance, so we need to ensure
-	# we migrate the state of these services when performing a
-	# not-in-place upgrade. Otherwise, we'd wind up with the default
-	# state of these services after the upgrade, which could be
-	# different than the current state of these services.
-	#
-	while read -r svc; do
-		migrate_svc "$svc"
-	done <<-EOF
-		delphix-fluentd.service
-		delphix-masking.service
-		nfs-mountd.service
-		ntp.service
-		rpc-statd.service
-		rpcbind.service
-		rpcbind.socket
-	EOF
 
 	#
 	# These files are generic OS files that are required for the
