@@ -15,12 +15,21 @@
 #
 
 ---
+#
+# We are wrapping this in a retry block because the Gitlab server sometimes
+# hangs up unexpectedly. We haven't seen this with GitHub, so we should
+# probably remove the retry once we switch to GitHub.
+#
 - git:
     repo: 'https://gitlab.delphix.com/devops/dcenter-gate.git'
     version: master
     dest: /opt/dcenter/lib/dcenter-gate
     accept_hostkey: yes
     update: no
+  retries: 3
+  delay: 30
+  register: result
+  until: result is not failed
 
 - alternatives:
     name: java
@@ -62,3 +71,17 @@
     - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
 
 - command: systemctl disable bind9.service isc-dhcp-server.service isc-dhcp-server6.service
+
+#
+# delphix-platform installs ntp in a disabled state by default.
+# We want to enable ntp to keep the time in sync on DCenter as clock skew
+# can cause operational problems.
+#
+# For example, we run awscli on DCenter hosts, and some preliminary searching
+# shows that aws s3 commands can return RequestTimeTooSkewed errors if there
+# is clock skew.
+#
+# We also have cleanup jobs that run on DCenter hosts that rely on filesystem
+# timestamps being accurate.
+#
+- command: systemctl enable ntp.service

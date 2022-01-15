@@ -142,6 +142,12 @@ if [[ -n "$DELPHIX_HOTFIX_VERSION" ]]; then
 		"rpool/ROOT/$FSNAME"
 fi
 
+if [[ -n "$DELPHIX_MINIMUM_VERSION" ]]; then
+	zfs set \
+		"com.delphix:minimum-version=$DELPHIX_MINIMUM_VERSION" \
+		"rpool/ROOT/$FSNAME"
+fi
+
 zfs create \
 	-o canmount=noauto \
 	-o mountpoint=/ \
@@ -299,7 +305,12 @@ chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
 chroot "$DIRECTORY" umount /mnt
 
 for dir in /dev /proc /sys; do
-	umount -R "${DIRECTORY}${dir}"
+	for attempt in {1..5}; do
+		umount -R "${DIRECTORY}${dir}" && break
+		[[ "$attempt" == 5 ]] && die "Too many failed attempts, aborting."
+		echo "Attempt $attempt failed, trying again after a small nap."
+		sleep 10
+	done
 done
 
 umount "$DIRECTORY/var/log"
