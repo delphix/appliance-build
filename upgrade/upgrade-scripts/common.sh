@@ -476,5 +476,6 @@ function fix_and_migrate_services() {
 		rpcbind.socket
 		snmpd.service
 		systemd-timesyncd.service
+		td-agent.service
 	EOF
 }
