@@ -66,6 +66,10 @@
     accept_hostkey: yes
     update: no
   when: lookup('env', 'GITHUB_TOKEN') != ''
+  retries: 3
+  delay: 30
+  register: result
+  until: result is not failed
 
 - file:
     path: "/export/home/delphix/zfs"
