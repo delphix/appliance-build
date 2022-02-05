@@ -379,8 +379,13 @@ function mask_service() {
 	fi
 }
 
-function is_svc_masked_or_disabled() {
+function is_svc_new_or_masked_or_disabled() {
 	local svc="$1"
+
+	systemctl cat "$svc" &>/dev/null
+	if [ $? -eq 1 ]; then
+		return 0
+	fi
 
 	state=$(systemctl is-enabled "$svc")
 	if [[ "$state" == masked || "$state" == disabled ]]; then
@@ -457,7 +462,7 @@ function fix_and_migrate_services() {
 	# enable them.
 	#
 	while read -r svc; do
-		is_svc_masked_or_disabled "$svc" &&
+		is_svc_new_or_masked_or_disabled "$svc" &&
 			mask_service "$svc" "$container"
 	done <<-EOF
 		delphix-fluentd.service
