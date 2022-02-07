@@ -81,7 +81,7 @@
   with_items:
     - nginx.service
     - postgresql.service
-    - systemd-timesyncd.service
+    - td-agent.service
 
 #
 # The services in this section should be disabled & masked initially, but
