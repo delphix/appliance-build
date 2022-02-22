@@ -46,7 +46,6 @@
 - apt:
     name:
       - ant
-      - awscli
       - build-essential
       - git
       - libcrypt-blowfish-dev
