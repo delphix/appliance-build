@@ -196,6 +196,7 @@ zfs create \
 
 zfs create \
 	-o mountpoint=legacy \
+	-o recordsize=1MB \
 	"rpool/ROOT/$FSNAME/log"
 
 #

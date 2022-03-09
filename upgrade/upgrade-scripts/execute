@@ -441,6 +441,10 @@ if [[ -z "$CURRENT_VERSION" ]]; then
 			"to '$VERSION' for '$ROOTFS_CONTAINER'"
 fi
 
+zfs set "recordsize=1MB" "$ROOTFS_CONTAINER/log" ||
+	die "failed to set property 'recordsize' " \
+		"to '1MB' for '$ROOTFS_CONTAINER/log'"
+
 zfs set "$PROP_CURRENT_VERSION=$VERSION" "$ROOTFS_CONTAINER" ||
 	die "failed to set property '$PROP_CURRENT_VERSION'" \
 		"to '$VERSION' for '$ROOTFS_CONTAINER'"
