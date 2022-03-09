@@ -109,6 +109,8 @@ cp config/hooks/template.ctl delphix-entire.ctl
 # shellcheck disable=SC2016
 chroot binary dpkg-query -Wf '${Package}=${Version}\n' | sort >packages.list
 
+cp packages.list "$ARTIFACT_NAME.packages.list"
+
 echo "$APPLIANCE_VARIANT" >variant
 
 test -n "$DELPHIX_APPLIANCE_VERSION"
