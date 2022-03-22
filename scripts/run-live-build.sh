@@ -208,6 +208,7 @@ fi
 set -o errexit
 
 lb config \
+	--apt-recommends false \
 	--parent-mirror-bootstrap "$pkg_mirror_main" \
 	--parent-mirror-chroot "$pkg_mirror_main" \
 	--parent-mirror-chroot-security "$pkg_mirror_main" \
