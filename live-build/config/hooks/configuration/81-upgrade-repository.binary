@@ -83,11 +83,16 @@ rename 's/\%3a/:/g' binary/packages/*.deb
 #
 # Copy over the generated hotfix metadata.
 #
+# Note: AWS_S3_HOTFIX_METADATA is the only variable that is allowed to
+# be unset in this logic, thus the temporary `set -u`.
+#
+set +u
 if [[ -z "$AWS_S3_HOTFIX_METADATA" ]]; then
 	touch hotfix_metadata
 else
 	aws s3 cp --only-show-errors "$AWS_S3_HOTFIX_METADATA" hotfix_metadata
 fi
+set -u
 
 if [[ ! -f "hotfix_metadata" ]]; then
 	echo "Could not generate hotfix_metadata file."
