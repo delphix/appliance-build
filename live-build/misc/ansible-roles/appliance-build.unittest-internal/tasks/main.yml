@@ -27,6 +27,15 @@
     state: present
 
 #
+# Prior to running the unit tests, the Jenkins automation will execute a
+# script (enable-swap.sh) that formats a disk to use as a swap device.
+# This script uses "sgdisk", so we need to ensure that's installed.
+#
+- apt:
+    name: gdisk
+    state: present
+
+#
 # The UI-precommit suite requires some chromium-browser dependendencies to be
 # installed. However on 20.04 chromium is provided by a snap, and the
 # "chromium-browser" package neither provides any dependencies nor the actual
