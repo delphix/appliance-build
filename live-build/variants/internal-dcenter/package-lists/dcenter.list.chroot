@@ -18,7 +18,6 @@ adoptopenjdk-java8-jdk
 bind9
 dnsutils
 git
-gnupg
 isc-dhcp-server
 libldap2-dev
 libsasl2-dev
