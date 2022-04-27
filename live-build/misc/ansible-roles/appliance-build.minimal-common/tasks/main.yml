@@ -68,3 +68,8 @@
   delay: 30
   register: result
   until: result is succeeded
+
+- apt:
+    name:
+      - azure-cli
+    state: present
