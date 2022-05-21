@@ -124,13 +124,16 @@ for (variant in allVariants) {
                 switch (runType) {
                     case upgradeArtifactsRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.packages.list"
                         break
                     case vmArtifactsRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.packages.list"
                         break
                     case allRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.packages.list"
                         break
                 }
 
