@@ -1,5 +1,5 @@
 #
-# Copyright 2018,2020 Delphix
+# Copyright 2018, 2022 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,6 +69,39 @@
   with_items:
     - { regexp: '^RPCNFSDCOUNT=', line: 'RPCNFSDCOUNT=64' }
     - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
+
+#
+# Use the same NFS configuration as a Delphix engine. The content here should
+# be identical to what is in '/opt/delphix/server/etc/nfs-local-v3v4.conf'.
+# This config file is for use with nfs-utils 2.6.1 and later.
+#
+- ansible.builtin.stat:
+    path: /etc/nfs.conf.d
+  register: nfs_conf_d
+- copy:
+    dest: "/etc/nfs.conf.d/local.conf"
+    mode: 0644
+    content: |
+      [lockd]
+      port = 54045
+
+      [nfsd]
+      debug = all
+      lease-time = 20
+      grace-time = 20
+      vers2 = n
+      vers3 = y
+      vers4 = y
+      threads = 512
+
+      [mountd]
+      manage-gids = n
+      port = 54043
+      threads = 5
+
+      [statd]
+      port = 54044
+  when: nfs_conf_d.stat.isdir is defined and nfs_conf_d.stat.isdir
 
 - command: systemctl mask named.service isc-dhcp-server.service isc-dhcp-server6.service
 
