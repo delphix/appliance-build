@@ -82,6 +82,7 @@
     - nginx.service
     - postgresql.service
     - td-agent.service
+    - telegraf.service
 
 #
 # The services in this section should be disabled & masked initially, but
