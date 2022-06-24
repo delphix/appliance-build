@@ -831,12 +831,11 @@ function do_upgrade_container_not_in_place() {
 }
 
 function get_type() {
-	local root origin
+	local origin
 
-	root=$(zfs list -Hpo name /var/lib/machines/"${CONTAINER}")
-	[[ -n "${root}" ]] || die "Failed to obtain root filesystem for container '${CONTAINER}'"
-	origin=$(zfs get -Hpo value origin "${root}")
-	[[ -n "${origin}" ]] || die "Failed to origin of the root filesystem '${root}' for container '${CONTAINER}'"
+	origin=$(zfs get -Hpo value origin "rpool/ROOT/${CONTAINER}/root")
+	[[ -n "${origin}" ]] ||
+		die "failed to get origin for container '${CONTAINER}'"
 
 	case "${origin}" in
 	-)
