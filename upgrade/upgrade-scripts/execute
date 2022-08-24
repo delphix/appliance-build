@@ -33,19 +33,19 @@ function usage() {
 function generate_interface_to_mac_address_map() {
   # we always create the map file anew to avoid using any stale versions of the same
   if [[ -e "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ]]; then
-    > "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" || \
+    rm "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ||
       die "Could not delete the existing contents of the mac address map file"
   fi
   for i in $(ls -lart /sys/class/net | awk '{print $9}');
   do
     interface_name="$i";
-    if [ -e /sys/class/net/"$i"/address ] && \
+    if [ -e /sys/class/net/"$i"/address ] &&
       grep -q -v -e "00:00:00:00:00:00" /sys/class/net/$i/address ; then
       mac_address=$(cat /sys/class/net/"$i"/address | tr -d ":");
       echo $interface_name $mac_address >> "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH"
     fi;
   done
-  [ -s "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ] || \
+  [ -s "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ] ||
     die "Failed to generate map from interface names to mac addresses"
 }
 
