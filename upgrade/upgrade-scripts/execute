@@ -36,13 +36,13 @@ function generate_interface_to_mac_address_map() {
     		rm "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ||
       		die "Could not delete the existing contents of the mac address map file"
   	fi
-  	for i in $(ls -lart /sys/class/net | awk '{print $9}');
+  	for i in $(find /sys/class/net/ type '-l' | awk -F "/" '{print $5}');
   	do
     		interface_name="$i";
     		if [ -e /sys/class/net/"$i"/address ] &&
-      			grep -q -v -e "00:00:00:00:00:00" /sys/class/net/$i/address ; then
-      			mac_address=$(cat /sys/class/net/"$i"/address | tr -d ":");
-      			echo $interface_name $mac_address >> "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH"
+      			grep -q -v -e "00:00:00:00:00:00" /sys/class/net/"$i"/address ; then
+      				mac_address=$(tr -d ":" < /sys/class/net/"$i"/address);
+      				echo "$interface_name $mac_address" >> "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH"
     		fi;
   	done
   	[ -s "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ] ||
