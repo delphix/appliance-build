@@ -41,8 +41,8 @@ function generate_interface_to_mac_address_map() {
     		interface_name="$i";
     		if [ -e /sys/class/net/"$i"/address ] &&
       			grep -q -v -e "00:00:00:00:00:00" /sys/class/net/"$i"/address ; then
-      				mac_address=$(tr -d ":" < /sys/class/net/"$i"/address);
-      				echo "$interface_name $mac_address" >> "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH"
+      			mac_address=$(tr -d ":" < /sys/class/net/"$i"/address);
+      			echo "$interface_name $mac_address" >> "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH"
     		fi;
   	done
   	[ -s "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ] ||
