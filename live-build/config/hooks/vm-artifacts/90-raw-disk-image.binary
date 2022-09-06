@@ -28,6 +28,23 @@ die() {
 }
 
 #
+# usage: retry <attempts> <delay> command arg1 arg2 ...
+#
+retry() {
+	attempts=$1
+	shift
+	delay=$1
+	shift
+
+	for attempt in $(seq ${attempts}); do
+		$* && break
+		[[ $attempt == $attempts ]] && die "Too many failed attempts, aborting."
+		echo "Attempt $attempt failed, trying again after a small nap."
+		sleep $delay
+	done
+}
+
+#
 # The root filesystem container needs to have the appliance version
 # embedded in it as a dataset property, thus if this value was not
 # passed into the build, we need to error out (preferably before we do
@@ -305,18 +322,13 @@ chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
 chroot "$DIRECTORY" umount /mnt
 
 for dir in /dev /proc /sys; do
-	for attempt in {1..5}; do
-		umount -R "${DIRECTORY}${dir}" && break
-		[[ "$attempt" == 5 ]] && die "Too many failed attempts, aborting."
-		echo "Attempt $attempt failed, trying again after a small nap."
-		sleep 10
-	done
+	retry 5 10 umount -R "${DIRECTORY}${dir}"
 done
 
 umount "$DIRECTORY/var/log"
 umount "$DIRECTORY/var/delphix"
 umount "$DIRECTORY/export/home"
 umount "/var/crash"
-zfs umount "rpool/ROOT/$FSNAME/root"
-zpool export rpool
+retry 5 10 zfs umount "rpool/ROOT/$FSNAME/root"
+retry 5 10 zpool export rpool
 kpartx -d "$ARTIFACT_NAME.img"
