@@ -36,7 +36,7 @@ function generate_interface_to_mac_address_map() {
 		rm "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ||
 			die "Could not delete the existing contents of the mac address map file"
 	fi
-	for i in /sys/class/net/* ; do
+	for i in /sys/class/net/*; do
 		ifname=$(basename "$i")
 		if [ -e "$i"/address ]; then
 			mac_address=$(cat "$i"/address)
