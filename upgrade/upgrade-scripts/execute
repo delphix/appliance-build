@@ -17,8 +17,6 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
-INTERFACE_TO_MACADRESS_MAP_FILE_PATH="/var/tmp/delphix-upgrade/interface_to_macaddress_map.out"
-
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
@@ -31,6 +29,7 @@ function usage() {
 }
 
 function generate_interface_to_mac_address_map() {
+	INTERFACE_TO_MACADRESS_MAP_FILE_PATH="/var/tmp/delphix-upgrade/interface_to_macaddress_map.out"
 	# we always create the map file anew to avoid using any stale versions of the same
 	if [[ -e "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ]]; then
 		rm "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ||
