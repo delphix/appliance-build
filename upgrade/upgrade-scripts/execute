@@ -17,8 +17,6 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
-INTERFACE_TO_MACADRESS_MAP_FILE_PATH="/etc/interface_to_macaddress_map.out"
-
 IMAGE_PATH=$(get_image_path)
 [[ -n "$IMAGE_PATH" ]] || die "failed to determine image path"
 
