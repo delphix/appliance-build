@@ -24,6 +24,7 @@
       - snmptrapd
       - ufw
       - nmap
+      - gnupg
     state: present
   register: result
   until: result is not failed
