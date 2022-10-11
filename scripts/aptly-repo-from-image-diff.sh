@@ -131,7 +131,7 @@ aptly repo search image-b |
 	xargs aptly repo remove upgrade-repository ||
 	die "failed to remove packages from repository: 'upgrade-repository'"
 
-aptly publish repo -skip-contents -skip-signing upgrade-repository ||
+aptly publish repo -skip-contents -skip-signing -architectures=amd64 upgrade-repository ||
 	die "failed to publish repository: 'upgrade-repository'"
 
 [[ -d ~/.aptly/public ]] || die "failed to generate aptly repository"
