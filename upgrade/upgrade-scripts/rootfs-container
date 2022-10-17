@@ -23,8 +23,10 @@ function delete() {
 	zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
 		die "rootfs container '$CONTAINER' does not exist"
 
+	MOUNTPOINT=$(zfs get mountpoint -Hpo value "rpool/ROOT/$CONTAINER/root")
 	MOUNTED=$(zfs get mounted -Hpo value "rpool/ROOT/$CONTAINER/root")
-	[[ "$MOUNTED" == "no" ]] ||
+
+	[[ "$MOUNTPOINT" == "/" ]] && [[ "$MOUNTED" == "yes" ]] &&
 		die "cannot delete mounted rootfs container: '$CONTAINER'"
 
 	local snapname

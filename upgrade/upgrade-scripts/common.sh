@@ -169,7 +169,13 @@ function get_dataset_rollback_snapshot_name() {
 }
 
 function get_snapshot_clones() {
-	zfs get clones -Hpo value "$1"
+	local CLONES
+
+	CLONES="$(zfs get clones -Hpo value "$1")"
+
+	if [[ "$CLONES" != "-" ]]; then
+		echo "$CLONES"
+	fi
 }
 
 function get_version_property() {
