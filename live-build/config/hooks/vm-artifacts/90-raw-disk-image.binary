@@ -36,11 +36,11 @@ retry() {
 	delay=$1
 	shift
 
-	for attempt in $(seq ${attempts}); do
-		$* && break
-		[[ $attempt == $attempts ]] && die "Too many failed attempts, aborting."
+	for attempt in $(seq "${attempts}"); do
+		"$@" && break
+		[[ $attempt == "$attempts" ]] && die "Too many failed attempts, aborting."
 		echo "Attempt $attempt failed, trying again after a small nap."
-		sleep $delay
+		sleep "$delay"
 	done
 }
 
