@@ -169,7 +169,7 @@ else
 	# If no secondary package mirror is provided, then pull in the latest
 	# mirror dataset for the build. If no latest dataset is found, then fail.
 	#
-	source_url="http://linux-package-mirror.delphix.com/$UPSTREAM_BRANCH/latest/"
+	source_url="http://10.110.21.97/$UPSTREAM_BRANCH/latest/"
 	if ! pkg_mirror_secondary=$(curl -fLSs -o /dev/null -w '%{url_effective}' "$source_url"); then
 		kill -9 $APTLY_SERVE_PID
 		echo "No URL found for PPA packages at ${source_url}."
@@ -192,7 +192,7 @@ else
 	# If no main package mirror is provided, then pull in the latest mirror
 	# dataset for the build. If no latest dataset is found, then fail.
 	#
-	source_url="http://linux-package-mirror.delphix.com/$UPSTREAM_BRANCH/latest/"
+	source_url="http://10.110.21.97/$UPSTREAM_BRANCH/latest/"
 	if ! pkg_mirror_main=$(curl -fLSs -o /dev/null -w '%{url_effective}' "$source_url"); then
 		kill -9 $APTLY_SERVE_PID
 		echo "No mirror URL found for ubuntu archive packages at ${source_url}."
