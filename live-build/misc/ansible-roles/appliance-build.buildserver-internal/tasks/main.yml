@@ -18,7 +18,13 @@
 - apt:
     name:
       - adoptopenjdk-java8-jdk
+      - build-essential
       - curl
+      - debhelper
+      - devscripts
+      - equivs
       - git
       - gnupg
+      - jq
+      - shellcheck
     state: present
