@@ -19,6 +19,11 @@
     name:
       - adoptopenjdk-java8-jdk
       - curl
+      - docker.io
       - git
       - gnupg
     state: present
+
+- user:
+    name: delphix
+    groups: docker
