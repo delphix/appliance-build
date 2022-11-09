@@ -27,3 +27,4 @@
 - user:
     name: delphix
     groups: docker
+    append: true
