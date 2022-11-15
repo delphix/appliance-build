@@ -223,6 +223,16 @@ zfs create \
 	-o mountpoint=legacy \
 	"$FSNAME/ROOT/$FSNAME/log"
 
+case "$APPLIANCE_VARIANT" in
+internal-buildserver)
+	zpool upgrade "$FSNAME"
+	zfs set recordsize=1M  "$FSNAME/ROOT/$FSNAME/root"
+	zfs set recordsize=1M  "$FSNAME/ROOT/$FSNAME/home"
+	zfs set recordsize=1M  "$FSNAME/ROOT/$FSNAME/data"
+	zfs set recordsize=1M  "$FSNAME/ROOT/$FSNAME/log"
+	;;
+esac
+
 #
 # Initialize the grub dataset. This dataset will be used to contain all
 # of the grub-specific files; this includes the "grub.cfg" file, along
