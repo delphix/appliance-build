@@ -35,6 +35,7 @@
     uid: 65433
     group: staff
     groups: root
+    append: true
     shell: /bin/bash
     create_home: yes
     comment: Delphix User
