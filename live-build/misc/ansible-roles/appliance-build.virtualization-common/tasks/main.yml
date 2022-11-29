@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2022 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@
 # modifies this configuration at runtime, and we don't want ansible roles that
 # are re-run as part of upgrades to undo these runtime modifications.
 #
+# This initialization works for both nfs-utils 1.3.4 and nfs-utils 2.6.1
+#
 - name: Link initial NFS configuration
   file:
     src: /opt/delphix/server/etc/nfs-kernel-server-v4
@@ -37,6 +39,21 @@
     owner: root
     group: root
     state: link
+
+- name: Get stats of directory
+  ansible.builtin.stat:
+    path: /etc/nfs.conf.d
+  register: nfs_conf_d
+
+- name: Link initial nfs-utils 2.6.1 configuration
+  file:
+    src: /opt/delphix/server/etc/nfs-local-v4.conf
+    dest: /etc/nfs.conf.d/local.conf
+    force: yes
+    owner: root
+    group: root
+    state: link
+  when: nfs_conf_d.stat.isdir is defined and nfs_conf_d.stat.isdir
 
 #
 # The section below deals with disabling and masking services that need to be
