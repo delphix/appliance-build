@@ -15,18 +15,10 @@
 #
 
 ---
-#
-# We are wrapping this in a retry block because the Gitlab server sometimes
-# hangs up unexpectedly. We haven't seen this with GitHub, so we should
-# probably remove the retry once we switch to GitHub.
-#
 - git:
-    repo: 'https://gitlab.delphix.com/devops/devops-gate.git'
-    version: master
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/devops-gate.git"
+    version: main
     dest: /opt/devops-gate
     accept_hostkey: yes
     update: no
-  retries: 3
-  delay: 30
-  register: result
-  until: result is not failed
+  when: lookup('env', 'GITHUB_TOKEN') != ''
