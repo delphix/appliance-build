@@ -40,9 +40,9 @@ ALL_RUN_TYPE="all"
 RUN_TYPES="$UPGRADE_RUN_TYPE|$VM_RUN_TYPE|$ALL_RUN_TYPE"
 
 case "$3" in
-$UPGRADE_RUN_TYPE) ;;
-$VM_RUN_TYPE) ;;
-$ALL_RUN_TYPE) ;;
+"$UPGRADE_RUN_TYPE") ;;
+"$VM_RUN_TYPE") ;;
+"$ALL_RUN_TYPE") ;;
 *)
 	echo "Unknown run type '$3'. Must be one of <$RUN_TYPES>"
 	exit 1
