@@ -586,6 +586,15 @@ function destroy() {
 }
 
 function run() {
+	#
+	# We've seen cases where systemd-run fails to exit, even after
+	# it's run the comamnds/script specified. We've "fixed" this in
+	# the past by executing "systemd daemon-reexec", and retrying
+	# the upgrade. Thus, to try and avoid the failure to begin with,
+	# we restart this service, which serves to run "daemon-reexec".
+	#
+	systemctl restart systemd-reexec.service
+
 	systemd-run \
 		--machine="$CONTAINER" \
 		--setenv=CONTAINER="$CONTAINER" \
