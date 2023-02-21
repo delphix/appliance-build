@@ -127,7 +127,7 @@ APTLY_SERVE_PID=$!
 set +o errexit
 attempts=0
 while ! curl --output /dev/null --silent --head --fail \
-	"http://localhost:8080/dists/focal/Release"; do
+	"http://localhost:8080/dists/jammy/Release"; do
 	((attempts++))
 	if [[ $attempts -gt 30 ]]; then
 		echo "Timed out waiting for ancillary repository." 1>&2

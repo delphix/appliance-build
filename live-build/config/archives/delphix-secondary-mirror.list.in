@@ -14,6 +14,6 @@
 # limitations under the License.
 #
 
-deb @@URL@@ focal main multiverse universe contrib stable
-deb @@URL@@ focal-updates main multiverse universe
-deb @@URL@@ focal-pgdg main
+deb @@URL@@ jammy main multiverse universe contrib stable
+deb @@URL@@ jammy-updates main multiverse universe
+deb @@URL@@ jammy-pgdg main
