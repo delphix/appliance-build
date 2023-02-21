@@ -207,26 +207,27 @@ else
 fi
 set -o errexit
 
-lb config \
-	--apt-recommends false \
-	--parent-mirror-bootstrap "$pkg_mirror_main" \
-	--parent-mirror-chroot "$pkg_mirror_main" \
-	--parent-mirror-chroot-security "$pkg_mirror_main" \
-	--parent-mirror-chroot-volatile "$pkg_mirror_main" \
-	--parent-mirror-chroot-backports "$pkg_mirror_main" \
-	--parent-mirror-binary "$pkg_mirror_main" \
-	--parent-mirror-binary-security "$pkg_mirror_main" \
-	--parent-mirror-binary-volatile "$pkg_mirror_main" \
-	--parent-mirror-binary-backports "$pkg_mirror_main" \
-	--mirror-bootstrap "$pkg_mirror_main" \
-	--mirror-chroot "$pkg_mirror_main" \
-	--mirror-chroot-security "$pkg_mirror_main" \
-	--mirror-chroot-volatile "$pkg_mirror_main" \
-	--mirror-chroot-backports "$pkg_mirror_main" \
-	--mirror-binary "$pkg_mirror_main" \
-	--mirror-binary-security "$pkg_mirror_main" \
-	--mirror-binary-volatile "$pkg_mirror_main" \
-	--mirror-binary-backports "$pkg_mirror_main"
+#lb config \
+#	--apt-recommends false \
+#	--parent-mirror-bootstrap "$pkg_mirror_main" \
+#	--parent-mirror-chroot "$pkg_mirror_main" \
+#	--parent-mirror-chroot-security "$pkg_mirror_main" \
+#	--parent-mirror-chroot-volatile "$pkg_mirror_main" \
+#	--parent-mirror-chroot-backports "$pkg_mirror_main" \
+#	--parent-mirror-binary "$pkg_mirror_main" \
+#	--parent-mirror-binary-security "$pkg_mirror_main" \
+#	--parent-mirror-binary-volatile "$pkg_mirror_main" \
+#	--parent-mirror-binary-backports "$pkg_mirror_main" \
+#	--mirror-bootstrap "$pkg_mirror_main" \
+#	--mirror-chroot "$pkg_mirror_main" \
+#	--mirror-chroot-security "$pkg_mirror_main" \
+#	--mirror-chroot-volatile "$pkg_mirror_main" \
+#	--mirror-chroot-backports "$pkg_mirror_main" \
+#	--mirror-binary "$pkg_mirror_main" \
+#	--mirror-binary-security "$pkg_mirror_main" \
+#	--mirror-binary-volatile "$pkg_mirror_main" \
+#	--mirror-binary-backports "$pkg_mirror_main"
+lb config --apt-recommends false
 
 lb build
 
