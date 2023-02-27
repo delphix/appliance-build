@@ -20,8 +20,8 @@
 
 deb [trusted=yes] http://ppa.launchpad.net/ansible/ansible/ubuntu jammy main
 
-deb [trusted=yes] http://ddebs.ubuntu.com jammy main restricted universe multiverse
-deb [trusted=yes] http://ddebs.ubuntu.com jammy-updates main restricted universe multiverse
+#deb [trusted=yes] http://ddebs.ubuntu.com jammy main restricted universe multiverse
+#deb [trusted=yes] http://ddebs.ubuntu.com jammy-updates main restricted universe multiverse
 
 deb [trusted=yes] http://packages.treasuredata.com/4/ubuntu/jammy jammy contrib
 
