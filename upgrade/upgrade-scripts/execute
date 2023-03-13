@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2023 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -160,40 +160,32 @@ fix_and_migrate_services
 systemctl mask docker.service
 
 #
-# Older versions (i.e. the 6.0.0.0 release) of the "nfs-kernel-server"
-# package had "etab" file delivered as part of the package. Thus, when
-# upgrading the package, the existing "etab" file would get replaced
-# with a new/empty "etab" file from the new package.
+# Older versions (i.e. before 9.0.0.0 release) of the "nfs-kernel-server"
+# package had "rmtab" file delivered as part of the package. Thus, when
+# upgrading the package, the existing "rmtab" file would get replaced
+# with a new/empty "rmtab" file from the new package.
 #
 # This file is dynamically modified during runtime, to contain the list
-# of currently exported filesystems. Thus, when it's replaced on upgrade
-# with an empty file, this results in all exports being unexported; i.e.
-# mountd notices that the file is empty, interprets that to mean no
-# filesystems should be currently exported, and then unexports all
-# previously exported filesystems.
+# of active NFSv3 client mounts. Thus, when it's replaced on upgrade
+# with an empty file, this can lead to the NFSv3 services being disabled
+# while there are still active v3 mounts.
 #
-# This is problematic, since the act of unexporting the filesystems can
-# result in client errors, if those exports are being actively used at
-# the time of the upgrade/unexport.
+# This is problematic, since disabling NFSv3 services can result in
+# client errors, if NFSv3 mounts are being actively used at the time of
+# the upgrade.
 #
 # To avoid this issue, we're modifying the dpkg state, such that dpkg
-# will no longer associate the "etab" file with the "nfs-kernel-server"
-# package. This way, when the old package is removed, the "etab" file
+# will no longer associate the "rmtab" file with the "nfs-kernel-server"
+# package. This way, when the old package is removed, the "rmtab" file
 # will not be automatically manipulated by dpkg.  We *must* do this
 # prior to invoking "apt-get" below, to ensure we remove the association
 # before upgrading the package.
 #
-# FWIW, we tried to do this via the package's "preinst" package hook,
-# but that did not help; the "etab" file was still removed when the old
-# package was replaced/upgraded.
-#
 # We can safely remove this once running a version that no longer
-# supports upgrading from the 6.0.0.0 release, since that's the only
-# release that suffers from this defect; we've dis-associated the "etab"
-# file from the "nfs-kernel-server" package in all later releases.
+# supports upgrading from releases earlier than 9.0.0.0.
 #
 [[ -e /var/lib/dpkg/info/nfs-kernel-server.list ]] &&
-	sed -i '/\/var\/lib\/nfs\/etab/d' /var/lib/dpkg/info/nfs-kernel-server.list
+	sed -i '/\/var\/lib\/nfs\/rmtab/d' /var/lib/dpkg/info/nfs-kernel-server.list
 
 apt_get update || die "failed to update apt sources"
 
