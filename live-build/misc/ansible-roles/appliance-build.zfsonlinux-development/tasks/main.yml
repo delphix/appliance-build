@@ -26,6 +26,7 @@
       - cppcheck
       - curl
       - delphix-rust
+      - dwarves
       - emacs-nox
       - fakeroot
       - flake8
