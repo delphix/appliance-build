@@ -26,6 +26,7 @@
       - cppcheck
       - curl
       - delphix-rust
+      - dwarves
       - emacs-nox
       - fakeroot
       - flake8
@@ -40,6 +41,7 @@
       - libssl-dev
       - libtool
       - libudev-dev
+      - llvm-12
       - lsscsi
       - mandoc
       - nfs-kernel-server
