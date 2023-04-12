@@ -42,7 +42,7 @@
         <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>
         <vssd:InstanceID>0</vssd:InstanceID>
         <vssd:VirtualSystemIdentifier>@@VM_NAME@@</vssd:VirtualSystemIdentifier>
-        <vssd:VirtualSystemType>vmx-11</vssd:VirtualSystemType>
+        <vssd:VirtualSystemType>vmx-13</vssd:VirtualSystemType>
       </System>
       <Item>
         <rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>
@@ -151,7 +151,7 @@
     </VirtualHardwareSection>
     <AnnotationSection ovf:required="false">
       <Info>A human-readable annotation</Info>
-      <Annotation>Delphix Appliance, VM Hardware Version 11</Annotation>
+      <Annotation>Delphix Appliance, VM Hardware Version 13</Annotation>
     </AnnotationSection>
   </VirtualSystem>
 </Envelope>
