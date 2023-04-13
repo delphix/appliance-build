@@ -29,20 +29,13 @@
 # probably remove the retry once we switch to GitHub.
 #
 - git:
-    repo: "{{ item.repo }}"
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dms-core-gate.git"
     dest:
-      "/export/home/delphix/{{ item.dest }}"
-    version: "{{ item.version }}"
+      "/export/home/delphix/dms-core-gate"
+    version: "develop"
     accept_hostkey: yes
     update: no
-  with_items:
-    - { repo: 'https://gitlab.delphix.com/masking/dms-core-gate.git',
-        version: master,
-        dest: dms-core-gate }
-  retries: 3
-  delay: 30
-  register: result
-  until: result is not failed
+  when: lookup('env', 'GITHUB_TOKEN') != ''
 
 - file:
     path: "/export/home/delphix/{{ item }}"
