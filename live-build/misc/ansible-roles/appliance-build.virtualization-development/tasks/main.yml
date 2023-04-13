@@ -79,20 +79,12 @@
 # probably remove the retry once we switch to GitHub.
 #
 - git:
-    repo: "{{ item.repo }}"
-    dest:
-      "/export/home/delphix/{{ item.dest }}"
-    version: "{{ item.version }}"
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dlpx-app-gate.git"
+    dest: "/export/home/delphix/dlpx-app-gate"
+    version: "develop"
     accept_hostkey: yes
     update: no
-  with_items:
-    - { repo: 'https://gitlab.delphix.com/app/dlpx-app-gate.git',
-        version: master,
-        dest: dlpx-app-gate }
-  retries: 3
-  delay: 30
-  register: result
-  until: result is not failed
+  when: lookup('env', 'GITHUB_TOKEN') != ''
 
 - file:
     path: "/export/home/delphix/{{ item }}"
