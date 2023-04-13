@@ -593,7 +593,10 @@ function run() {
 	# the upgrade. Thus, to try and avoid the failure to begin with,
 	# we restart this service, which serves to run "daemon-reexec".
 	#
-	systemctl restart systemd-reexec.service
+	# This will fail on versions of Delphix that don't yet have
+	# this service, so we hide any failure to account for that.
+	#
+	systemctl restart systemd-reexec.service 2>/dev/null
 
 	systemd-run \
 		--machine="$CONTAINER" \
