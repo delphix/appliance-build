@@ -27,7 +27,7 @@
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dms-core-gate.git"
     dest:
       "/export/home/delphix/dms-core-gate"
-    version: "6.0/stage"
+    version: "develop"
     accept_hostkey: yes
     update: no
   when: lookup('env', 'GITHUB_TOKEN') != ''
