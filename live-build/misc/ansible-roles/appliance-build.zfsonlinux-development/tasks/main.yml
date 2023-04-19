@@ -64,7 +64,7 @@
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/zfs.git"
     dest:
       "/export/home/delphix/zfs"
-    version: master
+    version: develop
     accept_hostkey: yes
     update: no
   when: lookup('env', 'GITHUB_TOKEN') != ''
