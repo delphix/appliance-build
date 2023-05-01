@@ -135,3 +135,26 @@ function extract_debs_into_dir() {
 	find "$source_dir" -name '*.deb' -exec mv {} "$target_dir" \;
 	find "$source_dir" -name '*.ddeb' -exec mv {} "$target_dir" \;
 }
+
+function get_upstream_or_fail_if_unset() {
+  if [[ -z "$UPSTREAM_PRODUCT_BRANCH" ]]; then
+    local upstream_branch
+    upstream_branch="$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" | cut -d'/' -f2-)"
+    if [[ -z $upstream_branch ]]; then
+      echo "ERROR: The currently checked out branch" >&2
+      echo "  does not have an upstream branch configured. Set the" >&2
+      echo "  upstream branch you plan to push to:" >&2
+      echo "" >&2
+      echo "    git branch --set-upstream-to=<upstream>" >&2
+      echo "" >&2
+      echo "  Then run this script again. '<upstream>' can be " >&2
+      echo "  something like '6.0/stage'" >&2
+      return 1
+    else
+      echo "$upstream_branch"
+      return 0
+    fi
+  else
+    echo "$UPSTREAM_PRODUCT_BRANCH"
+  fi
+}
