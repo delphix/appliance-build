@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+. "${BASH_SOURCE%/*}/common.sh"
+
 TOP=$(git rev-parse --show-toplevel 2>/dev/null)
 
 if [[ -z "$TOP" ]]; then
@@ -138,33 +140,17 @@ while ! curl --output /dev/null --silent --head --fail \
 	sleep 1
 done
 
-#
-# Set UPSTREAM_BRANCH. This will determine which version of the linux package
-# mirror is used.
-#
-if [[ -z "$UPSTREAM_PRODUCT_BRANCH" ]]; then
-	echo "UPSTREAM_PRODUCT_BRANCH is not set."
-	if ! source "$TOP/branch.config" 2>/dev/null; then
-		echo "No branch.config file found in repo root."
-		exit 1
-	fi
-
-	if [[ -z "$UPSTREAM_BRANCH" ]]; then
-		echo "UPSTREAM_BRANCH parameter was not sourced from branch.config." \
-			"Ensure branch.config is properly formatted with e.g." \
-			"UPSTREAM_BRANCH=\"<upstream-product-branch>\""
-		exit 1
-	fi
-	echo "Defaulting to branch $UPSTREAM_BRANCH set in branch.config."
-else
-	UPSTREAM_BRANCH="$UPSTREAM_PRODUCT_BRANCH"
-fi
-echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
-
 pkg_mirror_secondary=''
 if [[ -n "$DELPHIX_PACKAGE_MIRROR_SECONDARY" ]]; then
 	pkg_mirror_secondary="$DELPHIX_PACKAGE_MIRROR_SECONDARY"
 else
+	#
+	# Set UPSTREAM_BRANCH. This will determine which version of the linux package
+	# mirror is used.
+	#
+	UPSTREAM_BRANCH=$(get_upstream_or_fail_if_unset) || exit 1
+	echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
+
 	#
 	# If no secondary package mirror is provided, then pull in the latest
 	# mirror dataset for the build. If no latest dataset is found, then fail.
@@ -188,6 +174,13 @@ pkg_mirror_main=''
 if [[ -n "$DELPHIX_PACKAGE_MIRROR_MAIN" ]]; then
 	pkg_mirror_main="$DELPHIX_PACKAGE_MIRROR_MAIN"
 else
+	#
+	# Set UPSTREAM_BRANCH. This will determine which version of the linux package
+	# mirror is used.
+	#
+	UPSTREAM_BRANCH=$(get_upstream_or_fail_if_unset) || exit 1
+	echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
+
 	#
 	# If no main package mirror is provided, then pull in the latest mirror
 	# dataset for the build. If no latest dataset is found, then fail.
