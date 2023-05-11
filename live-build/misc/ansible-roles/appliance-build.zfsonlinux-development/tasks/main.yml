@@ -26,6 +26,7 @@
       - cppcheck
       - curl
       - delphix-rust
+      - dwarves
       - emacs-nox
       - fakeroot
       - flake8
@@ -40,6 +41,7 @@
       - libssl-dev
       - libtool
       - libudev-dev
+      - llvm-12
       - lsscsi
       - mandoc
       - nfs-kernel-server
@@ -62,7 +64,7 @@
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/zfs.git"
     dest:
       "/export/home/delphix/zfs"
-    version: master
+    version: develop
     accept_hostkey: yes
     update: no
   when: lookup('env', 'GITHUB_TOKEN') != ''
