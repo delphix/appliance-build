@@ -25,6 +25,7 @@
       - build-essential
       - cppcheck
       - curl
+      - delphix-go
       - delphix-rust
       - dwarves
       - emacs-nox
