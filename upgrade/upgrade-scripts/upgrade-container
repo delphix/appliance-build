@@ -813,18 +813,23 @@ function migrate_configuration() {
 }
 
 function do_upgrade_container_in_place() {
-	[[ -f "/var/lib/delphix-appliance/platform" ]] ||
-		die "could not determine platform; file does not exist"
+	CONTAINER_VERSION="$(run /usr/bin/get-appliance-version)"
+	if compare_versions "$CONTAINER_VERSION" "ge" "12.0.0.0-0"; then
+		run /usr/bin/execute-in-place-upgrade -i "$IMAGE_PATH"
+	else
+		[[ -f "/var/lib/delphix-appliance/platform" ]] ||
+			die "could not determine platform; file does not exist"
 
-	run "$IMAGE_PATH/execute" \
-		-p "$(cat /var/lib/delphix-appliance/platform)" ||
-		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
+		run "$IMAGE_PATH/execute" \
+			-p "$(cat /var/lib/delphix-appliance/platform)" ||
+			die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
 
-	run /bin/systemctl reload delphix-platform ||
-		die "'systemctl reload delphix-platform' failed in '$CONTAINER'"
+		run /bin/systemctl reload delphix-platform ||
+			die "reload of delphix-platform failed in '$CONTAINER'"
 
-	run /bin/systemctl restart delphix-platform ||
-		die "'systemctl restart delphix-platform' failed in '$CONTAINER'"
+		run /bin/systemctl restart delphix-platform ||
+			die "restart of delphix-platform failed in '$CONTAINER'"
+	fi
 }
 
 function do_upgrade_container_not_in_place() {
