@@ -28,6 +28,37 @@ function usage() {
 	exit 2
 }
 
+function post_alert() {
+	local jmxtool="/opt/delphix/server/bin/jmxtool"
+
+	#
+	# Alerts are a virtualization service concept. Thus, if we're
+	# running on a variant that doesn't have the virtualization
+	# package installed, skip the alert.
+	#
+	[[ ! -x "$jmxtool" ]] && return
+
+	#
+	# Skip the alert when running in an upgrade container, as the
+	# alert is only meant to notify the user about the host.
+	#
+	systemd-detect-virt -qc && return
+
+	#
+	# The alert isn't critical, so if it fails to post, that's
+	# acceptiable. Further, it's possible to execute this script
+	# without the virtualization service running. As a result, we
+	# use "-w" and don't worry if it returns an error code.
+	#
+	if [[ "$1" == "reboot" ]]; then
+		$jmxtool -w boot upgrade server &>/dev/null
+	elif [[ "$1" == "restart" ]]; then
+		$jmxtool -w boot upgrade management &>/dev/null
+	else
+		die "invalid alert specified: '$1'"
+	fi
+}
+
 function generate_interface_to_mac_address_map() {
 	INTERFACE_TO_MACADRESS_MAP_FILE_PATH="/etc/interface_to_macaddress_map.out"
 
@@ -563,8 +594,10 @@ if [[ -f "$UPDATE_DIR/upgrade.properties" ]]; then
 fi
 
 if [[ -n "$opt_f" ]] || [[ "$UPGRADE_TYPE" == "FULL" ]]; then
+	post_alert "reboot"
 	exec systemctl reboot || die "failed to reboot"
 else
+	post_alert "restart"
 	exec systemctl restart delphix.target ||
 		die "failed to restart delphix.target"
 fi
