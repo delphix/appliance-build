@@ -24,8 +24,39 @@ set -o pipefail
 
 function usage() {
 	echo "$(basename "$0"): $*" >&2
-	echo "Usage: $(basename "$0") -p <platform>"
+	echo "Usage: $(basename "$0") [-f] [-p <platform>]"
 	exit 2
+}
+
+function post_alert() {
+	local jmxtool="/opt/delphix/server/bin/jmxtool"
+
+	#
+	# Alerts are a virtualization service concept. Thus, if we're
+	# running on a variant that doesn't have the virtualization
+	# package installed, skip the alert.
+	#
+	[[ ! -x "$jmxtool" ]] && return
+
+	#
+	# Skip the alert when running in an upgrade container, as the
+	# alert is only meant to notify the user about the host.
+	#
+	systemd-detect-virt -qc && return
+
+	#
+	# The alert isn't critical, so if it fails to post, that's
+	# acceptiable. Further, it's possible to execute this script
+	# without the virtualization service running. As a result, we
+	# use "-w" and don't worry if it returns an error code.
+	#
+	if [[ "$1" == "reboot" ]]; then
+		$jmxtool -w boot upgrade server &>/dev/null
+	elif [[ "$1" == "restart" ]]; then
+		$jmxtool -w boot upgrade management &>/dev/null
+	else
+		die "invalid alert specified: '$1'"
+	fi
 }
 
 function generate_interface_to_mac_address_map() {
@@ -47,17 +78,40 @@ function generate_interface_to_mac_address_map() {
 		die "Failed to generate map from interface names to mac addresses"
 }
 
-while getopts ':rlBfsp:' c; do
+#
+# Specifies the platform to upgrade to; by default choose the same
+# platform the script is running on.
+#
+# For not-in-place upgrades, we cannot use the get-appliance-platform
+# script to determine the platform, hence why this option exists.
+#
+# This option should not be used to change platforms via an upgrade.
+#
+opt_p=""
+
+#
+# Perform a "full" upgrade, which does a system reboot. By default, we
+# perform a "deferred" upgrade, which resetarts services, but does not
+# reboot the system.
+#
+opt_f=""
+
+while getopts ':fp:' c; do
 	case $c in
-	r | l | B | f | s) ;; # LX-72: For now, silently ignore these.
-	p)
-		platform=$OPTARG
-		;;
+	f) eval "opt_$c=true" ;;
+	p) eval "opt_$c='$OPTARG'" ;;
 	*) usage "illegal options -- $OPTARG" ;;
 	esac
 done
+shift $((OPTIND - 1))
 
-[[ -z "$platform" ]] && usage "platform must be specified"
+[[ $# -ne 0 ]] && usage "too many arguments specified"
+[[ "$EUID" -ne 0 ]] && die "must be run as root"
+
+if [[ -z "$opt_p" ]]; then
+	opt_p="$(get-appliance-platform)" ||
+		usage "platform must be specified"
+fi
 
 #
 # When upgrading the packages on with this script, we want to ensure
@@ -205,8 +259,8 @@ apt_get update || die "failed to update apt sources"
 # by installing delphix-virtualization at a later stage of the build via
 # ansible hooks, when the delphix-platform package has already been installed.
 #
-if ! dpkg-query -l "delphix-platform-$platform" &>/dev/null; then
-	apt_get install -y "delphix-platform-$platform" ||
+if ! dpkg-query -l "delphix-platform-$opt_p" &>/dev/null; then
+	apt_get install -y "delphix-platform-$opt_p" ||
 		die "failed to install delphix-platform"
 fi
 
@@ -270,7 +324,7 @@ dpkg-query -Wf '${Package}\n' | xargs apt-mark auto ||
 # shellcheck disable=SC2153
 apt_get install \
 	-y --allow-downgrades --reinstall \
-	"delphix-entire-$platform=$VERSION" ||
+	"delphix-entire-$opt_p=$VERSION" ||
 	die "upgrade failed; from '$CURRENT_VERSION' to '$VERSION'"
 
 #
@@ -282,17 +336,17 @@ apt_get install \
 # particularly in the case of "--reinstall", which replaces the current
 # package with a new package of the same version (i.e. for hotfixes).
 #
-apt-mark manual "delphix-entire-$platform" ||
+apt-mark manual "delphix-entire-$opt_p" ||
 	die "failed to mark 'delphix-entire' package as 'manual' installed"
 
-[[ -f "/usr/share/doc/delphix-entire-$platform/packages.list.gz" ]] ||
+[[ -f "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" ]] ||
 	die "delphix-entire's packages.list.gz file is missing"
 
-zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
+zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	xargs_apt_get install -y --allow-downgrades ||
 	die "failed to install packages listed in packages.list.gz file"
 
-zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
+zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	cut -d= -f1 | xargs apt-mark manual ||
 	die "failed to mark as manual packages listed in packages.list.gz file"
 
@@ -394,7 +448,7 @@ stop_stderr_redirect_to_system_log
 # we verify the package is installed and its version is correct; this
 # is simply to help us be confident that upgrade behaves as we expect.
 #
-zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" | sed 's/=/ /' |
+zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" | sed 's/=/ /' |
 	while read -r name version; do
 		installed=$(dpkg-query -Wf '${Version}' "$name")
 		compare_versions "$installed" "=" "$version" ||
@@ -497,9 +551,37 @@ fi
 # The container does not have visibility into the complete network namespace of the
 # engine. Hence we need to create the map outside the container to ensure the presense
 # of all the interfaces in the map
-if ! systemd-detect-virt --container --quiet && [[ $(get-appliance-platform) == "aws" ]]; then
+if ! systemd-detect-virt -qc && [[ "$opt_p" == "aws" ]]; then
 	generate_interface_to_mac_address_map
 fi
+
+#
+# We use a seperate ZFS dataset for GRUB, and this dataset is generally
+# not mounted when we update pacakges on the system.  Thus, when a new
+# kernel package is installed, via the call to "execute" above, the GRUB
+# configuration will not be modified to use that new kernel.
+#
+# In order for the system to use the new kernel after a reboot, we must
+# regenerate the GRUB configuration after the new kernel has been
+# installed. The "rootfs-container set-bootfs" command will do just
+# that; it knows how to mount our GRUB specific dataset, and how
+# properly update the GRUB configuration.
+#
+# Note, we only want to update GRUB when running outside of an upgrade
+# container; since executing an upgrade within an upgrade container
+# should not affect the host system.
+#
+if ! systemd-detect-virt -qc; then
+	ROOTFS_CONTAINER="$(get_mounted_rootfs_container_name)"
+	[[ -n "$ROOTFS_CONTAINER" ]] ||
+		die "unable to determine currently mounted rootfs container"
+
+	"$IMAGE_PATH/rootfs-container" set-bootfs "$ROOTFS_CONTAINER" ||
+		die "failed to set-bootfs '$ROOTFS_CONTAINER'"
+fi
+
+systemctl reload delphix-platform.service ||
+	die "failed to reload delphix-platform.service"
 
 #
 # Before we exit, we want to ensure all of the changes made to the root
@@ -507,4 +589,18 @@ fi
 #
 zpool sync rpool || die "'zpool sync rpool' failed"
 
-exit 0
+if [[ -f "$UPDATE_DIR/upgrade.properties" ]]; then
+	source_upgrade_properties
+fi
+
+if [[ -n "$opt_f" ]] || [[ "$UPGRADE_TYPE" == "FULL" ]]; then
+	post_alert "reboot"
+	exec systemctl reboot || die "failed to reboot"
+else
+	post_alert "restart"
+	exec systemctl restart delphix.target ||
+		die "failed to restart delphix.target"
+fi
+
+# We shouldn't reach this statement; error if we do.
+exit 1
