@@ -164,7 +164,7 @@ function upgrade_in_place() {
 		opt_f="-f"
 	fi
 
-	"$IMAGE_PATH/execute" "$opt_f" ||
+	"$IMAGE_PATH/execute" $opt_f ||
 		die "'$IMAGE_PATH/execute' failed in running appliance."
 }
 
