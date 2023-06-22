@@ -25,22 +25,25 @@ function die() {
 
 function resolve_s3_uri() {
 	local pkg_uri="$1"
-	local latest_subprefix="$2"
 
-	local bucket="snapshot-de-images"
-	local jenkinsid="jenkins-ops"
 	local resolved_uri
 
 	if [[ -n "$pkg_uri" ]]; then
 		resolved_uri="$pkg_uri"
-	elif [[ -n "$latest_subprefix" ]]; then
+	else
+		#
+		# Set UPSTREAM_BRANCH. This will determine which version of the linux package
+		# mirror is used.
+		#
+		UPSTREAM_BRANCH=$(get_upstream_or_fail_if_unset) || exit 1
+		echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
+		local latest_subprefix="linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest"
+		local bucket="snapshot-de-images"
+		local jenkinsid="jenkins-ops"
 		aws s3 cp --quiet \
 			"s3://$bucket/builds/$jenkinsid/$latest_subprefix" .
 		resolved_uri="s3://$bucket/$(cat latest)"
 		rm -f latest
-	else
-		echo "Invalid arguments provided to resolve_s3_uri()" 2>&1
-		exit 1
 	fi
 
 	if aws s3 ls "$resolved_uri" &>/dev/null; then
@@ -134,4 +137,27 @@ function extract_debs_into_dir() {
 		die "'$target_dir' must be an existing directory"
 	find "$source_dir" -name '*.deb' -exec mv {} "$target_dir" \;
 	find "$source_dir" -name '*.ddeb' -exec mv {} "$target_dir" \;
+}
+
+function get_upstream_or_fail_if_unset() {
+	if [[ -z "$UPSTREAM_PRODUCT_BRANCH" ]]; then
+		local upstream_branch
+		upstream_branch="$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" | cut -d'/' -f2-)"
+		if [[ -z $upstream_branch ]]; then
+			echo "ERROR: The currently checked out branch" >&2
+			echo "  does not have an upstream branch configured. Set the" >&2
+			echo "  upstream branch you plan to push to:" >&2
+			echo "" >&2
+			echo "    git branch --set-upstream-to=<upstream>" >&2
+			echo "" >&2
+			echo "  Then run this script again. '<upstream>' can be " >&2
+			echo "  something like '6.0/stage'" >&2
+			return 1
+		else
+			echo "$upstream_branch"
+			return 0
+		fi
+	else
+		echo "$UPSTREAM_PRODUCT_BRANCH"
+	fi
 }
