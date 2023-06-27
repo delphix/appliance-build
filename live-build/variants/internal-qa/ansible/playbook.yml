@@ -26,3 +26,13 @@
     - appliance-build.qa-internal
     - appliance-build.virtualization-common
     - appliance-build.recovery-environment
+
+
+# Delete backup files that serve no purpose in production instances.
+
+- file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/passwd-
+    - /etc/shadow-
