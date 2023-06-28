@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2023 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,17 +14,12 @@
 # limitations under the License.
 #
 
----
-- hosts: all
-  gather_facts: no
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-  roles:
-    - appliance-build.minimal-common
-    - appliance-build.minimal-internal
-    - appliance-build.masking-common
-    - appliance-build.qa-internal
-    - appliance-build.virtualization-common
-    - appliance-build.recovery-environment
-    - appliance-build.cleanup
 
+# Delete backup files that serve no purpose in production instances.
+
+- file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/passwd-
+    - /etc/shadow-
