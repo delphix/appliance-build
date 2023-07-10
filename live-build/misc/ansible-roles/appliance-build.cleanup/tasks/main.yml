@@ -17,9 +17,17 @@
 
 # Delete backup files that serve no purpose in production instances.
 
-- file:
+# - file:
+#     path: "{{ item }}"
+#     state: absent
+#   with_items:
+#     - /etc/passwd-
+#     - /etc/shadow-
+
+- name: Limit read access to root for sensitive files
+  ansible.builtin.file:
     path: "{{ item }}"
-    state: absent
+    mode: '600'
   with_items:
     - /etc/passwd-
     - /etc/shadow-
