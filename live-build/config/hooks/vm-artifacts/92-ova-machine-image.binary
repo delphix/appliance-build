@@ -47,7 +47,6 @@ esac
 
 DATE=$(date --utc --iso-8601=seconds)
 
-VMDK_FILESIZE=$(stat -c %s "$ARTIFACT_NAME.vmdk")
 VMDK_CAPACITY=$(qemu-img info --output=json "$ARTIFACT_NAME.vmdk" |
 	jq '.["virtual-size"]')
 
@@ -58,7 +57,6 @@ cp "$ARTIFACT_NAME.vmdk" "$OVA_DIRECTORY/$ARTIFACT_NAME.vmdk"
 cp config/hooks/template.ovf "$OVA_DIRECTORY/$ARTIFACT_NAME.ovf"
 sed -i "$OVA_DIRECTORY/$ARTIFACT_NAME.ovf" \
 	-e "s/@@VMDK_FILENAME@@/$ARTIFACT_NAME.vmdk/g" \
-	-e "s/@@VMDK_FILESIZE@@/$VMDK_FILESIZE/g" \
 	-e "s/@@VMDK_CAPACITY@@/$VMDK_CAPACITY/g" \
 	-e "s/@@CPUS_COUNT@@/$CPUS_COUNT/g" \
 	-e "s/@@MEMORY_MB@@/$MEMORY_MB/g" \
