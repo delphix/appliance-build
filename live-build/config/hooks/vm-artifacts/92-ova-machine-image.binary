@@ -47,8 +47,7 @@ esac
 
 DATE=$(date --utc --iso-8601=seconds)
 
-VMDK_FILESIZE=$(qemu-img info --output=json "$ARTIFACT_NAME.vmdk" |
-	jq '.["actual-size"]')
+VMDK_FILESIZE=$(stat -c %s "$ARTIFACT_NAME.vmdk")
 VMDK_CAPACITY=$(qemu-img info --output=json "$ARTIFACT_NAME.vmdk" |
 	jq '.["virtual-size"]')
 
