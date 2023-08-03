@@ -1,0 +1,49 @@
+#
+# Copyright 2018,2020 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+- alternatives:
+    name: java
+    path: /usr/lib/jvm/adoptopenjdk-java8-jdk-amd64/bin/java
+
+#
+# The default setting for the number of nfs threads is too low. To
+# improve performance we reset the value to 64 which mimics what
+# we use on the delphix engine.
+#
+- lineinfile:
+    path: /etc/default/nfs-kernel-server
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^RPCNFSDCOUNT=', line: 'RPCNFSDCOUNT=64' }
+    - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
+
+- command: systemctl mask named.service isc-dhcp-server.service isc-dhcp-server6.service
+
+#
+# delphix-platform installs ntp in a disabled state by default.
+# We want to enable ntp to keep the time in sync on DCenter as clock skew
+# can cause operational problems.
+#
+# For example, we run awscli on DCenter hosts, and some preliminary searching
+# shows that aws s3 commands can return RequestTimeTooSkewed errors if there
+# is clock skew.
+#
+# We also have cleanup jobs that run on DCenter hosts that rely on filesystem
+# timestamps being accurate.
+#
+- command: systemctl enable ntp.service

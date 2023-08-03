@@ -21,6 +21,6 @@
     ansible_python_interpreter: /usr/bin/python3
   roles:
     - appliance-build.minimal-common
-      #- appliance-build.masking-common
-      #- appliance-build.virtualization-common
-      #- appliance-build.recovery-environment
+    - appliance-build.masking-common
+    - appliance-build.virtualization-common
+    - appliance-build.recovery-environment
