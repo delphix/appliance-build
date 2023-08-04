@@ -15,14 +15,6 @@
 #
 
 ---
-- git:
-    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dcenter-gate.git"
-    version: main
-    dest: /opt/dcenter/lib/dcenter-gate
-    accept_hostkey: yes
-    update: no
-  when: lookup('env', 'GITHUB_TOKEN') != ''
-
 - alternatives:
     name: java
     path: /usr/lib/jvm/adoptopenjdk-java8-jdk-amd64/bin/java
@@ -32,22 +24,6 @@
 # can operate. For dcenter, we maintain the dhcp configuration
 # in /tmp so we need to add those paths into the apparmor configuration.
 #
-- copy:
-    dest: "/etc/apparmor.d/local/usr.sbin.dhcpd"
-    content: |
-      /tmp/dcenter_dhcp_config/ r,
-      /tmp/dcenter_dhcp_config/** r,
-      /tmp/dcenter_dhcp_config/dhcpd{,6}.conf r,
-      /tmp/dcenter_dhcp_config/dhcpd{,6}_ldap.conf r,
-      /tmp/dcenter_dhcp_config/dhcpd{,6}.leases* lrw,
-      /tmp/dcenter_dhcp_config/dhcpd{,6}.pid rw,
-
-- copy:
-    dest: "/etc/apparmor.d/local/usr.sbin.named"
-    content: |
-      /tmp/dcenter_dhcp_config/named.conf r,
-      /tmp/dcenter_dhcp_config/named.zone r,
-      /tmp/dcenter_dhcp_config/named.pid w,
 
 #
 # The default setting for the number of nfs threads is too low. To
