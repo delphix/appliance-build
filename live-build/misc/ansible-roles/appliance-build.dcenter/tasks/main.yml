@@ -15,10 +15,6 @@
 #
 
 ---
-- alternatives:
-    name: java
-    path: /usr/lib/jvm/adoptopenjdk-java8-jdk-amd64/bin/java
-
 #
 # By default, ubuntu restricts directories where dhcpd and named
 # can operate. For dcenter, we maintain the dhcp configuration
