@@ -23,4 +23,3 @@
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
     - appliance-build.delphix-ldap
-    - appliance-build.dcenter
