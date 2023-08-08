@@ -262,7 +262,7 @@ zfs create \
 # these mounts.
 #
 mkdir -p "$DIRECTORY/export/home"
-mount -t zfs "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/export/home"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/home"
 
 mkdir -p "$DIRECTORY/var/delphix"
 mount -t zfs "$FSNAME/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
@@ -292,7 +292,7 @@ rsync --info=stats3 -Wa binary/* "$DIRECTORY/"
 # automatically whenever we boot into the crash kernel.
 #
 cat <<-EOF >"$DIRECTORY/etc/fstab"
-	rpool/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/home /home zfs defaults,x-systemd.before=zfs-import-cache.service nodev 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/crashdump  /var/crash     zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
@@ -335,8 +335,10 @@ done
 
 umount "$DIRECTORY/var/log"
 umount "$DIRECTORY/var/delphix"
-umount "$DIRECTORY/export/home"
+umount "$DIRECTORY/home"
 umount "/var/crash"
 retry 5 10 zfs umount "$FSNAME/ROOT/$FSNAME/root"
 retry 5 10 zpool export "$FSNAME"
 kpartx -d "$ARTIFACT_NAME.img"
+
+ln -s /export/home /home
