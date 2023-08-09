@@ -341,4 +341,4 @@ retry 5 10 zfs umount "$FSNAME/ROOT/$FSNAME/root"
 retry 5 10 zpool export "$FSNAME"
 kpartx -d "$ARTIFACT_NAME.img"
 
-ln -s /export/home /home
+ln -s /home /export/home
