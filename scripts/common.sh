@@ -36,7 +36,7 @@ function resolve_s3_uri() {
 		# mirror is used.
 		#
 		UPSTREAM_BRANCH=$(get_upstream_or_fail_if_unset) || exit 1
-		echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
+		#echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
 		local latest_subprefix="linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest"
 		local bucket="snapshot-de-images"
 		local jenkinsid="jenkins-ops"
