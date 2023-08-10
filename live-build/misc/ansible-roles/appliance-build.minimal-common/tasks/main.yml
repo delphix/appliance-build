@@ -26,7 +26,7 @@
   no_log: true
 
 - file:
-    path: /export/home
+    path: /home
     state: directory
     mode: 0755
 
@@ -39,7 +39,7 @@
     shell: /bin/bash
     create_home: yes
     comment: Delphix User
-    home: /export/home/delphix
+    home: /home/delphix
     password:
       "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
 

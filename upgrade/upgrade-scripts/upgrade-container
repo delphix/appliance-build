@@ -202,7 +202,7 @@ function create_upgrade_container() {
 		-o mountpoint=legacy \
 		"$ROOTFS_DATASET/home@$SNAPSHOT_NAME" \
 		"rpool/ROOT/$CONTAINER/home" ||
-		die "failed to create upgrade /export/home clone"
+		die "failed to create upgrade /home clone"
 
 	zfs clone \
 		-o mountpoint=legacy \
@@ -227,7 +227,7 @@ function create_upgrade_container() {
 		# dataset.
 		#
 		mount_upgrade_container_dataset \
-			"rpool/ROOT/$CONTAINER/home" "$DIRECTORY/export/home"
+			"rpool/ROOT/$CONTAINER/home" "$DIRECTORY/home"
 		mount_upgrade_container_dataset \
 			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
 		mount_upgrade_container_dataset \
@@ -296,7 +296,7 @@ function create_upgrade_container() {
 	# before the zfs-import service is run.
 	#
 	cat <<-EOF >"$DIRECTORY/etc/fstab"
-		rpool/ROOT/$CONTAINER/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+		rpool/ROOT/$CONTAINER/home /home zfs defaults,nodev,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/crashdump           /var/crash    zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
