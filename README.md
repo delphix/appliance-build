@@ -13,9 +13,9 @@ EC2, Microsoft Azure, VMware, OpenStack).
 
 Run this command on "dlpxdc.co" to create the VM used to do the build:
 
-    $ dc clone-latest --size COMPUTE_LARGE bootstrap-20-04 $USER-bootstrap
+    $ dc clone-latest --size COMPUTE_LARGE dlpx-internal-buildserver-develop $USER-bootstrap
 
-Log into that VM using the "ubuntu" user, and run these commands:
+Log into that VM using the "delphix" user, and run these commands:
 
     $ git clone https://github.com/delphix/appliance-build.git
     $ cd appliance-build
