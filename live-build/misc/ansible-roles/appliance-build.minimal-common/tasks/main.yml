@@ -69,3 +69,15 @@
   delay: 30
   register: result
   until: result is succeeded
+
+#
+# XXX Explain
+#
+- shell: ls /lib/modules
+  register: kernel_versions
+
+- ansible.builtin.file:
+    src: '/usr/lib/debug/boot/vmlinux-{{ item }}'
+    dest: '/usr/src/linux-headers-{{ item }}/vmlinux'
+    state: link
+  loop: '{{ kernel_versions.stdout_lines }}'
