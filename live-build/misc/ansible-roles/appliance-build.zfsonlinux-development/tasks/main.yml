@@ -45,6 +45,7 @@
       - llvm-12
       - lsscsi
       - mandoc
+      - mold
       - nfs-kernel-server
       - parted
       - pkg-config
@@ -76,3 +77,14 @@
     group: staff
     state: directory
     recurse: yes
+
+- file:
+    path: "/export/home/delphix/.cargo/"
+    state: directory
+    owner: delphix
+    group: staff
+- copy:
+    dest: "/export/home/delphix/.cargo/cargo.toml"
+    content: |
+        [target.x86_64-unknown-linux-gnu]
+        rustflags = ["-C", "link-arg=-B/usr/local/libexec/mold"]
