@@ -68,3 +68,9 @@
       #!/usr/sbin/nft -f
       flush ruleset
   notify: nftables
+
+- lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: "^#?\\s*(Subsystem\\s+sftp.*$)"
+    line: "\1"
+    backrefs: yes
