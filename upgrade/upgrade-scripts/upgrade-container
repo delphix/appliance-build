@@ -462,6 +462,7 @@ function start() {
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
+	systemctl restart systemd-reexec.service 2>/dev/null
 	machinectl start "$CONTAINER" ||
 		die "failed to start container '$CONTAINER'"
 
@@ -486,6 +487,7 @@ function start() {
 }
 
 function stop() {
+	systemctl restart systemd-reexec.service 2>/dev/null
 	machinectl terminate "$CONTAINER" ||
 		die "failed to termiante container: '$CONTAINER'"
 
