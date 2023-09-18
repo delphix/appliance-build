@@ -381,7 +381,7 @@ function mask_service() {
 		chroot "/var/lib/machines/$container" systemctl mask "$svc" ||
 			die "failed to mask '$svc' in container '$container'"
 	else
-		systemctl mask "$svc" || die "failed to mask '$svc'"
+		systemctl mask --now "$svc" || die "failed to mask '$svc'"
 	fi
 }
 
@@ -442,6 +442,10 @@ function fix_and_migrate_services() {
 		fi
 	fi
 
+  if [[ "$(systemctl is-enabled telegraf)" == enabled ]]; then
+    mask_service telegraf "$container"
+  fi
+
 	#
 	# The services listed below are either permanently disabled or can be
 	# dynamically modified by the application(s) running on the appliance,
@@ -483,5 +487,6 @@ function fix_and_migrate_services() {
 		snmpd.service
 		systemd-timesyncd.service
 		td-agent.service
+		telegraf.service
 	EOF
 }
