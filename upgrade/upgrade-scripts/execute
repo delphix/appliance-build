@@ -381,6 +381,15 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 	done || die "failed to remove obsolete package configuration files"
 
 #
+# telegraf's postinst script recreates the service unit and attempts to enable the service,
+# which means that the previous attempt to mask it is reversed. Due to this and DLPX-84565,
+# telegraf must be masked after packages are upgraded.
+#
+if [[ "$(systemctl is-enabled telegraf)" == enabled ]]; then
+	systemctl mask --now telegraf.service
+fi
+
+#
 # Unmask docker, which was masked at the beginning of the upgrade due
 # to DLPX-77949.
 #
