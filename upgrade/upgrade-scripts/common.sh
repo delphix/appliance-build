@@ -378,10 +378,10 @@ function mask_service() {
 	# Note that masking should succeed even if service doesn't exist
 	#
 	if [[ -n "$container" ]]; then
-		chroot "/var/lib/machines/$container" systemctl mask "$svc" ||
+		chroot "/var/lib/machines/$container" systemctl mask --now "$svc" ||
 			die "failed to mask '$svc' in container '$container'"
 	else
-		systemctl mask "$svc" || die "failed to mask '$svc'"
+		systemctl mask --now "$svc" || die "failed to mask '$svc'"
 	fi
 }
 
@@ -483,5 +483,6 @@ function fix_and_migrate_services() {
 		snmpd.service
 		systemd-timesyncd.service
 		td-agent.service
+		telegraf.service
 	EOF
 }
