@@ -435,6 +435,17 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 	done || die "failed to remove obsolete package configuration files"
 
 #
+# Due to https://github.com/influxdata/telegraf/issues/14052, telegraf must be masked after
+# packages are upgraded. The telegraf package removes /etc/systemd/system/telegraf.service thus
+# reversing the `systemctl mask` operation performed before the packages are upgraded.
+# Once this issue is fixed and a version with the fix makes it into the product, this can be
+# removed.
+#
+if [[ "$(systemctl is-enabled telegraf)" == enabled ]]; then
+	systemctl mask --now telegraf.service
+fi
+
+#
 # Unmask docker, which was masked at the beginning of the upgrade due
 # to DLPX-77949.
 #
