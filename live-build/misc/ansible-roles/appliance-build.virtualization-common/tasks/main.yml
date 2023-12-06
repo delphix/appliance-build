@@ -119,3 +119,11 @@
   command: "systemctl disable {{ item }}"
   with_items:
     - docker.service
+
+- name: Add systemctl bash completion
+  file:
+    path:/etc/bash_completion.d/systemctl
+    content: |
+      if [[ -r /usr/share/bash-completion/completions/systemctl ]]; then
+        . /usr/share/bash-completion/completions/systemctl && complete -F _systemctl systemctl sct
+      fi
