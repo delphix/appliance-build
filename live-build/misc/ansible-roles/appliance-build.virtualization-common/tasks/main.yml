@@ -129,6 +129,9 @@
       fi
 
 - name: Source bash completion
-  lineinfile:
+  blockinfile:
     dest: "/export/home/delphix/.bashrc"
-    line: ". /etc/bash_completion.d/systemctl"
+    block: |
+      . /etc/bash_completion.d/systemctl
+      . /etc/bash_completion.d/zfs
+      PATH=$PATH:/opt/delphix/server/bin
