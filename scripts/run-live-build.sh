@@ -129,7 +129,7 @@ APTLY_SERVE_PID=$!
 set +o errexit
 attempts=0
 while ! curl --output /dev/null --silent --head --fail \
-	"http://localhost:8080/dists/focal/Release"; do
+	"http://localhost:8080/dists/jammy/Release"; do
 	((attempts++))
 	if [[ $attempts -gt 30 ]]; then
 		echo "Timed out waiting for ancillary repository." 1>&2
@@ -200,26 +200,27 @@ else
 fi
 set -o errexit
 
-lb config \
-	--apt-recommends false \
-	--parent-mirror-bootstrap "$pkg_mirror_main" \
-	--parent-mirror-chroot "$pkg_mirror_main" \
-	--parent-mirror-chroot-security "$pkg_mirror_main" \
-	--parent-mirror-chroot-volatile "$pkg_mirror_main" \
-	--parent-mirror-chroot-backports "$pkg_mirror_main" \
-	--parent-mirror-binary "$pkg_mirror_main" \
-	--parent-mirror-binary-security "$pkg_mirror_main" \
-	--parent-mirror-binary-volatile "$pkg_mirror_main" \
-	--parent-mirror-binary-backports "$pkg_mirror_main" \
-	--mirror-bootstrap "$pkg_mirror_main" \
-	--mirror-chroot "$pkg_mirror_main" \
-	--mirror-chroot-security "$pkg_mirror_main" \
-	--mirror-chroot-volatile "$pkg_mirror_main" \
-	--mirror-chroot-backports "$pkg_mirror_main" \
-	--mirror-binary "$pkg_mirror_main" \
-	--mirror-binary-security "$pkg_mirror_main" \
-	--mirror-binary-volatile "$pkg_mirror_main" \
-	--mirror-binary-backports "$pkg_mirror_main"
+#lb config \
+#	--apt-recommends false \
+#	--parent-mirror-bootstrap "$pkg_mirror_main" \
+#	--parent-mirror-chroot "$pkg_mirror_main" \
+#	--parent-mirror-chroot-security "$pkg_mirror_main" \
+#	--parent-mirror-chroot-volatile "$pkg_mirror_main" \
+#	--parent-mirror-chroot-backports "$pkg_mirror_main" \
+#	--parent-mirror-binary "$pkg_mirror_main" \
+#	--parent-mirror-binary-security "$pkg_mirror_main" \
+#	--parent-mirror-binary-volatile "$pkg_mirror_main" \
+#	--parent-mirror-binary-backports "$pkg_mirror_main" \
+#	--mirror-bootstrap "$pkg_mirror_main" \
+#	--mirror-chroot "$pkg_mirror_main" \
+#	--mirror-chroot-security "$pkg_mirror_main" \
+#	--mirror-chroot-volatile "$pkg_mirror_main" \
+#	--mirror-chroot-backports "$pkg_mirror_main" \
+#	--mirror-binary "$pkg_mirror_main" \
+#	--mirror-binary-security "$pkg_mirror_main" \
+#	--mirror-binary-volatile "$pkg_mirror_main" \
+#	--mirror-binary-backports "$pkg_mirror_main"
+lb config --apt-recommends false
 
 lb build
 

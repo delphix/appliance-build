@@ -47,7 +47,7 @@ function build_ancillary_repository() {
 
 	rm -rf "$HOME/.aptly"
 	aptly repo create \
-		-distribution=focal -component=main ancillary-repository
+		-distribution=jammy -component=main ancillary-repository
 	aptly repo add ancillary-repository "$pkg_directory"
 	aptly publish repo -skip-contents -skip-signing ancillary-repository
 

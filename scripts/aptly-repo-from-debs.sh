@@ -79,6 +79,6 @@ rm -rf "$WORK_DIRECTORY"
 #
 # Generate an Aptly/APT repository
 #
-aptly repo create -distribution=focal -component=delphix upgrade-repository
+aptly repo create -distribution=jammy -component=delphix upgrade-repository
 aptly repo add upgrade-repository debs
 aptly publish repo -skip-contents -skip-signing upgrade-repository
