@@ -612,7 +612,8 @@ fi
 if { [[ -n "$opt_f" ]] || [[ "$UPGRADE_TYPE" == "FULL" ]]; } &&
 	compare_versions "$CURRENT_VERSION" lt "18.0.0.0-0"; then
 	post_alert "reboot"
-	exec systemctl reboot || die "failed to reboot"
+	systemctl reboot || die "failed to reboot"
+	exec sleep infinity || die "failed to wait for the reboot"
 else
 	post_alert "restart"
 	exec systemctl restart delphix.target ||
