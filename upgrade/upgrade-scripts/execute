@@ -612,9 +612,26 @@ fi
 if { [[ -n "$opt_f" ]] || [[ "$UPGRADE_TYPE" == "FULL" ]]; } &&
 	compare_versions "$CURRENT_VERSION" lt "18.0.0.0-0"; then
 	post_alert "reboot"
-	exec systemctl reboot || die "failed to reboot"
+
+	#
+	# We don't want this script to return until after the reboot has
+	# been completed; i.e. don't exit. Since "systemctl reboot" will
+	# initiate a reboot, but return prior to the reboot having been
+	# completed, we rely on the sleep to prevent this script from
+	# exiting prior to the reboot.
+	#
+	systemctl reboot || die "failed to reboot"
+	exec sleep infinity || die "failed to wait for the reboot"
 else
 	post_alert "restart"
+
+	#
+	# Similar to the reboot case above, we don't want this script
+	# to return until after the delphix services have been restarted.
+	# Since "systemctl restart" will initiate the restart of the
+	# services, and wait for them to become active before it returns,
+	# we don't need to add a sleep like we did for the reboot case.
+	#
 	exec systemctl restart delphix.target ||
 		die "failed to restart delphix.target"
 fi
