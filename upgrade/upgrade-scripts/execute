@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xv
 #
 # Copyright 2018, 2023 Delphix
 #

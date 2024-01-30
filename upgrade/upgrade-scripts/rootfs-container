@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xv
 #
 # Copyright 2019 Delphix
 #
@@ -153,12 +153,12 @@ function set_bootfs_not_mounted() {
 			die "bootloader device '/dev/$dev' not block device"
 
 		chroot "/var/lib/machines/$CONTAINER" \
-			grub-install --root-directory=/mnt "/dev/$dev" ||
+			 bash -x grub-install --root-directory=/mnt "/dev/$dev" ||
 			die "'grub-install' for '$dev' failed in '$CONTAINER'"
 	done
 
 	chroot "/var/lib/machines/$CONTAINER" \
-		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+		bash -x grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
 		die "'grub-mkconfig' failed in '$CONTAINER'"
 
 	set_bootfs_not_mounted_cleanup
