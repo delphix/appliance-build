@@ -41,12 +41,14 @@
     comment: Delphix User
     home: /export/home/delphix
     password:
-      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
+      "$6$oSDBhe8aMbPzcuGf$Zpnq.v8h6hdq/eYXs61oxvCK/b08mx.5uD61xoJq8SrQS\
+      tkEO.lzYgBhIEIWCIrF2cImTYZz/FIGGTYbOCvqO0"
 
 - user:
     name: root
     password:
-      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
+      "$6$oSDBhe8aMbPzcuGf$Zpnq.v8h6hdq/eYXs61oxvCK/b08mx.5uD61xoJq8SrQS\
+      tkEO.lzYgBhIEIWCIrF2cImTYZz/FIGGTYbOCvqO0"
 
 #
 # The virtualization package uses the /etc/issue file to store a
