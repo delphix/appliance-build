@@ -261,8 +261,8 @@ zfs create \
 # contents. During normal boot up, we'll rely on "/etc/fstab" to handle
 # these mounts.
 #
-mkdir -p "$DIRECTORY/export/home"
-mount -t zfs "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/export/home"
+mkdir -p "$DIRECTORY/home"
+mount -t zfs "rpool/ROOT/$FSNAME/home" "$DIRECTORY/home"
 
 mkdir -p "$DIRECTORY/var/delphix"
 mount -t zfs "$FSNAME/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
