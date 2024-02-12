@@ -29,6 +29,7 @@ openjdk-11-jdk-headless
 python3.12
 python3.12-dbg
 python3.12-dev
+python3-venv
 python3.12-venv
 targetcli-fb
 telnet
