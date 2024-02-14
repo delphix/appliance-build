@@ -37,6 +37,7 @@
 
 - alternatives:
     name: python3
+    link: /usr/bin/python3
     path: /usr/bin/python3.12
 
 
