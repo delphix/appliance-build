@@ -32,11 +32,9 @@
   until: result is not failed
 
 - alternatives:
-    name: java
+  - name: java
     path: /usr/lib/jvm/adoptopenjdk-java8-jdk-amd64/bin/java
-
-- alternatives:
-    name: python3
+  - name: python3
     link: /usr/bin/python3
     path: /usr/bin/python3.12
 
