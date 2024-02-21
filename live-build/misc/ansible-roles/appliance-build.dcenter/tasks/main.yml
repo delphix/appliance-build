@@ -24,9 +24,11 @@
   when: lookup('env', 'GITHUB_TOKEN') != ''
 
 - alternatives:
-  - name: java
+    name: java
     path: /usr/lib/jvm/adoptopenjdk-java8-jdk-amd64/bin/java
-  - name: python3
+
+- alternatives:
+    name: python3
     link: /usr/bin/python3
     path: /usr/bin/python3.12
 
