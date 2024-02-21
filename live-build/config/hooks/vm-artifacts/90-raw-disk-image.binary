@@ -28,6 +28,23 @@ die() {
 }
 
 #
+# usage: retry <attempts> <delay> command arg1 arg2 ...
+#
+retry() {
+	attempts=$1
+	shift
+	delay=$1
+	shift
+
+	for attempt in $(seq "${attempts}"); do
+		"$@" && break
+		[[ $attempt == "$attempts" ]] && die "Too many failed attempts, aborting."
+		echo "Attempt $attempt failed, trying again after a small nap."
+		sleep "$delay"
+	done
+}
+
+#
 # The root filesystem container needs to have the appliance version
 # embedded in it as a dataset property, thus if this value was not
 # passed into the build, we need to error out (preferably before we do
@@ -43,14 +60,21 @@ die() {
 # We want to use different sized rpool depending on if we're building a
 # disk image meant for internal use, or external (i.e. customer) use.
 #
-# The only exception to this is our "dcenter" variant. While that
-# variant is only used internally, we use it in a way that more
-# resembles our external variants, so we want the rpool size for
-# the dcenter images to match our external images.
+# One exception to this is our "dcenter" variant. While that variant is
+# only used internally, we use it in a way that more resembles our
+# external variants, so we want the rpool size for the dcenter images to
+# match our external images.
+#
+# Another exception is our "buildserver" variant. We use those images to
+# generate our appliance images, and upgrade images, which consume a lot
+# of space during the build process; thus, we need a larger rpool.
 #
 case "$APPLIANCE_VARIANT" in
 external-* | internal-dcenter)
 	RAW_DISK_SIZE_GB=127
+	;;
+internal-buildserver)
+	RAW_DISK_SIZE_GB=256
 	;;
 internal-*)
 	RAW_DISK_SIZE_GB=70
@@ -122,38 +146,39 @@ zpool create -d \
 	-O mountpoint=none \
 	-O compression=on \
 	-R "$DIRECTORY" \
+	-t "$FSNAME" \
 	rpool "/dev/mapper/${LOOPNAME}p1"
 
 zfs create \
 	-o canmount=off \
 	-o mountpoint=none \
-	"rpool/ROOT"
+	"$FSNAME/ROOT"
 
 zfs create \
 	-o canmount=off \
 	-o mountpoint=none \
 	-o "com.delphix:initial-version=$DELPHIX_APPLIANCE_VERSION" \
 	-o "com.delphix:current-version=$DELPHIX_APPLIANCE_VERSION" \
-	"rpool/ROOT/$FSNAME"
+	"$FSNAME/ROOT/$FSNAME"
 
 if [[ -n "$DELPHIX_HOTFIX_VERSION" ]]; then
 	zfs set \
 		"com.delphix:hotfix-version=$DELPHIX_HOTFIX_VERSION" \
-		"rpool/ROOT/$FSNAME"
+		"$FSNAME/ROOT/$FSNAME"
 fi
 
 if [[ -n "$DELPHIX_MINIMUM_VERSION" ]]; then
 	zfs set \
 		"com.delphix:minimum-version=$DELPHIX_MINIMUM_VERSION" \
-		"rpool/ROOT/$FSNAME"
+		"$FSNAME/ROOT/$FSNAME"
 fi
 
 zfs create \
 	-o canmount=noauto \
 	-o mountpoint=/ \
-	"rpool/ROOT/$FSNAME/root"
+	"$FSNAME/ROOT/$FSNAME/root"
 
-zfs mount "rpool/ROOT/$FSNAME/root"
+zfs mount "$FSNAME/ROOT/$FSNAME/root"
 
 #
 # We are later going to recursively bind mount /proc/, /sys/, and /dev/
@@ -188,15 +213,15 @@ mount --make-slave "$DIRECTORY"
 
 zfs create \
 	-o mountpoint=legacy \
-	"rpool/ROOT/$FSNAME/home"
+	"$FSNAME/ROOT/$FSNAME/home"
 
 zfs create \
 	-o mountpoint=legacy \
-	"rpool/ROOT/$FSNAME/data"
+	"$FSNAME/ROOT/$FSNAME/data"
 
 zfs create \
 	-o mountpoint=legacy \
-	"rpool/ROOT/$FSNAME/log"
+	"$FSNAME/ROOT/$FSNAME/log"
 
 #
 # Initialize the grub dataset. This dataset will be used to contain all
@@ -217,7 +242,7 @@ zfs create \
 #
 zfs create \
 	-o mountpoint=legacy \
-	rpool/grub
+	"$FSNAME/grub"
 
 #
 # Initialize the crashdump dataset. This is used to store core files
@@ -227,8 +252,8 @@ zfs create \
 #
 zfs create \
 	-o mountpoint=legacy \
-	-o quota="$(echo "$(zpool list -Hpo size rpool) / 2" | bc)b" \
-	rpool/crashdump
+	-o quota="$(echo "$(zpool list -Hpo size "$FSNAME") / 2" | bc)b" \
+	"$FSNAME/crashdump"
 
 #
 # Since these datasets use "legacy" for their mountpoints, we need to
@@ -237,16 +262,16 @@ zfs create \
 # these mounts.
 #
 mkdir -p "$DIRECTORY/export/home"
-mount -t zfs "rpool/ROOT/$FSNAME/home" "$DIRECTORY/export/home"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/export/home"
 
 mkdir -p "$DIRECTORY/var/delphix"
-mount -t zfs "rpool/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
 
 mkdir -p "$DIRECTORY/var/log"
-mount -t zfs "rpool/ROOT/$FSNAME/log" "$DIRECTORY/var/log"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/log" "$DIRECTORY/var/log"
 
 mkdir -p "/var/crash"
-mount -t zfs "rpool/crashdump" "/var/crash"
+mount -t zfs "$FSNAME/crashdump" "/var/crash"
 
 #
 # Populate the root filesystem with the contents of the "binary" directory
@@ -299,24 +324,19 @@ done
 # We need to use the dedicated grub dataset when running "grub-install"
 # and "grub-mkconfig", so we need to mount this dataset first.
 #
-chroot "$DIRECTORY" mount -t zfs rpool/grub /mnt
+chroot "$DIRECTORY" mount -t zfs "$FSNAME/grub" /mnt
 chroot "$DIRECTORY" grub-install --root-directory=/mnt "/dev/$LOOPNAME"
 chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
 chroot "$DIRECTORY" umount /mnt
 
 for dir in /dev /proc /sys; do
-	for attempt in {1..5}; do
-		umount -R "${DIRECTORY}${dir}" && break
-		[[ "$attempt" == 5 ]] && die "Too many failed attempts, aborting."
-		echo "Attempt $attempt failed, trying again after a small nap."
-		sleep 10
-	done
+	retry 5 10 umount -R "${DIRECTORY}${dir}"
 done
 
 umount "$DIRECTORY/var/log"
 umount "$DIRECTORY/var/delphix"
 umount "$DIRECTORY/export/home"
 umount "/var/crash"
-zfs umount "rpool/ROOT/$FSNAME/root"
-zpool export rpool
+retry 5 10 zfs umount "$FSNAME/ROOT/$FSNAME/root"
+retry 5 10 zpool export "$FSNAME"
 kpartx -d "$ARTIFACT_NAME.img"

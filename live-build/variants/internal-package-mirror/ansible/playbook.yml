@@ -1,5 +1,5 @@
 #
-# Copyright 2021, 2024 Delphix
+# Copyright 2022 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +14,12 @@
 # limitations under the License.
 #
 
-adoptopenjdk-java8-jdk
-bind9
-dnsutils
-git
-gnupg
-isc-dhcp-server
-libldap2-dev
-libsasl2-dev
-nfs-kernel-server
-openjdk-11-jdk-headless
-python3.12
-python3.12-dev
-python3-venv
-python3.12-venv
-targetcli-fb
-telnet
+---
+- hosts: all
+  gather_facts: no
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  roles:
+    - appliance-build.minimal-common
+    - appliance-build.minimal-internal
+    - appliance-build.devops-development

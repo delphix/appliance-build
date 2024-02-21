@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2023 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,21 +24,94 @@ set -o pipefail
 
 function usage() {
 	echo "$(basename "$0"): $*" >&2
-	echo "Usage: $(basename "$0") -p <platform>"
+	echo "Usage: $(basename "$0") [-f] [-p <platform>]"
 	exit 2
 }
 
-while getopts ':rlBfsp:' c; do
+function post_alert() {
+	local jmxtool="/opt/delphix/server/bin/jmxtool"
+
+	#
+	# Alerts are a virtualization service concept. Thus, if we're
+	# running on a variant that doesn't have the virtualization
+	# package installed, skip the alert.
+	#
+	[[ ! -x "$jmxtool" ]] && return
+
+	#
+	# Skip the alert when running in an upgrade container, as the
+	# alert is only meant to notify the user about the host.
+	#
+	systemd-detect-virt -qc && return
+
+	#
+	# The alert isn't critical, so if it fails to post, that's
+	# acceptiable. Further, it's possible to execute this script
+	# without the virtualization service running. As a result, we
+	# use "-w" and don't worry if it returns an error code.
+	#
+	if [[ "$1" == "reboot" ]]; then
+		$jmxtool -w boot upgrade server &>/dev/null
+	elif [[ "$1" == "restart" ]]; then
+		$jmxtool -w boot upgrade management &>/dev/null
+	else
+		die "invalid alert specified: '$1'"
+	fi
+}
+
+function generate_interface_to_mac_address_map() {
+	INTERFACE_TO_MACADRESS_MAP_FILE_PATH="/etc/interface_to_macaddress_map.out"
+
+	# we always create the map file anew to avoid using any stale versions of the same
+	if [[ -e "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ]]; then
+		rm "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ||
+			die "Could not delete the existing contents of the mac address map file"
+	fi
+	for i in /sys/class/net/*; do
+		ifname=$(basename "$i")
+		if [ -e "$i"/address ]; then
+			mac_address=$(cat "$i"/address)
+			echo "$ifname" "$mac_address" >>"$INTERFACE_TO_MACADRESS_MAP_FILE_PATH"
+		fi
+	done
+	[ -s "$INTERFACE_TO_MACADRESS_MAP_FILE_PATH" ] ||
+		die "Failed to generate map from interface names to mac addresses"
+}
+
+#
+# Specifies the platform to upgrade to; by default choose the same
+# platform the script is running on.
+#
+# For not-in-place upgrades, we cannot use the get-appliance-platform
+# script to determine the platform, hence why this option exists.
+#
+# This option should not be used to change platforms via an upgrade.
+#
+opt_p=""
+
+#
+# Perform a "full" upgrade, which does a system reboot. By default, we
+# perform a "deferred" upgrade, which resetarts services, but does not
+# reboot the system.
+#
+opt_f=""
+
+while getopts ':fp:' c; do
 	case $c in
-	r | l | B | f | s) ;; # LX-72: For now, silently ignore these.
-	p)
-		platform=$OPTARG
-		;;
+	f) eval "opt_$c=true" ;;
+	p) eval "opt_$c='$OPTARG'" ;;
 	*) usage "illegal options -- $OPTARG" ;;
 	esac
 done
+shift $((OPTIND - 1))
 
-[[ -z "$platform" ]] && usage "platform must be specified"
+[[ $# -ne 0 ]] && usage "too many arguments specified"
+[[ "$EUID" -ne 0 ]] && die "must be run as root"
+
+if [[ -z "$opt_p" ]]; then
+	opt_p="$(get-appliance-platform)" ||
+		usage "platform must be specified"
+fi
 
 #
 # When upgrading the packages on with this script, we want to ensure
@@ -141,40 +214,32 @@ fix_and_migrate_services
 systemctl mask docker.service
 
 #
-# Older versions (i.e. the 6.0.0.0 release) of the "nfs-kernel-server"
-# package had "etab" file delivered as part of the package. Thus, when
-# upgrading the package, the existing "etab" file would get replaced
-# with a new/empty "etab" file from the new package.
+# Older versions (i.e. before 9.0.0.0 release) of the "nfs-kernel-server"
+# package had "rmtab" file delivered as part of the package. Thus, when
+# upgrading the package, the existing "rmtab" file would get replaced
+# with a new/empty "rmtab" file from the new package.
 #
 # This file is dynamically modified during runtime, to contain the list
-# of currently exported filesystems. Thus, when it's replaced on upgrade
-# with an empty file, this results in all exports being unexported; i.e.
-# mountd notices that the file is empty, interprets that to mean no
-# filesystems should be currently exported, and then unexports all
-# previously exported filesystems.
+# of active NFSv3 client mounts. Thus, when it's replaced on upgrade
+# with an empty file, this can lead to the NFSv3 services being disabled
+# while there are still active v3 mounts.
 #
-# This is problematic, since the act of unexporting the filesystems can
-# result in client errors, if those exports are being actively used at
-# the time of the upgrade/unexport.
+# This is problematic, since disabling NFSv3 services can result in
+# client errors, if NFSv3 mounts are being actively used at the time of
+# the upgrade.
 #
 # To avoid this issue, we're modifying the dpkg state, such that dpkg
-# will no longer associate the "etab" file with the "nfs-kernel-server"
-# package. This way, when the old package is removed, the "etab" file
+# will no longer associate the "rmtab" file with the "nfs-kernel-server"
+# package. This way, when the old package is removed, the "rmtab" file
 # will not be automatically manipulated by dpkg.  We *must* do this
 # prior to invoking "apt-get" below, to ensure we remove the association
 # before upgrading the package.
 #
-# FWIW, we tried to do this via the package's "preinst" package hook,
-# but that did not help; the "etab" file was still removed when the old
-# package was replaced/upgraded.
-#
 # We can safely remove this once running a version that no longer
-# supports upgrading from the 6.0.0.0 release, since that's the only
-# release that suffers from this defect; we've dis-associated the "etab"
-# file from the "nfs-kernel-server" package in all later releases.
+# supports upgrading from releases earlier than 9.0.0.0.
 #
 [[ -e /var/lib/dpkg/info/nfs-kernel-server.list ]] &&
-	sed -i '/\/var\/lib\/nfs\/etab/d' /var/lib/dpkg/info/nfs-kernel-server.list
+	sed -i '/\/var\/lib\/nfs\/rmtab/d' /var/lib/dpkg/info/nfs-kernel-server.list
 
 apt_get update || die "failed to update apt sources"
 
@@ -194,8 +259,8 @@ apt_get update || die "failed to update apt sources"
 # by installing delphix-virtualization at a later stage of the build via
 # ansible hooks, when the delphix-platform package has already been installed.
 #
-if ! dpkg-query -l "delphix-platform-$platform" &>/dev/null; then
-	apt_get install -y "delphix-platform-$platform" ||
+if ! dpkg-query -l "delphix-platform-$opt_p" &>/dev/null; then
+	apt_get install -y "delphix-platform-$opt_p" ||
 		die "failed to install delphix-platform"
 fi
 
@@ -259,7 +324,7 @@ dpkg-query -Wf '${Package}\n' | xargs apt-mark auto ||
 # shellcheck disable=SC2153
 apt_get install \
 	-y --allow-downgrades --reinstall \
-	"delphix-entire-$platform=$VERSION" ||
+	"delphix-entire-$opt_p=$VERSION" ||
 	die "upgrade failed; from '$CURRENT_VERSION' to '$VERSION'"
 
 #
@@ -271,17 +336,17 @@ apt_get install \
 # particularly in the case of "--reinstall", which replaces the current
 # package with a new package of the same version (i.e. for hotfixes).
 #
-apt-mark manual "delphix-entire-$platform" ||
+apt-mark manual "delphix-entire-$opt_p" ||
 	die "failed to mark 'delphix-entire' package as 'manual' installed"
 
-[[ -f "/usr/share/doc/delphix-entire-$platform/packages.list.gz" ]] ||
+[[ -f "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" ]] ||
 	die "delphix-entire's packages.list.gz file is missing"
 
-zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
+zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	xargs_apt_get install -y --allow-downgrades ||
 	die "failed to install packages listed in packages.list.gz file"
 
-zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" |
+zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	cut -d= -f1 | xargs apt-mark manual ||
 	die "failed to mark as manual packages listed in packages.list.gz file"
 
@@ -370,6 +435,17 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 	done || die "failed to remove obsolete package configuration files"
 
 #
+# Due to https://github.com/influxdata/telegraf/issues/14052, telegraf must be masked after
+# packages are upgraded. The telegraf package removes /etc/systemd/system/telegraf.service thus
+# reversing the `systemctl mask` operation performed before the packages are upgraded.
+# Once this issue is fixed and a version with the fix makes it into the product, this can be
+# removed.
+#
+if [[ "$(systemctl is-enabled telegraf)" == enabled ]]; then
+	systemctl mask --now telegraf.service
+fi
+
+#
 # Unmask docker, which was masked at the beginning of the upgrade due
 # to DLPX-77949.
 #
@@ -383,7 +459,7 @@ stop_stderr_redirect_to_system_log
 # we verify the package is installed and its version is correct; this
 # is simply to help us be confident that upgrade behaves as we expect.
 #
-zcat "/usr/share/doc/delphix-entire-$platform/packages.list.gz" | sed 's/=/ /' |
+zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" | sed 's/=/ /' |
 	while read -r name version; do
 		installed=$(dpkg-query -Wf '${Version}' "$name")
 		compare_versions "$installed" "=" "$version" ||
@@ -459,10 +535,106 @@ else
 			"for '$ROOTFS_CONTAINER'"
 fi
 
+# In AWS environments, changing instance type could result in generation of
+# different network interface names compared to the existing ones. This mismatch
+# causes our netplan file handler in the osadmin service to remove the existing
+# entries in the netplan plan, because they are not to be found on the new instance.
+# However, the mac address remains consistent and does not change with a change in
+# the instance types.
+# To handle this, from 6.0.17.0 onwards, we are switching to use mac address based
+# interface names in the netplan file. To facilitate this change across upgrades from
+# older verrsions to 6.0.17.0 and above, we create a map from the network interface
+# names to their corresponding mac address, resulting in mac addrress based interface
+# names. For wider context, see DLPX-75209.
+#
+# For deferred upgrades, we cannot know when the engine will be rebooted into the new
+# image. The decision depends on the end-user. Hence we always create the map file
+# irrespective of the upgrade type, to allow the upgrade finalize logic to copy the
+# map file from the currently mounted root filesystem to the root filesystem of the
+# target container.
+#
+# The map creation logic does not apply to engines being upgraded from 6.0.17.0 onwards.
+# This is because the netplan file from 6.0.17.0 will by default be populated with mac
+# address based interface names. This makes this logic redundant for upgrades from
+# 6.0.17.0 and onwards. Hence, we must remove this logic as soon as we mark 6.0.17.0 as
+# the minimum version supported release.
+
+# The container does not have visibility into the complete network namespace of the
+# engine. Hence we need to create the map outside the container to ensure the presense
+# of all the interfaces in the map
+if ! systemd-detect-virt -qc && [[ "$opt_p" == "aws" ]]; then
+	generate_interface_to_mac_address_map
+fi
+
+#
+# We use a seperate ZFS dataset for GRUB, and this dataset is generally
+# not mounted when we update pacakges on the system.  Thus, when a new
+# kernel package is installed, via the call to "execute" above, the GRUB
+# configuration will not be modified to use that new kernel.
+#
+# In order for the system to use the new kernel after a reboot, we must
+# regenerate the GRUB configuration after the new kernel has been
+# installed. The "rootfs-container set-bootfs" command will do just
+# that; it knows how to mount our GRUB specific dataset, and how
+# properly update the GRUB configuration.
+#
+# Note, we only want to update GRUB when running outside of an upgrade
+# container; since executing an upgrade within an upgrade container
+# should not affect the host system.
+#
+if ! systemd-detect-virt -qc; then
+	ROOTFS_CONTAINER="$(get_mounted_rootfs_container_name)"
+	[[ -n "$ROOTFS_CONTAINER" ]] ||
+		die "unable to determine currently mounted rootfs container"
+
+	"$IMAGE_PATH/rootfs-container" set-bootfs "$ROOTFS_CONTAINER" ||
+		die "failed to set-bootfs '$ROOTFS_CONTAINER'"
+fi
+
+systemctl reload delphix-platform.service ||
+	die "failed to reload delphix-platform.service"
+
 #
 # Before we exit, we want to ensure all of the changes made to the root
 # pool via the packaging operations above have made it to disk.
 #
 zpool sync rpool || die "'zpool sync rpool' failed"
 
-exit 0
+if [[ -f "$UPDATE_DIR/upgrade.properties" ]]; then
+	source_upgrade_properties
+fi
+
+#
+# On versions 18.0 and greater, we don't issue the reboot. Rather,
+# we restart the delphix services, and the reboot will be issued by
+# the virtualization service as it starts up.
+#
+if { [[ -n "$opt_f" ]] || [[ "$UPGRADE_TYPE" == "FULL" ]]; } &&
+	compare_versions "$CURRENT_VERSION" lt "18.0.0.0-0"; then
+	post_alert "reboot"
+
+	#
+	# We don't want this script to return until after the reboot has
+	# been completed; i.e. don't exit. Since "systemctl reboot" will
+	# initiate a reboot, but return prior to the reboot having been
+	# completed, we rely on the sleep to prevent this script from
+	# exiting prior to the reboot.
+	#
+	systemctl reboot || die "failed to reboot"
+	exec sleep infinity || die "failed to wait for the reboot"
+else
+	post_alert "restart"
+
+	#
+	# Similar to the reboot case above, we don't want this script
+	# to return until after the delphix services have been restarted.
+	# Since "systemctl restart" will initiate the restart of the
+	# services, and wait for them to become active before it returns,
+	# we don't need to add a sleep like we did for the reboot case.
+	#
+	exec systemctl restart delphix.target ||
+		die "failed to restart delphix.target"
+fi
+
+# We shouldn't reach this statement; error if we do.
+exit 1

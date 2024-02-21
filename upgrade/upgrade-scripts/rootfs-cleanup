@@ -26,6 +26,10 @@ def version(rootfs: str) -> str:
         ]).decode("UTF-8").strip())
 
 
+def exists(rootfs: str) -> bool:
+    return not bool(subprocess.run(["zfs", "list", rootfs]).returncode)
+
+
 #
 # Helper class used when sorting rootfs filesystems and snapshots. This allows
 # us to use the "sorted" builtin, to build a list of all rootfs filesystems and
@@ -111,6 +115,13 @@ def main() -> None:
     # after an upgrade (i.e. we never upgrade to a lower version).
     #
     for rootfs in sorted(filesystems + snapshots, key=rootfscmp)[:-2]:
+        #
+        # Skip if the snapshot or filesystem was destroyed by a previous
+        # iteration.
+        #
+        if not exists(rootfs):
+            continue
+
         #
         # In the event of a rollback, we want to be careful to not
         # delete the currently running version, as well as any versions

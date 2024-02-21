@@ -1,5 +1,5 @@
 #
-# Copyright 2021, 2024 Delphix
+# Copyright 2022 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +14,17 @@
 # limitations under the License.
 #
 
-adoptopenjdk-java8-jdk
-bind9
-dnsutils
-git
-gnupg
-isc-dhcp-server
-libldap2-dev
-libsasl2-dev
-nfs-kernel-server
-openjdk-11-jdk-headless
-python3.12
-python3.12-dev
-python3-venv
-python3.12-venv
-targetcli-fb
-telnet
+---
+- apt:
+    name:
+      - adoptopenjdk-java8-jdk
+      - curl
+      - docker.io
+      - git
+      - gnupg
+    state: present
+
+- user:
+    name: delphix
+    groups: docker
+    append: true

@@ -64,9 +64,7 @@ done
 # Download the delphix upgrade verification debian package, stored in the
 # combined-packages bundle.
 #
-AWS_S3_URI_COMBINED_PACKAGES=$(resolve_s3_uri \
-	"$AWS_S3_URI_COMBINED_PACKAGES" \
-	"linux-pkg/${UPSTREAM_BRANCH}/combine-packages/post-push/latest")
+AWS_S3_URI_COMBINED_PACKAGES=$(resolve_s3_uri "$AWS_S3_URI_COMBINED_PACKAGES")
 
 WORK_DIRECTORY=$(mktemp -d -p "$TOP/upgrade" tmp.pkgs.XXXXXXXXXX)
 

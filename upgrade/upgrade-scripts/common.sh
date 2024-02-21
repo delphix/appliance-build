@@ -169,7 +169,13 @@ function get_dataset_rollback_snapshot_name() {
 }
 
 function get_snapshot_clones() {
-	zfs get clones -Hpo value "$1"
+	local CLONES
+
+	CLONES="$(zfs get clones -Hpo value "$1")"
+
+	if [[ "$CLONES" != "-" ]]; then
+		echo "$CLONES"
+	fi
 }
 
 function get_version_property() {
@@ -375,7 +381,7 @@ function mask_service() {
 		chroot "/var/lib/machines/$container" systemctl mask "$svc" ||
 			die "failed to mask '$svc' in container '$container'"
 	else
-		systemctl mask "$svc" || die "failed to mask '$svc'"
+		systemctl mask --now "$svc" || die "failed to mask '$svc'"
 	fi
 }
 
@@ -437,6 +443,17 @@ function fix_and_migrate_services() {
 	fi
 
 	#
+	# Due to https://github.com/influxdata/telegraf/issues/14052, telegraf must be masked after
+	# packages are upgraded. The telegraf package removes /etc/systemd/system/telegraf.service thus
+	# reversing the `systemctl mask` operation performed before the packages are upgraded.
+	# Once this issue is fixed and a version with the fix makes it into the product, this can be
+	# removed.
+	#
+	if [[ "$(systemctl is-enabled telegraf)" == enabled ]]; then
+		mask_service telegraf "$container"
+	fi
+
+	#
 	# The services listed below are either permanently disabled or can be
 	# dynamically modified by the application(s) running on the appliance,
 	# so we need to ensure we migrate the state of these services when
@@ -477,5 +494,6 @@ function fix_and_migrate_services() {
 		snmpd.service
 		systemd-timesyncd.service
 		td-agent.service
+		telegraf.service
 	EOF
 }

@@ -35,6 +35,7 @@
     uid: 65433
     group: staff
     groups: root
+    append: true
     shell: /bin/bash
     create_home: yes
     comment: Delphix User
@@ -68,3 +69,18 @@
   delay: 30
   register: result
   until: result is succeeded
+
+- shell: ls /lib/modules
+  register: kernel_versions
+
+#
+# In order to generate BTF data when building the ZFS kernel module
+# through git-zfs-make we need to provide a symlink of our vmlinux
+# (with debug info) in the kernel header source directory which is
+# referenced during the kernel module's compilation.
+#
+- ansible.builtin.file:
+    src: '/usr/lib/debug/boot/vmlinux-{{ item }}'
+    dest: '/usr/src/linux-headers-{{ item }}/vmlinux'
+    state: link
+  loop: '{{ kernel_versions.stdout_lines }}'

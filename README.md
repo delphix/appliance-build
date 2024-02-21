@@ -13,9 +13,9 @@ EC2, Microsoft Azure, VMware, OpenStack).
 
 Run this command on "dlpxdc.co" to create the VM used to do the build:
 
-    $ dc clone-latest --size COMPUTE_LARGE bootstrap-18-04 $USER-bootstrap
+    $ dc clone-latest --size COMPUTE_LARGE dlpx-internal-buildserver-develop $USER-bootstrap
 
-Log into that VM using the "ubuntu" user, and run these commands:
+Log into that VM using the "delphix" user, and run these commands:
 
     $ git clone https://github.com/delphix/appliance-build.git
     $ cd appliance-build
@@ -52,7 +52,7 @@ images.
 
 ### Step 1: Create Docker Host using DCenter on AWS
 
-Delphix maintains the "bootstrap-18-04" group in DCenter on AWS that
+Delphix maintains the "bootstrap-20-04" group in DCenter on AWS that
 fulfills the required build dependencies previously described. Thus, the
 first step is to use this group to create the host that will be used to
 execute the build. This can be done as usual, using "dc clone-latest".
@@ -60,7 +60,7 @@ execute the build. This can be done as usual, using "dc clone-latest".
 Example commands running on "dlpxdc.co":
 
     $ export DLPX_DC_INSTANCE_PUB_KEY=~/.ssh/id_rsa.pub
-    $ dc clone-latest --size COMPUTE_LARGE bootstrap-18-04 ps-build
+    $ dc clone-latest --size COMPUTE_LARGE bootstrap-20-04 ps-build
 
 Use the "ubuntu" user to log in to the VM after it's cloned; all of the
 following steps assume their being run on the cloned VM.
