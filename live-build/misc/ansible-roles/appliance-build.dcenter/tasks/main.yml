@@ -32,6 +32,10 @@
     link: /usr/bin/python3
     path: /usr/bin/python3.12
 
+- alternatives:
+    name: python3
+    link: /bin/python3
+    path: /bin/python3.12
 
 #
 # By default, ubuntu restricts directories where dhcpd and named
