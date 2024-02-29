@@ -44,6 +44,21 @@
       Environment=DLPX_DEBUG=true
 
 - file:
+    path: "/etc/systemd/system/delphix-osadmin.service.d"
+    owner: root
+    group: root
+    state: directory
+    recurse: yes
+
+- copy:
+    dest: "/etc/systemd/system/delphix-osadmin.service.d/override.conf"
+    owner: root
+    group: root
+    content: |
+      [Service]
+      Environment=DLPX_DEBUG=true
+
+- file:
     path: "/etc/systemd/system/delphix-sso-app.service.d"
     owner: root
     group: root
