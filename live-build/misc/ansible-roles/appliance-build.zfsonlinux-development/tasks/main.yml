@@ -65,26 +65,26 @@
 - git:
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/zfs.git"
     dest:
-      "/export/home/delphix/zfs"
+      "/home/delphix/zfs"
     version: develop
     accept_hostkey: yes
     update: no
   when: lookup('env', 'GITHUB_TOKEN') != ''
 
 - file:
-    path: "/export/home/delphix/zfs"
+    path: "/home/delphix/zfs"
     owner: delphix
     group: staff
     state: directory
     recurse: yes
 
 - file:
-    path: "/export/home/delphix/.cargo/"
+    path: "/home/delphix/.cargo/"
     state: directory
     owner: delphix
     group: staff
 - copy:
-    dest: "/export/home/delphix/.cargo/config.toml"
+    dest: "/home/delphix/.cargo/config.toml"
     content: |
         [target.x86_64-unknown-linux-gnu]
         rustflags = ["-C", "link-arg=-B/usr/libexec/mold"]
