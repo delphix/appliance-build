@@ -89,7 +89,7 @@ resemble the following:
 
 A "rootfs container" is a collection of ZFS datasets that can be used as
 the "root filesytsem" of the appliance. This includes a dataset for "/"
-of the appliance, but also seperate datasets for "/export/home" and
+of the appliance, but also seperate datasets for "/home" and
 "/var/delphix".
 
 Here's an example of the datasets for a rootfs container:
