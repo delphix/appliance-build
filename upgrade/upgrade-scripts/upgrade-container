@@ -202,7 +202,7 @@ function create_upgrade_container() {
 		-o mountpoint=legacy \
 		"$ROOTFS_DATASET/home@$SNAPSHOT_NAME" \
 		"rpool/ROOT/$CONTAINER/home" ||
-		die "failed to create upgrade /export/home clone"
+		die "failed to create upgrade /home clone"
 
 	zfs clone \
 		-o mountpoint=legacy \
@@ -227,11 +227,31 @@ function create_upgrade_container() {
 		# dataset.
 		#
 		mount_upgrade_container_dataset \
-			"rpool/ROOT/$CONTAINER/home" "$DIRECTORY/export/home"
+			"rpool/ROOT/$CONTAINER/home" "$DIRECTORY/home"
 		mount_upgrade_container_dataset \
 			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
 		mount_upgrade_container_dataset \
 			"rpool/ROOT/$CONTAINER/log" "$DIRECTORY/var/log"
+
+    #
+    # If the file has still the old owners change /etc/passwd file
+    #
+    passwd_file=/etc/passwd
+    if grep -q "\/export\/home\/delphix" "$passwd_file"
+    then
+      usermod --home /home/delphix delphix
+    fi
+
+    if grep -q "\/export\/home\/cli" "$passwd_file"
+    then
+      usermod --home /home/cli cli
+    fi
+
+    if grep -q "\/export\/home\/cloudagent" "$passwd_file"
+    then
+      usermod --home /home/cloudagent cloudagent
+    fi
+
 
 		#
 		# This function needs to return the container's name to
@@ -296,7 +316,7 @@ function create_upgrade_container() {
 	# before the zfs-import service is run.
 	#
 	cat <<-EOF >"$DIRECTORY/etc/fstab"
-		rpool/ROOT/$CONTAINER/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+		rpool/ROOT/$CONTAINER/home /home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/crashdump           /var/crash    zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
