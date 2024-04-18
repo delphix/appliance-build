@@ -88,7 +88,7 @@
 - user:
     name: testrunner
     comment: "Delphix"
-    home: /export/home/testrunner
+    home: /home/testrunner
     groups: docker
     password:
       "$6$pWQE0MPZWgue7fNC$8RvR0u04Mt67792b.x4ao0G2Z/H/hrYPWezOqCkz59MIA\
