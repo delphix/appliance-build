@@ -26,14 +26,14 @@
 - git:
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dms-core-gate.git"
     dest:
-      "/export/home/delphix/dms-core-gate"
+      "/home/delphix/dms-core-gate"
     version: "develop"
     accept_hostkey: yes
     update: no
   when: lookup('env', 'GITHUB_TOKEN') != ''
 
 - file:
-    path: "/export/home/delphix/{{ item }}"
+    path: "/home/delphix/{{ item }}"
     owner: delphix
     group: staff
     mode: "g+w"
