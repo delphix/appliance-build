@@ -27,3 +27,12 @@
     owner: root
     group: root
     mode: 0444
+
+
+# The presence of the auto_home is an issue
+# because this is also mounted on /home so
+# we need to remove this.
+- lineinfile:
+    path: /etc/auto.master
+    line: "/home   auto_home    -nobrowse"
+    state: absent
