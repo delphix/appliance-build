@@ -23,4 +23,3 @@
     - appliance-build.minimal-common
     - appliance-build.masking-common
     - appliance-build.virtualization-common
-    - appliance-build.recovery-environment
