@@ -145,6 +145,8 @@ function set_bootfs_not_mounted() {
 	mount -t zfs rpool/grub "/var/lib/machines/$CONTAINER/mnt" ||
 		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
 
+	PLATFORM=$(get_appliance_platform)
+
 	for dev in $(get_bootloader_devices); do
 		[[ -e "/dev/$dev" ]] ||
 			die "bootloader device '/dev/$dev' not found"
@@ -152,8 +154,15 @@ function set_bootfs_not_mounted() {
 		[[ -b "/dev/$dev" ]] ||
 			die "bootloader device '/dev/$dev' not block device"
 
+		opts="--root-directory=/mnt"
+
+		if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+			opts+=" --debug-image=all"
+			opts+=" -v"
+		fi
+
 		chroot "/var/lib/machines/$CONTAINER" \
-			grub-install --root-directory=/mnt "/dev/$dev" ||
+			grub-install $opts "/dev/$dev" ||
 			die "'grub-install' for '$dev' failed in '$CONTAINER'"
 	done
 
@@ -199,6 +208,8 @@ function set_bootfs_mounted() {
 	mount -t zfs rpool/grub "/mnt" ||
 		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
 
+	PLATFORM=$(get_appliance_platform)
+
 	for dev in $(get_bootloader_devices); do
 		[[ -e "/dev/$dev" ]] ||
 			die "bootloader device '/dev/$dev' not found"
@@ -206,7 +217,14 @@ function set_bootfs_mounted() {
 		[[ -b "/dev/$dev" ]] ||
 			die "bootloader device '/dev/$dev' not block device"
 
-		grub-install --root-directory=/mnt "/dev/$dev" ||
+		opts="--root-directory=/mnt"
+
+		if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+			opts+=" --debug-image=all"
+			opts+=" -v"
+		fi
+
+		grub-install $opts "/dev/$dev" ||
 			die "'grub-install' for '$dev' failed in '$CONTAINER'"
 	done
 
