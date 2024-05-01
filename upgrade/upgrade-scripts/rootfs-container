@@ -153,7 +153,8 @@ function set_bootfs_not_mounted() {
 			die "bootloader device '/dev/$dev' not block device"
 
 		chroot "/var/lib/machines/$CONTAINER" \
-			grub-install --root-directory=/mnt "/dev/$dev" ||
+			grub-install -v --debug-image=all \
+			--root-directory=/mnt "/dev/$dev" ||
 			die "'grub-install' for '$dev' failed in '$CONTAINER'"
 	done
 
@@ -206,7 +207,8 @@ function set_bootfs_mounted() {
 		[[ -b "/dev/$dev" ]] ||
 			die "bootloader device '/dev/$dev' not block device"
 
-		grub-install --root-directory=/mnt "/dev/$dev" ||
+		grub-install -v --debug-image=all \
+			--root-directory=/mnt "/dev/$dev" ||
 			die "'grub-install' for '$dev' failed in '$CONTAINER'"
 	done
 
