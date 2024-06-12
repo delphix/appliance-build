@@ -29,7 +29,16 @@ if [[ -e /etc/resolv.conf ]]; then
 	cp /etc/resolv.conf binary/etc/resolv.conf
 fi
 
+for dir in /proc /sys /dev; do
+	mount --rbind "$dir" "binary/${dir}"
+	mount --make-rslave "binary/${dir}"
+done
+
 ansible-playbook -vv -c chroot -i binary, ansible/playbook.yml
+
+for dir in /proc /sys /dev; do
+	umount -R "binary/${dir}"
+done
 
 if [[ -e binary/etc/resolv.conf ]]; then
 	rm binary/etc/resolv.conf
