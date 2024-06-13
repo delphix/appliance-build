@@ -93,7 +93,7 @@ popd &>/dev/null || die "'popd' failed"
 # system (e.g. "upgrade-image-from-aptly-repo.sh").
 #
 
-aptly repo create -distribution=focal -component=delphix upgrade-repository ||
+aptly repo create -distribution=jammy -component=delphix upgrade-repository ||
 	die "failed to create repository: 'upgrade-repository'"
 aptly repo search image-a | xargs aptly repo copy image-a upgrade-repository ||
 	die "failed to copy packages to repository: 'upgrade-repository'"
