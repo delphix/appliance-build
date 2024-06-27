@@ -759,6 +759,7 @@ function migrate_configuration() {
 	done <<-EOF
 		/etc/challenge_response.key
 		/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+		/etc/cloud/cloud.cfg.d/99-delphix-disable-network-config.cfg
 		/etc/delphix-interface-names.yaml
 		/etc/default/locale
 		/etc/engine-code

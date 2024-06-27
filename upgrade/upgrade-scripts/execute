@@ -342,6 +342,23 @@ apt-mark manual "delphix-entire-$opt_p" ||
 [[ -f "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" ]] ||
 	die "delphix-entire's packages.list.gz file is missing"
 
+#
+# In DLPX-91387, we discovered that cloud-init's preinst script was
+# removing '/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg', which
+# was created by the delphix-osadmin service to disable cloud-init from
+# overwriting the netplan file after the initial boot.
+# To prevent this from happening, DLPX-91387 renamed the file to
+# '99-delphix-disable-network-config.cfg'. Here, we copy the file to the new location
+# before installing the new packages so that the upgrade of cloud-init
+# does not cause this configuration to be lost.
+#
+if [[ -f "/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg" ]]; then
+	cp "/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg" \
+		"/etc/cloud/cloud.cfg.d/99-delphix-disable-network-config.cfg" ||
+		die "failed to copy /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg" \
+			" to /etc/cloud/cloud.cfg.d/99-delphix-disable-network-config.cfg"
+fi
+
 zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	xargs_apt_get install -y --allow-downgrades ||
 	die "failed to install packages listed in packages.list.gz file"
