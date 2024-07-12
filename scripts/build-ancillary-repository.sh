@@ -85,6 +85,8 @@ mkdir -p "$WORK_DIRECTORY/artifacts"
 download_combined_packages_artifacts "$AWS_S3_URI_COMBINED_PACKAGES" \
 	"$WORK_DIRECTORY/artifacts"
 
+download_dct_artifacts "$AWS_S3_URI_DCT_PACKAGES" "$WORK_DIRECTORY/artifacts"
+
 #
 # Create a delphix-build-info package from the build metadata of each
 # package and of appliance-build itself and store it along with the other
