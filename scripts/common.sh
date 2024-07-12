@@ -125,6 +125,29 @@ function download_combined_packages_artifacts() {
 	popd &>/dev/null
 }
 
+function download_dct_artifacts {
+	local dct_artifacts_uri="$1"
+	local target_dir="$2"
+
+	if [[ -z "$dct_artifacts_uri" ]]; then
+		DCT_S3_DIR="s3://snapshot-de-images"
+		DCT_LATEST_PREFIX="builds/jenkins-ops/dct/develop/post-push/latest"
+
+		aws s3 cp "$DCT_S3_DIR/$DCT_LATEST_PREFIX" .
+
+		DCT_PACKAGE_PREFIX=$(cat latest)
+		rm -f latest
+
+		dct_artifacts_uri="$DCT_S3_DIR/$DCT_PACKAGE_PREFIX"
+	fi
+
+	mkdir "$target_dir/dct"
+	pushd "$target_dir/dct" &>/dev/null
+
+	aws s3 sync "$DCT_S3_DIR/$DCT_PACKAGE_PREFIX" .
+	sha256sum -c SHA256SUMS
+}
+
 #
 # Find all .deb and .ddeb packages in source directory tree and move them
 # to target directory.
