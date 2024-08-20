@@ -15,6 +15,11 @@
 #
 
 ---
+# The VSDK plugin requires python3.8. The deadsnakes PPA provides python3.8 on 24.04.
+- apt_repository:
+    repo: ppa:deadsnakes/ppa
+    state: present
+
 - apt:
     update_cache: yes
 
@@ -22,10 +27,10 @@
     name:
       - ansible
       - aptly
-      - awscli
       - bc
       - coreutils
       - devscripts
+      - docker.io
       - equivs
       - gdisk
       - git
@@ -36,15 +41,38 @@
       - livecd-rootfs
       - make
       - man
-      - openjdk-8-jre-headless
+      - openjdk-8-jdk
       - pigz
-      - qemu
+      # The VSDK plugin requires python3.8
+      - python3.8
+      - qemu-system
       - rename
       - shellcheck
       - vim
       - zfsutils-linux
     state: present
 
+- systemd:
+    name: unattended-upgrades
+    state: stopped
+  register: result_systemd_stop
+  failed_when: "result_systemd_stop is failed and 'Could not find the requested service' not in result_systemd_stop.msg"
+
+- apt:
+    name:
+      - unattended-upgrades
+    state: absent
+    purge: true
+
+- snap:
+    name: aws-cli
+    classic: yes
+
 - modprobe:
     name: zfs
     state: present
+
+- user:
+    name: delphix
+    groups: docker
+    append: true
