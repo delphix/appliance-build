@@ -22,6 +22,10 @@
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
+    - appliance-build.minimal-development
     - appliance-build.dct-common
     - appliance-build.masking-common
+    - appliance-build.masking-development
     - appliance-build.virtualization-common
+    - appliance-build.virtualization-development
+    - appliance-build.qa-internal
