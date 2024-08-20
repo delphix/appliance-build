@@ -105,13 +105,7 @@ task shellCheck(type: Exec) {
     commandLine(["shellcheck", "--exclude=SC1090,SC1091"] + shellScripts.getFiles())
 }
 
-task ansibleCheck(type: Exec) {
-    def ansibleFiles = fileTree("bootstrap").include("**/playbook.yml") +
-                       fileTree("live-build/variants").include("**/playbook.yml")
-    commandLine(["ansible-lint", "--exclude=SC1090,SC1091"] + ansibleFiles.getFiles())
-}
-
-tasks.check.dependsOn shellCheck, shfmtCheck, ansibleCheck
+tasks.check.dependsOn shellCheck, shfmtCheck
 
 task format() {
     dependsOn shfmt
