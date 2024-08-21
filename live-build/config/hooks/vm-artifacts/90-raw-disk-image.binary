@@ -74,7 +74,7 @@ external-* | internal-dcenter)
 	RAW_DISK_SIZE_GB=127
 	;;
 internal-buildserver)
-	RAW_DISK_SIZE_GB=256
+	RAW_DISK_SIZE_GB=512
 	;;
 internal-*)
 	RAW_DISK_SIZE_GB=70
