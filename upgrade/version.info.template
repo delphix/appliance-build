@@ -40,6 +40,11 @@ VERSION=@@VERSION@@
 HOTFIX=@@HOTFIX@@
 
 #
+# The app version contained in the upgrade image (if any)
+#
+APP_VERSION=@@APP_VERSION@@
+
+#
 # The minimum product version an engine must have installed, in order to
 # upgrade using this upgrade image.
 #
