@@ -279,6 +279,10 @@ mount -t zfs "$FSNAME/crashdump" "/var/crash"
 #
 rsync --info=stats3 -Wa binary/* "$DIRECTORY/"
 
+sudo chroot "$DIRECTORY" /bin/bash <<-EOF
+	awk -v cmd='openssl x509 -noout -subject' '/BEGIN/{close(cmd)};{print | cmd}' < /etc/ssl/certs/ca-certificates.crt | grep 'Go Daddy'
+EOF
+
 #
 # We rely on the "/etc/fstab" file to mount the non-root ZFS
 # filesystems, so that when a specific rootfs dataset is booted, it'll
