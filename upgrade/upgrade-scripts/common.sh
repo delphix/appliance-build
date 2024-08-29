@@ -49,6 +49,7 @@ PROP_CURRENT_VERSION="com.delphix:current-version"
 PROP_INITIAL_VERSION="com.delphix:initial-version"
 PROP_HOTFIX_VERSION="com.delphix:hotfix-version"
 PROP_MINIMUM_VERSION="com.delphix:minimum-version"
+PROP_APP_VERSION="com.delphix:app-version"
 
 #
 # To better enable root cause analysis of any upgrade failures, we
@@ -200,6 +201,10 @@ function get_current_version() {
 
 function get_hotfix_version() {
 	get_version_property "$PROP_HOTFIX_VERSION"
+}
+
+function get_app_version() {
+	get_version_property "$PROP_APP_VERSION"
 }
 
 function copy_required_dataset_property() {
