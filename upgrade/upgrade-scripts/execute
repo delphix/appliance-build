@@ -182,7 +182,7 @@ if [[ -n "$CURRENT_VERSION" ]]; then
 		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
 	copy_optional_dataset_property "$PROP_HOTFIX_VERSION" \
 		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
-	copy_optional_dataset_property "$PROP_APP_VERSION" \
+	copy_optional_dataset_property "$PROP_PACKAGED_APP_VERSION" \
 		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
 fi
 
@@ -554,13 +554,13 @@ else
 			"for '$ROOTFS_CONTAINER'"
 fi
 
-if [[ -n "$APP_VERSION" ]]; then
-	zfs set "$PROP_APP_VERSION=$APP_VERSION" "$ROOTFS_CONTAINER" ||
-		die "failed to set property '$PROP_APP_VERSION'" \
-			"to '$APP_VERSION' for '$ROOTFS_CONTAINER'"
+if [[ -n "$PACKAGED_APP_VERSION" ]]; then
+	zfs set "$PROP_PACKAGED_APP_VERSION=$PACKAGED_APP_VERSION" "$ROOTFS_CONTAINER" ||
+		die "failed to set property '$PROP_PACKAGED_APP_VERSION'" \
+			"to '$PACKAGED_APP_VERSION' for '$ROOTFS_CONTAINER'"
 else
-	zfs inherit "$PROP_APP_VERSION" "$ROOTFS_CONTAINER" ||
-		die "failed to inherit property '$PROP_APP_VERSION'" \
+	zfs inherit "$PROP_PACKAGED_APP_VERSION" "$ROOTFS_CONTAINER" ||
+		die "failed to inherit property '$PROP_PACKAGED_APP_VERSION'" \
 			"for '$ROOTFS_CONTAINER'"
 fi
 
