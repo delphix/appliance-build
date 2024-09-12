@@ -302,12 +302,6 @@ function create_upgrade_container() {
 		rpool/crashdump           /var/crash    zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 	EOF
 
-	cat <<-EOF >>"$DIRECTORY/etc/fstab"
-		tmpfs /dev/shm tmpfs defaults,noexec,nosuid,nodev 0 0
-	EOF
-
-	mount -o remount /dev/shm
-
 	#
 	# DLPX-75089 - Since older versions of Delphix did not properly
 	# disable the NFS services within the upgrade container, we have

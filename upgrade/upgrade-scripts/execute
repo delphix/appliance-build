@@ -621,6 +621,16 @@ if [[ -f "$UPDATE_DIR/upgrade.properties" ]]; then
 	source_upgrade_properties
 fi
 
+FSTAB_FILE_PATH="$DIRECTORY/etc/fstab"
+DEV_SHM_LINE="tmpfs /dev/shm tmpfs defaults,noexec,nosuid,nodev 0 0"
+
+# Check if the /dev/shm exec permission block line exists in the file
+if ! grep -Fxq "$DEV_SHM_LINE" "$FSTAB_FILE_PATH"; then
+	# If the /dev/shm exec permission block line doesn't exist, append it to the file
+	echo "$DEV_SHM_LINE" >>"$FSTAB_FILE_PATH"
+	mount -o remount /dev/shm
+fi
+
 #
 # On versions 18.0 and greater, we don't issue the reboot. Rather,
 # we restart the delphix services, and the reboot will be issued by
