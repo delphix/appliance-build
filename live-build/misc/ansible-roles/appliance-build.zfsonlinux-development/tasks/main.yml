@@ -40,7 +40,7 @@
       - libelf-dev
       - libselinux-dev
       - libssl-dev
-      - libtool
+      - libtool-bin
       - libudev-dev
       - llvm-12
       - lsscsi
