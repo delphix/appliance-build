@@ -302,6 +302,33 @@ function create_upgrade_container() {
 		rpool/crashdump           /var/crash    zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 	EOF
 
+	for dir in tmp var/tmp; do
+
+		# Check if the directory is already mounted using 'findmnt'
+		if ! findmnt "/$dir" >/dev/null 2>&1; then
+
+			mount_dir=$(echo "$dir" | sed 's/\//-/g')
+
+			# If the directory is not mounted, create a ZFS dataset with the legacy mountpoint option
+			# $FSNAME is the name of the ZFS filesystem, and the dataset is created under $FSNAME/ROOT/$FSNAME/$dir
+			zfs create -o mountpoint=legacy "$FSNAME/ROOT/$FSNAME/$mount_dir"
+
+			# Create the directory if it doesn't already exist
+			mkdir -p "/$dir"
+
+			# Mount the newly created ZFS filesystem to the directory
+			mount -t zfs "$FSNAME/ROOT/$FSNAME/$mount_dir" "/$dir"
+		fi
+
+		# Define the entry to be added to /etc/fstab
+		fstab_entry="rpool/ROOT/$FSNAME/$mount_dir /$dir zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0"
+
+		if ! grep -qF "$fstab_entry" "$DIRECTORY/etc/fstab"; then
+			# If the entry is not present, append it to the /etc/fstab file
+			echo "$fstab_entry" >>"$DIRECTORY/etc/fstab"
+		fi
+	done
+
 	#
 	# DLPX-75089 - Since older versions of Delphix did not properly
 	# disable the NFS services within the upgrade container, we have
