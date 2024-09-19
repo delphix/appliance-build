@@ -326,6 +326,35 @@ for dir in /dev /proc /sys; do
 	mount --make-rslave "${DIRECTORY}${dir}"
 done
 
+for dir in tmp var/tmp; do
+
+	# Check if the directory is already mounted using 'findmnt'
+	if ! findmnt "/$dir" >/dev/null 2>&1; then
+
+		# Convert all forward slashes (/) in the directory path to hyphens (-)
+		# and store the result in the variable 'mount_dir', e.g. var/tmp -> var-tmp
+		mount_dir=$(echo "$dir" | sed 's/\//-/g')
+
+		# If the directory is not mounted, create a ZFS dataset with the legacy mountpoint option
+		# $FSNAME is the name of the ZFS filesystem, and the dataset is created under $FSNAME/ROOT/$FSNAME/$dir
+		zfs create -o mountpoint=legacy "$FSNAME/ROOT/$FSNAME/$mount_dir"
+
+		# Create the directory if it doesn't already exist
+		mkdir -p "/$dir"
+
+		# Mount the newly created ZFS filesystem to the directory
+		mount -t zfs "$FSNAME/ROOT/$FSNAME/$mount_dir" "/$dir"
+	fi
+
+	# Define the entry to be added to /etc/fstab
+	fstab_entry="rpool/ROOT/$FSNAME/$mount_dir /$dir zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0"
+
+	if ! grep -qF "$fstab_entry" "$DIRECTORY/etc/fstab"; then
+		# If the entry is not present, append it to the /etc/fstab file
+		echo "$fstab_entry" >>"$DIRECTORY/etc/fstab"
+	fi
+done
+
 #
 # We need to use the dedicated grub dataset when running "grub-install"
 # and "grub-mkconfig", so we need to mount this dataset first.
