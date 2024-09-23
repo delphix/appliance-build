@@ -216,6 +216,18 @@ function create_upgrade_container() {
 		"rpool/ROOT/$CONTAINER/log" ||
 		die "failed to create upgrade /var/log clone"
 
+	zfs clone \
+		-o mountpoint=legacy \
+		"$ROOTFS_DATASET/tmp@$SNAPSHOT_NAME" \
+		"rpool/ROOT/$CONTAINER/tmp" ||
+		die "failed to create upgrade /tmp clone"
+
+	zfs clone \
+		-o mountpoint=legacy \
+		"$ROOTFS_DATASET/vartmp@$SNAPSHOT_NAME" \
+		"rpool/ROOT/$CONTAINER/vartmp" ||
+		die "failed to create upgrade /var/tmp clone"
+
 	case "$type" in
 	not-in-place)
 		#
@@ -232,6 +244,10 @@ function create_upgrade_container() {
 			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
 		mount_upgrade_container_dataset \
 			"rpool/ROOT/$CONTAINER/log" "$DIRECTORY/var/log"
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/tmp" "$DIRECTORY/tmp"
+		mount_upgrade_container_dataset \
+			"rpool/ROOT/$CONTAINER/vartmp" "$DIRECTORY/var/tmp"
 
 		#
 		# This function needs to return the container's name to
@@ -283,6 +299,8 @@ function create_upgrade_container() {
 		# unmount these datasets that were mounted above.
 		#
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/log"
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/tmp"
+		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/vartmp"
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/data"
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/home"
 		;;
@@ -299,35 +317,10 @@ function create_upgrade_container() {
 		rpool/ROOT/$CONTAINER/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
-		rpool/crashdump           /var/crash    zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
+		rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+		rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+		rpool/crashdump            /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 	EOF
-
-	for dir in tmp var/tmp; do
-
-		# Check if the directory is already mounted using 'findmnt'
-		if ! findmnt "/$dir" >/dev/null 2>&1; then
-
-			mount_dir=$(echo "$dir" | sed 's/\//-/g')
-
-			# If the directory is not mounted, create a ZFS dataset with the legacy mountpoint option
-			# $FSNAME is the name of the ZFS filesystem, and the dataset is created under $FSNAME/ROOT/$FSNAME/$dir
-			zfs create -o mountpoint=legacy "$FSNAME/ROOT/$FSNAME/$mount_dir"
-
-			# Create the directory if it doesn't already exist
-			mkdir -p "/$dir"
-
-			# Mount the newly created ZFS filesystem to the directory
-			mount -t zfs "$FSNAME/ROOT/$FSNAME/$mount_dir" "/$dir"
-		fi
-
-		# Define the entry to be added to /etc/fstab
-		fstab_entry="rpool/ROOT/$FSNAME/$mount_dir /$dir zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0"
-
-		if ! grep -qF "$fstab_entry" "$DIRECTORY/etc/fstab"; then
-			# If the entry is not present, append it to the /etc/fstab file
-			echo "$fstab_entry" >>"$DIRECTORY/etc/fstab"
-		fi
-	done
 
 	#
 	# DLPX-75089 - Since older versions of Delphix did not properly
@@ -500,7 +493,9 @@ function start() {
 		! zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/home" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null ||
-		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null; then
+		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/tmp" &>/dev/null ||
+		! zfs list "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null; then
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
@@ -606,6 +601,8 @@ function destroy() {
 		# which we will catch, and then notify the user.
 		#
 		umount "rpool/ROOT/$CONTAINER/log" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/tmp" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/data" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/home" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/root" &>/dev/null

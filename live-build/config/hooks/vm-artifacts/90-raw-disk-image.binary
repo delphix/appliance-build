@@ -229,6 +229,14 @@ zfs create \
 	-o mountpoint=legacy \
 	"$FSNAME/ROOT/$FSNAME/log"
 
+zfs create \
+	-o mountpoint=legacy \
+	"$FSNAME/ROOT/$FSNAME/tmp"
+
+zfs create \
+	-o mountpoint=legacy \
+	"$FSNAME/ROOT/$FSNAME/vartmp"
+
 #
 # Initialize the grub dataset. This dataset will be used to contain all
 # of the grub-specific files; this includes the "grub.cfg" file, along
@@ -276,6 +284,12 @@ mount -t zfs "$FSNAME/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
 mkdir -p "$DIRECTORY/var/log"
 mount -t zfs "$FSNAME/ROOT/$FSNAME/log" "$DIRECTORY/var/log"
 
+mkdir -p "$DIRECTORY/tmp"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/tmp" "$DIRECTORY/tmp"
+
+mkdir -p "$DIRECTORY/var/tmp"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/vartmp" "$DIRECTORY/var/tmp"
+
 mkdir -p "/var/crash"
 mount -t zfs "$FSNAME/crashdump" "/var/crash"
 
@@ -301,6 +315,8 @@ cat <<-EOF >"$DIRECTORY/etc/fstab"
 	rpool/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/tmp  /tmp     zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/vartmp  /var/tmp     zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/crashdump  /var/crash     zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 EOF
 
@@ -325,36 +341,6 @@ for dir in /dev /proc /sys; do
 	#
 	mount --make-rslave "${DIRECTORY}${dir}"
 done
-
-for dir in tmp var/tmp; do
-
-	# Check if the directory is already mounted using 'findmnt'
-	if ! findmnt "/$dir" >/dev/null 2>&1; then
-
-		# Convert all forward slashes (/) in the directory path to hyphens (-)
-		# and store the result in the variable 'mount_dir', e.g. var/tmp -> var-tmp
-		mount_dir=$(echo "$dir" | sed 's/\//-/g')
-
-		# If the directory is not mounted, create a ZFS dataset with the legacy mountpoint option
-		# $FSNAME is the name of the ZFS filesystem, and the dataset is created under $FSNAME/ROOT/$FSNAME/$dir
-		zfs create -o mountpoint=legacy "$FSNAME/ROOT/$FSNAME/$mount_dir"
-
-		# Create the directory if it doesn't already exist
-		mkdir -p "/$dir"
-
-		# Mount the newly created ZFS filesystem to the directory
-		mount -t zfs "$FSNAME/ROOT/$FSNAME/$mount_dir" "/$dir"
-	fi
-
-	# Define the entry to be added to /etc/fstab
-	fstab_entry="rpool/ROOT/$FSNAME/$mount_dir /$dir zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0"
-
-	if ! grep -qF "$fstab_entry" "$DIRECTORY/etc/fstab"; then
-		# If the entry is not present, append it to the /etc/fstab file
-		echo "$fstab_entry" >>"$DIRECTORY/etc/fstab"
-	fi
-done
-
 #
 # We need to use the dedicated grub dataset when running "grub-install"
 # and "grub-mkconfig", so we need to mount this dataset first.
@@ -371,6 +357,8 @@ done
 umount "$DIRECTORY/var/log"
 umount "$DIRECTORY/var/delphix"
 umount "$DIRECTORY/export/home"
+umount "$DIRECTORY/tmp"
+umount "$DIRECTORY/var/tmp"
 umount "/var/crash"
 retry 5 10 zfs umount "$FSNAME/ROOT/$FSNAME/root"
 retry 5 10 zpool export "$FSNAME"
