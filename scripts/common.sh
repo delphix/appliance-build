@@ -144,7 +144,7 @@ function download_dct_artifacts() {
 	mkdir "$target_dir/dct"
 	pushd "$target_dir/dct" &>/dev/null || exit 1
 
-	aws s3 sync "$DCT_S3_DIR/$DCT_PACKAGE_PREFIX" .
+	aws s3 sync "$dct_artifacts_uri" .
 	sha256sum -c SHA256SUMS
 
 	popd &>/dev/null || exit 1
