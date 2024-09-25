@@ -167,6 +167,12 @@ if [[ -n "$DELPHIX_HOTFIX_VERSION" ]]; then
 		"$FSNAME/ROOT/$FSNAME"
 fi
 
+if [[ -n "$DELPHIX_PACKAGED_APP_VERSION" ]]; then
+	zfs set \
+		"com.delphix:packaged-app-version=$DELPHIX_PACKAGED_APP_VERSION" \
+		"$FSNAME/ROOT/$FSNAME"
+fi
+
 if [[ -n "$DELPHIX_MINIMUM_VERSION" ]]; then
 	zfs set \
 		"com.delphix:minimum-version=$DELPHIX_MINIMUM_VERSION" \

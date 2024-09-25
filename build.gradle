@@ -54,6 +54,7 @@ for (variant in allVariants) {
         for (envVar in ["DELPHIX_PLATFORMS",
                         "DELPHIX_HOTFIX_VERSION",
                         "DELPHIX_MINIMUM_VERSION",
+                        "DELPHIX_PACKAGED_APP_VERSION",
                         "AWS_S3_URI_LIVEBUILD_ARTIFACTS",
                         "AWS_S3_URI_COMBINED_PACKAGES"]) {
             inputs.property(envVar, System.getenv(envVar)).optional(true)
