@@ -24,7 +24,10 @@ CONTAINER=
 
 TMP_DATASETS_EXIST=false
 
-# Check if both datasets exist
+# Verify whether both /tmp and /var/tmp ZFS datasets exist for the specified container.
+# If both datasets are present, the system is considered CIS compliant.
+# In such cases, handle the /tmp and /var/tmp mounts appropriately during the upgrade process.
+# To ensure this handling, set the TMP_DATASETS_EXIST variable to true.
 if zfs list "rpool/ROOT/$CONTAINER/tmp" >/dev/null 2>&1 && zfs list "rpool/ROOT/$CONTAINER/vartmp" >/dev/null 2>&1; then
 	TMP_DATASETS_EXIST=true
 fi
@@ -337,8 +340,8 @@ function create_upgrade_container() {
 
 	if $TMP_DATASETS_EXIST; then
 		cat <<-EOF >>"$DIRECTORY/etc/fstab"
-			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
-			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
+			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
 		EOF
 	fi
 
@@ -610,10 +613,10 @@ function destroy() {
 		#
 		# In order to safely perform the recursive destroy below,
 		# we need to ensure the filesystems are unmounted in the
-		# correct order. Since the "log", "data", and "home"
-		# datasets are mounted inside the "root" dataset, we need
-		# to unmount these two datasets before attempting to
-		# unmount (and/or destroy) the "root" dataset.
+		# correct order. Since the "log", "data", "home", "tmp" and
+		# "vartmp" datasets are mounted inside the "root" dataset,
+		# we need to unmount these datasets before attempting
+		# to unmount (and/or destroy) the "root" dataset.
 		#
 		# Further, we don't check the return value of these
 		# commands for simplicity's sake. If these fail, it could
