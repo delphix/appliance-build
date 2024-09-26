@@ -315,8 +315,8 @@ cat <<-EOF >"$DIRECTORY/etc/fstab"
 	rpool/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
-	rpool/ROOT/$FSNAME/tmp  /tmp     zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
-	rpool/ROOT/$FSNAME/vartmp  /var/tmp     zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/tmp  /tmp     zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/vartmp  /var/tmp     zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/crashdump  /var/crash     zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 EOF
 
