@@ -22,6 +22,13 @@ IMAGE_PATH=$(get_image_path)
 
 CONTAINER=
 
+TMP_DATASETS_EXIST=false
+
+# Check if both datasets exist
+if zfs list "rpool/ROOT/$CONTAINER/tmp" >/dev/null 2>&1 && zfs list "rpool/ROOT/$CONTAINER/vartmp" >/dev/null 2>&1; then
+	TMP_DATASETS_EXIST=true
+fi
+
 function create_cleanup() {
 	#
 	# Upon successful creation of the container, don't perform any
@@ -216,17 +223,19 @@ function create_upgrade_container() {
 		"rpool/ROOT/$CONTAINER/log" ||
 		die "failed to create upgrade /var/log clone"
 
-	zfs clone \
-		-o mountpoint=legacy \
-		"$ROOTFS_DATASET/tmp@$SNAPSHOT_NAME" \
-		"rpool/ROOT/$CONTAINER/tmp" ||
-		die "failed to create upgrade /tmp clone"
+	if $TMP_DATASETS_EXIST; then
+		zfs clone \
+			-o mountpoint=legacy \
+			"$ROOTFS_DATASET/tmp@$SNAPSHOT_NAME" \
+			"rpool/ROOT/$CONTAINER/tmp" ||
+			die "failed to create upgrade /tmp clone"
 
-	zfs clone \
-		-o mountpoint=legacy \
-		"$ROOTFS_DATASET/vartmp@$SNAPSHOT_NAME" \
-		"rpool/ROOT/$CONTAINER/vartmp" ||
-		die "failed to create upgrade /var/tmp clone"
+		zfs clone \
+			-o mountpoint=legacy \
+			"$ROOTFS_DATASET/vartmp@$SNAPSHOT_NAME" \
+			"rpool/ROOT/$CONTAINER/vartmp" ||
+			die "failed to create upgrade /var/tmp clone"
+	fi
 
 	case "$type" in
 	not-in-place)
@@ -244,10 +253,13 @@ function create_upgrade_container() {
 			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
 		mount_upgrade_container_dataset \
 			"rpool/ROOT/$CONTAINER/log" "$DIRECTORY/var/log"
-		mount_upgrade_container_dataset \
-			"rpool/ROOT/$CONTAINER/tmp" "$DIRECTORY/tmp"
-		mount_upgrade_container_dataset \
-			"rpool/ROOT/$CONTAINER/vartmp" "$DIRECTORY/var/tmp"
+
+		if $TMP_DATASETS_EXIST; then
+			mount_upgrade_container_dataset \
+				"rpool/ROOT/$CONTAINER/tmp" "$DIRECTORY/tmp"
+			mount_upgrade_container_dataset \
+				"rpool/ROOT/$CONTAINER/vartmp" "$DIRECTORY/var/tmp"
+		fi
 
 		#
 		# This function needs to return the container's name to
@@ -299,10 +311,13 @@ function create_upgrade_container() {
 		# unmount these datasets that were mounted above.
 		#
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/log"
-		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/tmp"
-		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/vartmp"
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/data"
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/home"
+
+		if $TMP_DATASETS_EXIST; then
+			unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/tmp"
+			unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/vartmp"
+		fi
 		;;
 	esac
 
@@ -317,10 +332,15 @@ function create_upgrade_container() {
 		rpool/ROOT/$CONTAINER/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
-		rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
-		rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/crashdump            /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 	EOF
+
+	if $TMP_DATASETS_EXIST; then
+		cat <<-EOF >>"$DIRECTORY/etc/fstab"
+			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+		EOF
+	fi
 
 	#
 	# DLPX-75089 - Since older versions of Delphix did not properly
@@ -494,8 +514,10 @@ function start() {
 		! zfs list "rpool/ROOT/$CONTAINER/home" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null ||
-		! zfs list "rpool/ROOT/$CONTAINER/tmp" &>/dev/null ||
-		! zfs list "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null; then
+		($TMP_DATASETS_EXIST && {
+			! zfs list "rpool/ROOT/$CONTAINER/tmp" &>/dev/null ||
+				! zfs list "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
+		}); then
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
@@ -601,10 +623,12 @@ function destroy() {
 		# which we will catch, and then notify the user.
 		#
 		umount "rpool/ROOT/$CONTAINER/log" &>/dev/null
-		umount "rpool/ROOT/$CONTAINER/tmp" &>/dev/null
-		umount "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/data" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/home" &>/dev/null
+		if $TMP_DATASETS_EXIST; then
+			umount "rpool/ROOT/$CONTAINER/tmp" &>/dev/null
+			umount "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
+		fi
 		umount "rpool/ROOT/$CONTAINER/root" &>/dev/null
 
 		zfs destroy -r "rpool/ROOT/$CONTAINER" ||
