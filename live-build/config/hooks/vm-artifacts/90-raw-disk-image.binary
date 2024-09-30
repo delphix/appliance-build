@@ -132,6 +132,18 @@ LOOPNAME=$(kpartx -asv "$ARTIFACT_NAME.img" |
 	sed 's/^\(loop[0-9]\+\)p[0-9]\+$/\1/')
 
 #
+# Check if DIR_MODE is present (either commented or uncommented) in file where new user
+# configurations are stored If DIR_MODE is found, update its value to 0750 (uncomment if needed)
+# If DIR_MODE is not found, add it to the file with value 0750
+#
+NEW_USER_FILE="/etc/adduser.conf"
+if grep -q "^#\?DIR_MODE" "$NEW_USER_FILE"; then
+	sed -i 's/^#\?DIR_MODE.*/DIR_MODE=0750/' "$NEW_USER_FILE"
+else
+	echo "DIR_MODE=0750" >>"$NEW_USER_FILE"
+fi
+
+#
 # We use a consistent naming scheme for the root filesystems that are
 # generated here, on initial build, but also on upgrade and/or
 # migration. Thus, if the name is changed here, we also need to update
