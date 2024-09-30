@@ -43,6 +43,11 @@
     password:
       "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
 
+- file:
+    path: /export/home/delphix
+    mode: '0750'
+    state: directory
+
 - user:
     name: root
     password:
