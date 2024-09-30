@@ -596,6 +596,18 @@ if ! systemd-detect-virt -qc && [[ "$opt_p" == "aws" ]]; then
 fi
 
 #
+# Check if DIR_MODE is present (either commented or uncommented) in file where new user
+# configurations are stored If DIR_MODE is found, update its value to 0750 (uncomment if needed)
+# If DIR_MODE is not found, add it to the file with value 0750
+#
+NEW_USER_FILE="/etc/adduser.conf"
+if grep -q "^#\?DIR_MODE" "$NEW_USER_FILE"; then
+	sed -i 's/^#\?DIR_MODE.*/DIR_MODE=0750/' "$NEW_USER_FILE"
+else
+	echo "DIR_MODE=0750" >>"$NEW_USER_FILE"
+fi
+
+#
 # We use a seperate ZFS dataset for GRUB, and this dataset is generally
 # not mounted when we update pacakges on the system.  Thus, when a new
 # kernel package is installed, via the call to "execute" above, the GRUB
