@@ -304,6 +304,19 @@ cat <<-EOF >"$DIRECTORY/etc/fstab"
 	rpool/crashdump  /var/crash     zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 EOF
 
+LOGIN_DEFS_FILE="$DIRECTORY/etc/login.defs"
+
+#
+# Update UMASK value in /etc/login.defs to 027 to ensure files
+# created by users have the correct permissions
+#
+
+if grep -q "^UMASK" "$LOGIN_DEFS_FILE"; then
+	sed -i 's/^UMASK\s\+[0-9]\+/UMASK 027/' "$LOGIN_DEFS_FILE"
+else
+	echo "UMASK 027" >>"$LOGIN_DEFS_FILE"
+fi
+
 #
 # Now we need to install the bootloader. In order to do that, we'll chroot
 # into the newly populated root filesystem, so that we use the grub-install

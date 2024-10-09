@@ -302,6 +302,19 @@ function create_upgrade_container() {
 		rpool/crashdump           /var/crash    zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 	EOF
 
+	LOGIN_DEFS_FILE="$DIRECTORY/etc/login.defs"
+
+	#
+	# Update UMASK value in /etc/login.defs to 027 to ensure files
+	# created by users have the correct permissions
+	#
+
+	if grep -q "^UMASK" "$LOGIN_DEFS_FILE"; then
+		sed -i 's/^UMASK\s\+[0-9]\+/UMASK 027/' "$LOGIN_DEFS_FILE"
+	else
+		echo "UMASK 027" >>"$LOGIN_DEFS_FILE"
+	fi
+
 	#
 	# DLPX-75089 - Since older versions of Delphix did not properly
 	# disable the NFS services within the upgrade container, we have
