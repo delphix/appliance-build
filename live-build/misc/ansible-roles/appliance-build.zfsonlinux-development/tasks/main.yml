@@ -55,6 +55,7 @@
       - unzip
       - uuid-dev
       - wget
+      - xxhash
       - zlib1g-dev
     state: present
   register: result
