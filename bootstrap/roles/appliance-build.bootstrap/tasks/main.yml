@@ -22,7 +22,6 @@
     name:
       - ansible
       - aptly
-      - awscli
       - bc
       - coreutils
       - devscripts
@@ -36,14 +35,18 @@
       - livecd-rootfs
       - make
       - man
-      - openjdk-8-jre-headless
+      - openjdk-8-jdk
       - pigz
-      - qemu
+      - qemu-system
       - rename
       - shellcheck
       - vim
       - zfsutils-linux
     state: present
+
+- snap:
+    name: aws-cli
+    classic: yes
 
 - modprobe:
     name: zfs
