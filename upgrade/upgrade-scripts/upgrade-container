@@ -22,6 +22,16 @@ IMAGE_PATH=$(get_image_path)
 
 CONTAINER=
 
+TMP_DATASETS_EXIST=false
+
+# Verify whether both /tmp and /var/tmp ZFS datasets exist for the specified container.
+# If both datasets are present, the system is considered CIS compliant.
+# In such cases, handle the /tmp and /var/tmp mounts appropriately during the upgrade process.
+# To ensure this handling, set the TMP_DATASETS_EXIST variable to true.
+if zfs list "rpool/ROOT/$CONTAINER/tmp" >/dev/null 2>&1 && zfs list "rpool/ROOT/$CONTAINER/vartmp" >/dev/null 2>&1; then
+	TMP_DATASETS_EXIST=true
+fi
+
 function create_cleanup() {
 	#
 	# Upon successful creation of the container, don't perform any
@@ -216,6 +226,20 @@ function create_upgrade_container() {
 		"rpool/ROOT/$CONTAINER/log" ||
 		die "failed to create upgrade /var/log clone"
 
+	if $TMP_DATASETS_EXIST; then
+		zfs clone \
+			-o mountpoint=legacy \
+			"$ROOTFS_DATASET/tmp@$SNAPSHOT_NAME" \
+			"rpool/ROOT/$CONTAINER/tmp" ||
+			die "failed to create upgrade /tmp clone"
+
+		zfs clone \
+			-o mountpoint=legacy \
+			"$ROOTFS_DATASET/vartmp@$SNAPSHOT_NAME" \
+			"rpool/ROOT/$CONTAINER/vartmp" ||
+			die "failed to create upgrade /var/tmp clone"
+	fi
+
 	case "$type" in
 	not-in-place)
 		#
@@ -232,6 +256,13 @@ function create_upgrade_container() {
 			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
 		mount_upgrade_container_dataset \
 			"rpool/ROOT/$CONTAINER/log" "$DIRECTORY/var/log"
+
+		if $TMP_DATASETS_EXIST; then
+			mount_upgrade_container_dataset \
+				"rpool/ROOT/$CONTAINER/tmp" "$DIRECTORY/tmp"
+			mount_upgrade_container_dataset \
+				"rpool/ROOT/$CONTAINER/vartmp" "$DIRECTORY/var/tmp"
+		fi
 
 		#
 		# This function needs to return the container's name to
@@ -285,6 +316,11 @@ function create_upgrade_container() {
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/log"
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/data"
 		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/home"
+
+		if $TMP_DATASETS_EXIST; then
+			unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/tmp"
+			unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/vartmp"
+		fi
 		;;
 	esac
 
@@ -299,8 +335,15 @@ function create_upgrade_container() {
 		rpool/ROOT/$CONTAINER/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
-		rpool/crashdump           /var/crash    zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
+		rpool/crashdump            /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 	EOF
+
+	if $TMP_DATASETS_EXIST; then
+		cat <<-EOF >>"$DIRECTORY/etc/fstab"
+			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
+			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
+		EOF
+	fi
 
 	#
 	# DLPX-75089 - Since older versions of Delphix did not properly
@@ -473,7 +516,11 @@ function start() {
 		! zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/home" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null ||
-		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null; then
+		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null ||
+		($TMP_DATASETS_EXIST && {
+			! zfs list "rpool/ROOT/$CONTAINER/tmp" &>/dev/null ||
+				! zfs list "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
+		}); then
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
@@ -566,10 +613,10 @@ function destroy() {
 		#
 		# In order to safely perform the recursive destroy below,
 		# we need to ensure the filesystems are unmounted in the
-		# correct order. Since the "log", "data", and "home"
-		# datasets are mounted inside the "root" dataset, we need
-		# to unmount these two datasets before attempting to
-		# unmount (and/or destroy) the "root" dataset.
+		# correct order. Since the "log", "data", "home", "tmp" and
+		# "vartmp" datasets are mounted inside the "root" dataset,
+		# we need to unmount these datasets before attempting
+		# to unmount (and/or destroy) the "root" dataset.
 		#
 		# Further, we don't check the return value of these
 		# commands for simplicity's sake. If these fail, it could
@@ -581,6 +628,10 @@ function destroy() {
 		umount "rpool/ROOT/$CONTAINER/log" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/data" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/home" &>/dev/null
+		if $TMP_DATASETS_EXIST; then
+			umount "rpool/ROOT/$CONTAINER/tmp" &>/dev/null
+			umount "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
+		fi
 		umount "rpool/ROOT/$CONTAINER/root" &>/dev/null
 
 		zfs destroy -r "rpool/ROOT/$CONTAINER" ||

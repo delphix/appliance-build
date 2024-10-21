@@ -229,6 +229,14 @@ zfs create \
 	-o mountpoint=legacy \
 	"$FSNAME/ROOT/$FSNAME/log"
 
+zfs create \
+	-o mountpoint=legacy \
+	"$FSNAME/ROOT/$FSNAME/tmp"
+
+zfs create \
+	-o mountpoint=legacy \
+	"$FSNAME/ROOT/$FSNAME/vartmp"
+
 #
 # Initialize the grub dataset. This dataset will be used to contain all
 # of the grub-specific files; this includes the "grub.cfg" file, along
@@ -276,6 +284,12 @@ mount -t zfs "$FSNAME/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
 mkdir -p "$DIRECTORY/var/log"
 mount -t zfs "$FSNAME/ROOT/$FSNAME/log" "$DIRECTORY/var/log"
 
+mkdir -p "$DIRECTORY/tmp"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/tmp" "$DIRECTORY/tmp"
+
+mkdir -p "$DIRECTORY/var/tmp"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/vartmp" "$DIRECTORY/var/tmp"
+
 mkdir -p "/var/crash"
 mount -t zfs "$FSNAME/crashdump" "/var/crash"
 
@@ -301,6 +315,8 @@ cat <<-EOF >"$DIRECTORY/etc/fstab"
 	rpool/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/tmp  /tmp     zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/vartmp  /var/tmp     zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/crashdump  /var/crash     zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 EOF
 
@@ -342,6 +358,8 @@ done
 umount "$DIRECTORY/var/log"
 umount "$DIRECTORY/var/delphix"
 umount "$DIRECTORY/export/home"
+umount "$DIRECTORY/tmp"
+umount "$DIRECTORY/var/tmp"
 umount "/var/crash"
 retry 5 10 zfs umount "$FSNAME/ROOT/$FSNAME/root"
 retry 5 10 zpool export "$FSNAME"
