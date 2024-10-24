@@ -340,8 +340,8 @@ function create_upgrade_container() {
 
 	if $TMP_DATASETS_EXIST; then
 		cat <<-EOF >>"$DIRECTORY/etc/fstab"
-			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
-			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,noexec,x-systemd.before=zfs-import-cache.service 0 0
+			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
 		EOF
 	fi
 
