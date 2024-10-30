@@ -25,6 +25,7 @@
       - ufw
       - nmap
       - gnupg
+      - xxhash
     state: present
   register: result
   until: result is not failed
