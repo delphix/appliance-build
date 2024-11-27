@@ -191,15 +191,8 @@ fi
 # /etc/apt/sources.list.d/ because only the Delphix repository
 # from the upgrade image must be used to install/upgrade packages.
 #
-if [[ -f /etc/apt/sources.list ]]; then
-	rm /etc/apt/sources.list || die "failed to delete /etc/apt/sources.list"
-fi
-
-if [[ -d /etc/apt/sources.list.d ]]; then
-	for file in /etc/apt/sources.list.d/*; do
-		rm "$file" || die "failed to delete $file"
-	done
-fi
+rm -f /etc/apt/sources.list
+rm -f /etc/apt/sources.list.d/*
 
 #
 # Create a new sources.list that only contains the Delphix repository from
@@ -470,11 +463,11 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 
 #
 # Now that all the packages have been installed, delete the newly created
-# central /etc/apt/sources.list.
+# central /etc/apt/sources.list and also empty out the /etc/apt/sources.list.d/ directory
+# again in case packages added their own sources.
 #
-if [[ -f /etc/apt/sources.list ]]; then
-	rm /etc/apt/sources.list || die "failed to delete /etc/apt/sources.list"
-fi
+rm -f /etc/apt/sources.list
+rm -f /etc/apt/sources.list.d/*
 
 #
 # Due to https://github.com/influxdata/telegraf/issues/14052, telegraf must be masked after
