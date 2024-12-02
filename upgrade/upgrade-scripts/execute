@@ -186,11 +186,19 @@ if [[ -n "$CURRENT_VERSION" ]]; then
 		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
 fi
 
-if [[ -f /etc/apt/sources.list ]]; then
-	mv /etc/apt/sources.list /etc/apt/sources.list.orig ||
-		die "failed to save /etc/apt/sources.list"
-fi
+#
+# Delete the central /etc/apt/sources.list and also all files in
+# /etc/apt/sources.list.d/ because only the Delphix repository
+# from the upgrade image must be used to install/upgrade packages.
+#
+rm -f /etc/apt/sources.list
+rm -f /etc/apt/sources.list.d/*
 
+#
+# Create a new sources.list that only contains the Delphix repository from
+# the image. This ensures packages are only sourced from the upgrade
+# image.
+#
 cat <<EOF >/etc/apt/sources.list ||
 deb [trusted=yes] file://$IMAGE_PATH focal delphix
 EOF
@@ -454,6 +462,14 @@ dpkg-query -Wf '${Conffiles}\n' | awk '$3 == "obsolete" {print $1}' |
 	done || die "failed to remove obsolete package configuration files"
 
 #
+# Now that all the packages have been installed, delete the newly created
+# central /etc/apt/sources.list and also empty out the /etc/apt/sources.list.d/ directory
+# again in case packages added their own sources.
+#
+rm -f /etc/apt/sources.list
+rm -f /etc/apt/sources.list.d/*
+
+#
 # Due to https://github.com/influxdata/telegraf/issues/14052, telegraf must be masked after
 # packages are upgraded. The telegraf package removes /etc/systemd/system/telegraf.service thus
 # reversing the `systemctl mask` operation performed before the packages are upgraded.
@@ -485,19 +501,6 @@ zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" | sed 's/=/ /' |
 			die "'$name' package version incompatible;" \
 				"'$installed' '=' '$version'"
 	done || die "verification of package versions failed"
-
-if [[ -f /etc/apt/sources.list.orig ]]; then
-	mv /etc/apt/sources.list.orig /etc/apt/sources.list ||
-		die "failed to restore /etc/apt/sources.list"
-else
-	#
-	# If "/etc/apt/sources.list.orig" does not exist, then it likely
-	# means the system didn't have a "/etc/apt/sources.list" file to
-	# begin with; so we restore that state by simply removing our
-	# dynamically generated "sources.list" file (generated earlier).
-	#
-	rm /etc/apt/sources.list
-fi
 
 #
 # As mentioned in an earlier comment, when $CURRENT_VERSION is not set,
