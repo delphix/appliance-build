@@ -48,6 +48,20 @@ if [[ $(ls binary/lib/modules | wc -l) -gt 1 ]]; then
 fi
 
 #
+# In order for DNS to work when running Ansible chroot-ed in the
+# "binary" directory, we have to copy the host's resolv.conf file into
+# place, and then undo this change when we're done.
+#
+
+if [[ -e binary/etc/resolv.conf || -L binary/etc/resolv.conf ]]; then
+	mv binary/etc/resolv.conf binary/etc/resolv.conf.orig
+fi
+
+if [[ -e /etc/resolv.conf ]]; then
+	cp /etc/resolv.conf binary/etc/resolv.conf
+fi
+
+#
 # Here, we generate a list of all of the packages that have been
 # installed in the "binary" chroot directory, including package version,
 # and then use this list to download each of these packages.
@@ -142,3 +156,12 @@ rm -rf "binary/$DEBS_DIRECTORY"
 tar -I pigz -cf "$ARTIFACT_NAME.debs.tar.gz" ./*.deb -C binary/packages .
 
 rm -rf binary/packages
+
+
+if [[ -e binary/etc/resolv.conf ]]; then
+	rm binary/etc/resolv.conf
+fi
+
+if [[ -e binary/etc/resolv.conf.orig || -L binary/etc/resolv.conf ]]; then
+	mv binary/etc/resolv.conf.orig binary/etc/resolv.conf
+fi
