@@ -49,6 +49,7 @@
       /tmp/dcenter_dhcp_config/named.zone r,
       /tmp/dcenter_dhcp_config/named.pid w,
 
+<<<<<<< Updated upstream
 #
 # The default setting for the number of nfs threads is too low. To
 # improve performance we reset the value to 64 which mimics what
@@ -63,6 +64,30 @@
     - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
 
 - command: systemctl mask named.service isc-dhcp-server.service isc-dhcp-server6.service
+=======
+- name: Add dcenter-specific NFS overrides to /etc/nfs.conf.d/12-delphix-dcenter-nfs-overrides.conf
+  copy:
+    src: etc/
+    dest: /etc/
+    owner: root
+    group: root
+    mode: 0444
+
+- name: Mask named and dhcp services
+  ansible.builtin.systemd_service:
+    name: named.service
+    masked: true
+
+- name: Mask named and dhcp services
+  ansible.builtin.systemd_service:
+    name: isc-dhcp-server.service
+    masked: true
+
+- name: Mask named and dhcp services
+  ansible.builtin.systemd_service:
+    name: isc-dhcp-server6.service
+    masked: true
+>>>>>>> Stashed changes
 
 #
 # delphix-platform installs ntp in a disabled state by default.
