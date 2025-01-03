@@ -349,6 +349,7 @@ done
 chroot "$DIRECTORY" mount -t zfs "$FSNAME/grub" /mnt
 chroot "$DIRECTORY" grub-install --root-directory=/mnt "/dev/$LOOPNAME"
 chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
+chroot "$DIRECTORY" cat /mnt/boot/grub/grub.cfg
 chroot "$DIRECTORY" umount /mnt
 
 for dir in /dev /proc /sys; do
