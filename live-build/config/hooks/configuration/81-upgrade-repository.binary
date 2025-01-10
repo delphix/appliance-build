@@ -157,7 +157,6 @@ tar -I pigz -cf "$ARTIFACT_NAME.debs.tar.gz" ./*.deb -C binary/packages .
 
 rm -rf binary/packages
 
-
 if [[ -e binary/etc/resolv.conf ]]; then
 	rm binary/etc/resolv.conf
 fi
