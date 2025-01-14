@@ -18,7 +18,7 @@
 - name: Install apt packages
   ansible.builtin.apt:
     name:
-      - openjdk-8-jdk
+      - openjdk-8-jdk-headless
       - curl
       - docker.io
       - git
