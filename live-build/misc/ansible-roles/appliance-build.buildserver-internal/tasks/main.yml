@@ -15,7 +15,8 @@
 #
 
 ---
-- apt:
+- name: Install apt packages
+  ansible.builtin.apt:
     name:
       - openjdk-8-jdk
       - curl
@@ -24,7 +25,8 @@
       - gnupg
     state: present
 
-- user:
+- name: Add delphix user to docker group required by the virtualization package
+  ansible.builtin.user:
     name: delphix
     groups: docker
     append: true

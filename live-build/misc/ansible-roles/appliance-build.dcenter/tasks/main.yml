@@ -15,15 +15,17 @@
 #
 
 ---
-- git:
+- name: Clone the dcenter-gate repo
+  ansible.builtin.git:
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dcenter-gate.git"
     version: main
     dest: /opt/dcenter/lib/dcenter-gate
-    accept_hostkey: yes
-    update: no
+    accept_hostkey: true
+    update: false
   when: lookup('env', 'GITHUB_TOKEN') != ''
 
-- alternatives:
+- name: Set java to java-8-openjdk-amd64
+  community.general.alternatives:
     name: java
     path: /usr/lib/jvm/java-8-openjdk-amd64/bin/java
 
@@ -32,7 +34,8 @@
 # can operate. For dcenter, we maintain the dhcp configuration
 # in /tmp so we need to add those paths into the apparmor configuration.
 #
-- copy:
+- name: Create the apparmor configuration for dhcpd
+  ansible.builtin.copy:
     dest: "/etc/apparmor.d/local/usr.sbin.dhcpd"
     content: |
       /tmp/dcenter_dhcp_config/ r,
@@ -41,13 +44,16 @@
       /tmp/dcenter_dhcp_config/dhcpd{,6}_ldap.conf r,
       /tmp/dcenter_dhcp_config/dhcpd{,6}.leases* lrw,
       /tmp/dcenter_dhcp_config/dhcpd{,6}.pid rw,
+    mode: "0644"
 
-- copy:
+- name: Create the apparmor configuration for named
+  ansible.builtin.copy:
     dest: "/etc/apparmor.d/local/usr.sbin.named"
     content: |
       /tmp/dcenter_dhcp_config/named.conf r,
       /tmp/dcenter_dhcp_config/named.zone r,
       /tmp/dcenter_dhcp_config/named.pid w,
+    mode: "0644"
 
 <<<<<<< Updated upstream
 #
@@ -55,16 +61,16 @@
 # improve performance we reset the value to 64 which mimics what
 # we use on the delphix engine.
 #
-- lineinfile:
+- name: Update the number of nfs threads
+  ansible.builtin.lineinfile:
     path: /etc/default/nfs-kernel-server
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
   with_items:
-    - { regexp: '^RPCNFSDCOUNT=', line: 'RPCNFSDCOUNT=64' }
-    - { regexp: '^RPCMOUNTDOPTS=', line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
+    - { regexp: "^RPCNFSDCOUNT=", line: "RPCNFSDCOUNT=64" }
+    - { regexp: "^RPCMOUNTDOPTS=", line: 'RPCMOUNTDOPTS="--num-threads=5 --manage-gids"' }
 
-- command: systemctl mask named.service isc-dhcp-server.service isc-dhcp-server6.service
-=======
+
 - name: Add dcenter-specific NFS overrides to /etc/nfs.conf.d/12-delphix-dcenter-nfs-overrides.conf
   copy:
     src: etc/
@@ -87,7 +93,6 @@
   ansible.builtin.systemd_service:
     name: isc-dhcp-server6.service
     masked: true
->>>>>>> Stashed changes
 
 #
 # delphix-platform installs ntp in a disabled state by default.
@@ -101,4 +106,7 @@
 # We also have cleanup jobs that run on DCenter hosts that rely on filesystem
 # timestamps being accurate.
 #
-- command: systemctl enable ntp.service
+- name: Enable NTP systemd service
+  ansible.builtin.systemd_service:
+    name: ntp.service
+    enabled: true

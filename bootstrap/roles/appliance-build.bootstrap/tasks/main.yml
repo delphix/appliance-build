@@ -16,14 +16,13 @@
 
 ---
 # The VSDK plugin requires python3.8. The deadsnakes PPA provides python3.8 on 24.04.
-- apt_repository:
+- name: Add deadsnakes PPA to apt sources so that python3.8 can be installed
+  ansible.builtin.apt_repository:
     repo: ppa:deadsnakes/ppa
     state: present
 
-- apt:
-    update_cache: yes
-
-- apt:
+- name: Update apt cache and install apt packages
+  ansible.builtin.apt:
     name:
       - ansible
       - aptly
@@ -51,28 +50,36 @@
       - vim
       - zfsutils-linux
     state: present
+    update_cache: true
 
-- systemd:
+- name: Stop unattended-upgrades systemd service in preparation for package removal
+  ansible.builtin.systemd:
     name: unattended-upgrades
     state: stopped
   register: result_systemd_stop
   failed_when: "result_systemd_stop is failed and 'Could not find the requested service' not in result_systemd_stop.msg"
 
-- apt:
+- name: Remove unattended-upgrades package
+  ansible.builtin.apt:
     name:
       - unattended-upgrades
     state: absent
     purge: true
 
-- snap:
+# aws-cli is distributed via snap on 24.04. While the package is not required by the product,
+# it is required by appliance-build itself.
+- name: Install aws-cli snap package
+  community.general.snap:
     name: aws-cli
-    classic: yes
+    classic: true
 
-- modprobe:
+- name: Load ZFS kernel module.
+  community.general.modprobe:
     name: zfs
     state: present
 
-- user:
+- name: Add delphix user to docker group required by the virtualization package
+  ansible.builtin.user:
     name: delphix
     groups: docker
     append: true
