@@ -55,34 +55,6 @@
       /tmp/dcenter_dhcp_config/named.pid w,
     mode: "0644"
 
-<<<<<<< Updated upstream
-#
-# The default setting for the number of nfs threads is too low. To
-# improve performance we reset the value to 64 which mimics what
-# we use on the delphix engine.
-#
-- name: Update nfs.conf | Update the number of nfsd threads
-  community.general.ini_file:
-    path: /etc/nfs.conf
-    section: nfsd
-    option: threads
-    value: 64
-
-- name: Update nfs.conf | Update the number of mountd threads
-  community.general.ini_file:
-    path: /etc/nfs.conf
-    section: mountd
-    option: threads
-    value: 5
-
-- name: Update nfs.conf | Set manage-gids to yes
-  community.general.ini_file:
-    path: /etc/nfs.conf
-    section: mountd
-    option: manage-gids
-    value: yes # noqa yaml[truthy]
-
-
 - name: Add dcenter-specific NFS overrides to /etc/nfs.conf.d/12-delphix-dcenter-nfs-overrides.conf
   copy:
     src: etc/
