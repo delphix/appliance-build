@@ -15,12 +15,6 @@
 #
 
 ---
-# The VSDK plugin requires python3.8. The deadsnakes PPA provides python3.8 on 24.04.
-- name: Add deadsnakes PPA to apt sources so that python3.8 can be installed
-  ansible.builtin.apt_repository:
-    repo: ppa:deadsnakes/ppa
-    state: present
-
 - name: Update apt cache and install apt packages
   ansible.builtin.apt:
     name:
@@ -42,8 +36,8 @@
       - man
       - openjdk-8-jdk-headless
       - pigz
-      # The VSDK plugin requires python3.8
-      - python3.8
+      # The VSDK plugin requires python3.11
+      - python3.11
       - qemu-system
       - rename
       - shellcheck
