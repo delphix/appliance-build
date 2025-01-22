@@ -17,6 +17,8 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
+check_env DELPHIX_PACKAGE_MIRROR_MAIN DELPHIX_PACKAGE_MIRROR_SECONDARY
+
 TOP=$(git rev-parse --show-toplevel 2>/dev/null)
 
 if [[ -z "$TOP" ]]; then
@@ -129,7 +131,7 @@ APTLY_SERVE_PID=$!
 set +o errexit
 attempts=0
 while ! curl --output /dev/null --silent --head --fail \
-	"http://localhost:8080/dists/focal/Release"; do
+	"http://localhost:8080/dists/noble/Release"; do
 	((attempts++))
 	if [[ $attempts -gt 30 ]]; then
 		echo "Timed out waiting for ancillary repository." 1>&2
@@ -140,86 +142,32 @@ while ! curl --output /dev/null --silent --head --fail \
 	sleep 1
 done
 
-pkg_mirror_secondary=''
-if [[ -n "$DELPHIX_PACKAGE_MIRROR_SECONDARY" ]]; then
-	pkg_mirror_secondary="$DELPHIX_PACKAGE_MIRROR_SECONDARY"
-else
-	#
-	# Set UPSTREAM_BRANCH. This will determine which version of the linux package
-	# mirror is used.
-	#
-	UPSTREAM_BRANCH=$(get_upstream_or_fail_if_unset) || exit 1
-	echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
-
-	#
-	# If no secondary package mirror is provided, then pull in the latest
-	# mirror dataset for the build. If no latest dataset is found, then fail.
-	#
-	source_url="http://linux-package-mirror.delphix.com/$UPSTREAM_BRANCH/latest/"
-	if ! pkg_mirror_secondary=$(curl -fLSs -o /dev/null -w '%{url_effective}' "$source_url"); then
-		kill -9 $APTLY_SERVE_PID
-		echo "No URL found for PPA packages at ${source_url}."
-		exit 1
-	fi
-
-	# The mirror hosts secondary packages in the "ppas" subdirectory.
-	pkg_mirror_secondary+="ppas"
-fi
-
-sed "s|@@URL@@|$pkg_mirror_secondary|" \
+sed "s|@@URL@@|$DELPHIX_PACKAGE_MIRROR_SECONDARY|" \
 	<config/archives/delphix-secondary-mirror.list.in \
 	>config/archives/delphix-secondary-mirror.list
 
-pkg_mirror_main=''
-if [[ -n "$DELPHIX_PACKAGE_MIRROR_MAIN" ]]; then
-	pkg_mirror_main="$DELPHIX_PACKAGE_MIRROR_MAIN"
-else
-	#
-	# Set UPSTREAM_BRANCH. This will determine which version of the linux package
-	# mirror is used.
-	#
-	UPSTREAM_BRANCH=$(get_upstream_or_fail_if_unset) || exit 1
-	echo "Running with UPSTREAM_BRANCH set to ${UPSTREAM_BRANCH}"
-
-	#
-	# If no main package mirror is provided, then pull in the latest mirror
-	# dataset for the build. If no latest dataset is found, then fail.
-	#
-	source_url="http://linux-package-mirror.delphix.com/$UPSTREAM_BRANCH/latest/"
-	if ! pkg_mirror_main=$(curl -fLSs -o /dev/null -w '%{url_effective}' "$source_url"); then
-		kill -9 $APTLY_SERVE_PID
-		echo "No mirror URL found for ubuntu archive packages at ${source_url}."
-		exit 1
-	fi
-
-	#
-	# The internal mirror hosts the primary ubuntu package repository in the
-	# "ubuntu" subdirectory.
-	#
-	pkg_mirror_main+="ubuntu"
-fi
 set -o errexit
 
 lb config \
 	--apt-recommends false \
-	--parent-mirror-bootstrap "$pkg_mirror_main" \
-	--parent-mirror-chroot "$pkg_mirror_main" \
-	--parent-mirror-chroot-security "$pkg_mirror_main" \
-	--parent-mirror-chroot-volatile "$pkg_mirror_main" \
-	--parent-mirror-chroot-backports "$pkg_mirror_main" \
-	--parent-mirror-binary "$pkg_mirror_main" \
-	--parent-mirror-binary-security "$pkg_mirror_main" \
-	--parent-mirror-binary-volatile "$pkg_mirror_main" \
-	--parent-mirror-binary-backports "$pkg_mirror_main" \
-	--mirror-bootstrap "$pkg_mirror_main" \
-	--mirror-chroot "$pkg_mirror_main" \
-	--mirror-chroot-security "$pkg_mirror_main" \
-	--mirror-chroot-volatile "$pkg_mirror_main" \
-	--mirror-chroot-backports "$pkg_mirror_main" \
-	--mirror-binary "$pkg_mirror_main" \
-	--mirror-binary-security "$pkg_mirror_main" \
-	--mirror-binary-volatile "$pkg_mirror_main" \
-	--mirror-binary-backports "$pkg_mirror_main"
+	--parent-mirror-bootstrap "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-chroot "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-chroot-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-chroot-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-chroot-backports "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-binary "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-binary-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-binary-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--parent-mirror-binary-backports "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-bootstrap "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-chroot "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-chroot-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-chroot-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-chroot-backports "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-binary "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-binary-security "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-binary-volatile "$DELPHIX_PACKAGE_MIRROR_MAIN" \
+	--mirror-binary-backports "$DELPHIX_PACKAGE_MIRROR_MAIN"
 
 lb build
 

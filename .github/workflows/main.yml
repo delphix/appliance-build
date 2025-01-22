@@ -1,24 +1,24 @@
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
   check-ansible:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - run: sudo ./.github/scripts/install-gradle.sh
-      - run: sudo -E ./.github/scripts/install-ansible-lint.sh
-      - run: /opt/gradle-5.1/bin/gradle ansibleCheck
+      - uses: actions/checkout@v4
+      - name: Run ansible-lint
+        uses: ansible/ansible-lint@main
+        with:
+          args: ""
+          setup_python: "true"
+          working_directory: ""
+          requirements_file: ".github/misc/ansible-lint-requirements.yml"
   check-shellcheck:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - run: sudo ./.github/scripts/install-gradle.sh
-      - run: sudo ./.github/scripts/install-shellcheck.sh
-      - run: /opt/gradle-5.1/bin/gradle shellCheck
-  check-shfmt:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v1
-      - run: sudo ./.github/scripts/install-gradle.sh
-      - run: sudo ./.github/scripts/install-shfmt.sh
-      - run: /opt/gradle-5.1/bin/gradle shfmtCheck
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        env:
+          SHELLCHECK_OPTS: -e SC1090 -e SC1091
+        with:
+          ignore_names: gradlew

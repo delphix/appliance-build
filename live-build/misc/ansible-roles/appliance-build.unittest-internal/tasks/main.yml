@@ -17,7 +17,7 @@
 ---
 - apt:
     name:
-      - adoptopenjdk-java8-jdk
+      - openjdk-8-jdk-headless
       - ant
       - bash
       - build-essential
@@ -48,7 +48,7 @@
 #
 - apt:
     name:
-      - libasound2
+      - libasound2t64
       - libatk-bridge2.0-0
       - libatk-bridge2.0-0
       - libatspi2.0-0

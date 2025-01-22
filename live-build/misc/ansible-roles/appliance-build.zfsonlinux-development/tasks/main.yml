@@ -27,8 +27,8 @@
       - curl
       - delphix-go
       - delphix-rust
+      - dh-dkms
       - dwarves
-      - emacs-nox
       - fakeroot
       - flake8
       - gdebi
@@ -40,9 +40,10 @@
       - libelf-dev
       - libselinux-dev
       - libssl-dev
+      - libtirpc-dev
       - libtool-bin
       - libudev-dev
-      - llvm-12
+      - llvm-14
       - lsscsi
       - mandoc
       - mold

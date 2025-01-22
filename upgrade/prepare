@@ -25,7 +25,7 @@ function die() {
 		exit_code=1
 	fi
 	echo "$(basename "$0"): $*" >&2
-	exit ${exit_code}
+	exit "${exit_code}"
 }
 
 function usage() {
@@ -38,6 +38,7 @@ function report_progress_inc() {
 	echo "Progress increment: $(date +%T:%N%z), $1, $2"
 }
 
+# shellcheck disable=SC2317
 function cleanup() {
 	[[ -d "$UNPACK_DIR" ]] && rm -rf "$UNPACK_DIR"
 }

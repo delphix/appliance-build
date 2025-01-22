@@ -25,6 +25,7 @@
       - ufw
       - nmap
       - gnupg
+      - python3-aiosmtpd
     state: present
   register: result
   until: result is not failed
@@ -54,7 +55,8 @@
       - libpam0g-dev
       - libssl-dev
       - python3-pip
-      - python3.8
+      - python3.11
+      - python3.11-venv
     state: present
   register: result
   until: result is not failed
