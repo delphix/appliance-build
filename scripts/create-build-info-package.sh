@@ -68,18 +68,6 @@ mkdir "$target/appliance-build"
 cd "$TOP"
 git rev-parse HEAD >"$target/appliance-build/GIT_HASH"
 
-function check_env() {
-	#
-	# When the job is ran manually for testing purposes, we do not expect
-	# all environment to be set, so skip the env check.
-	#
-	[[ -n "$JENKINS_URL" ]] || return 0
-
-	local val="${!1}"
-	[[ -n "$val" ]] || die "check_env: $1 must be non-empty"
-	return 0
-}
-
 check_env APPLIANCE_BUILD_GIT_URL
 echo "$APPLIANCE_BUILD_GIT_URL" >"$target/appliance-build/GIT_URL"
 check_env APPLIANCE_BUILD_GIT_BRANCH

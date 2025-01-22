@@ -15,17 +15,15 @@
 #
 
 ---
-- apt:
-    update_cache: yes
-
-- apt:
+- name: Update apt cache and install apt packages
+  ansible.builtin.apt:
     name:
       - ansible
       - aptly
-      - awscli
       - bc
       - coreutils
       - devscripts
+      - docker.io
       - equivs
       - gdisk
       - git
@@ -36,15 +34,46 @@
       - livecd-rootfs
       - make
       - man
-      - openjdk-8-jre-headless
+      - openjdk-8-jdk-headless
       - pigz
-      - qemu
+      # The VSDK plugin requires python3.11
+      - python3.11
+      - qemu-system
       - rename
       - shellcheck
       - vim
       - zfsutils-linux
     state: present
+    update_cache: true
 
-- modprobe:
+- name: Stop unattended-upgrades systemd service in preparation for package removal
+  ansible.builtin.systemd:
+    name: unattended-upgrades
+    state: stopped
+  register: result_systemd_stop
+  failed_when: "result_systemd_stop is failed and 'Could not find the requested service' not in result_systemd_stop.msg"
+
+- name: Remove unattended-upgrades package
+  ansible.builtin.apt:
+    name:
+      - unattended-upgrades
+    state: absent
+    purge: true
+
+# aws-cli is distributed via snap on 24.04. While the package is not required by the product,
+# it is required by appliance-build itself.
+- name: Install aws-cli snap package
+  community.general.snap:
+    name: aws-cli
+    classic: true
+
+- name: Load ZFS kernel module.
+  community.general.modprobe:
     name: zfs
     state: present
+
+- name: Add delphix user to docker group required by the virtualization package
+  ansible.builtin.user:
+    name: delphix
+    groups: docker
+    append: true

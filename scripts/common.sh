@@ -186,3 +186,15 @@ function get_upstream_or_fail_if_unset() {
 		echo "$UPSTREAM_PRODUCT_BRANCH"
 	fi
 }
+
+function check_env() {
+	#
+	# When the job is ran manually for testing purposes, we do not expect
+	# all environment to be set, so skip the env check.
+	#
+	[[ -n "$JENKINS_URL" ]] || return 0
+
+	local val="${!1}"
+	[[ -n "$val" ]] || die "check_env: $1 must be non-empty"
+	return 0
+}
