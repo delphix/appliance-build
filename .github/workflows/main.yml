@@ -11,7 +11,7 @@ jobs:
           args: ""
           setup_python: "true"
           working_directory: ""
-          requirements_file: ".github/workflows/requirements.yml"
+          requirements_file: ".github/misc/ansible-lint-requirements.yml"
   check-shellcheck:
     runs-on: ubuntu-20.04
     steps:
