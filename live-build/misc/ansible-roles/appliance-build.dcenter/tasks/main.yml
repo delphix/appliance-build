@@ -65,18 +65,12 @@
 
 - name: Mask named and dhcp services
   ansible.builtin.systemd_service:
-    name: named.service
+    name: "{{ item }}"
     masked: true
-
-- name: Mask named and dhcp services
-  ansible.builtin.systemd_service:
-    name: isc-dhcp-server.service
-    masked: true
-
-- name: Mask named and dhcp services
-  ansible.builtin.systemd_service:
-    name: isc-dhcp-server6.service
-    masked: true
+  with_items:
+    - named.service
+    - isc-dhcp-server.service
+    - isc-dhcp-server6.service
 
 #
 # delphix-platform installs ntp in a disabled state by default.
