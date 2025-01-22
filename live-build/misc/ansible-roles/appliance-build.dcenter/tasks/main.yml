@@ -56,12 +56,12 @@
     mode: "0644"
 
 - name: Add dcenter-specific NFS overrides to /etc/nfs.conf.d/12-delphix-dcenter-nfs-overrides.conf
-  copy:
+  ansible.builtin.copy:
     src: etc/
     dest: /etc/
     owner: root
     group: root
-    mode: 0444
+    mode: "0444"
 
 - name: Mask named and dhcp services
   ansible.builtin.systemd_service:
