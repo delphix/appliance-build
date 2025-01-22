@@ -1,5 +1,5 @@
 #
-# Copyright 2019 Delphix
+# Copyright 2019, 2024 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@
 # limitations under the License.
 #
 
-deb @@URL@@ focal main multiverse universe contrib stable
-deb @@URL@@ focal-updates main multiverse universe
-deb @@URL@@ focal-pgdg main
+deb @@URL@@ noble main multiverse universe contrib stable
+deb @@URL@@ noble-pgdg main
+deb @@URL@@ stable main

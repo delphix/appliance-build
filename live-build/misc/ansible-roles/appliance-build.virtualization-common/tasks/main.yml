@@ -24,21 +24,6 @@
     state: directory
 
 #
-# Initial NFS Server configuration for virtualization. We do this here instead
-# of within the virtualization package because the virtualization software
-# modifies this configuration at runtime, and we don't want ansible roles that
-# are re-run as part of upgrades to undo these runtime modifications.
-#
-- name: Link initial NFS configuration
-  file:
-    src: /opt/delphix/server/etc/nfs-kernel-server-v4
-    dest: /etc/default/nfs-kernel-server
-    force: yes
-    owner: root
-    group: root
-    state: link
-
-#
 # The section below deals with disabling and masking services that need to be
 # disabled on initial install. Some of those services will remain disabled
 # forever, while others could be enabled by the various applications running

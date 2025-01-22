@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-adoptopenjdk-java8-jdk
+openjdk-8-jdk-headless
 bind9
 dnsutils
 git

@@ -192,7 +192,7 @@ if [[ -f /etc/apt/sources.list ]]; then
 fi
 
 cat <<EOF >/etc/apt/sources.list ||
-deb [trusted=yes] file://$IMAGE_PATH focal delphix
+deb [trusted=yes] file://$IMAGE_PATH noble delphix
 EOF
 	die "failed to configure apt sources"
 

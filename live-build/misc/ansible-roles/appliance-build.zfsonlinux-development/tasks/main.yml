@@ -42,7 +42,7 @@
       - libssl-dev
       - libtool-bin
       - libudev-dev
-      - llvm-12
+      - llvm-14
       - lsscsi
       - mandoc
       - mold
