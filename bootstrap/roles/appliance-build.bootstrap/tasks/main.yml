@@ -15,6 +15,12 @@
 #
 
 ---
+# The VSDK plugin requires python3.11. The deadsnakes PPA provides python3.11 on 24.04.
+- name: Add deadsnakes PPA for python3.11 for vSDK
+  ansible.builtin.apt_repository:
+    repo: ppa:deadsnakes/ppa
+    state: present
+
 - name: Update apt cache and install apt packages
   ansible.builtin.apt:
     name:
