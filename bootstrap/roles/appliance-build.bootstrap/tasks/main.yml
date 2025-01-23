@@ -50,6 +50,7 @@
       - man
       - openjdk-8-jdk-headless
       - pigz
+      - python3-passlib
       - qemu-system
       - rename
       - shellcheck
