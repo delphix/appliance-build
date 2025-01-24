@@ -15,11 +15,19 @@
 #
 
 ---
-# The VSDK plugin requires python3.11. The deadsnakes PPA provides python3.11 on 24.04.
-- name: Add deadsnakes PPA for python3.11 for vSDK
-  ansible.builtin.apt_repository:
-    repo: ppa:deadsnakes/ppa
-    state: present
+- name: Stop unattended-upgrades systemd service in preparation for package removal
+  ansible.builtin.systemd:
+    name: unattended-upgrades
+    state: stopped
+  register: result_systemd_stop
+  failed_when: "result_systemd_stop is failed and 'Could not find the requested service' not in result_systemd_stop.msg"
+
+- name: Remove unattended-upgrades package
+  ansible.builtin.apt:
+    name:
+      - unattended-upgrades
+    state: absent
+    purge: true
 
 - name: Update apt cache and install apt packages
   ansible.builtin.apt:
@@ -42,8 +50,8 @@
       - man
       - openjdk-8-jdk-headless
       - pigz
-      # The VSDK plugin requires python3.11
-      - python3.11
+      - python3-passlib
+      - python3-pip
       - qemu-system
       - rename
       - shellcheck
@@ -52,26 +60,13 @@
     state: present
     update_cache: true
 
-- name: Stop unattended-upgrades systemd service in preparation for package removal
-  ansible.builtin.systemd:
-    name: unattended-upgrades
-    state: stopped
-  register: result_systemd_stop
-  failed_when: "result_systemd_stop is failed and 'Could not find the requested service' not in result_systemd_stop.msg"
-
-- name: Remove unattended-upgrades package
-  ansible.builtin.apt:
-    name:
-      - unattended-upgrades
-    state: absent
-    purge: true
-
-# aws-cli is distributed via snap on 24.04. While the package is not required by the product,
+# awscli is distributed via pip or snap on 24.04. While the package is not required by the product,
 # it is required by appliance-build itself.
-- name: Install aws-cli snap package
-  community.general.snap:
-    name: aws-cli
-    classic: true
+- name: Install awscli python package
+  ansible.builtin.pip:
+    name: awscli
+    break_system_packages: true
+  become: true
 
 - name: Load ZFS kernel module.
   community.general.modprobe:
