@@ -51,6 +51,7 @@
       - openjdk-8-jdk-headless
       - pigz
       - python3-passlib
+      - python3-pip
       - qemu-system
       - rename
       - shellcheck
@@ -59,12 +60,13 @@
     state: present
     update_cache: true
 
-# aws-cli is distributed via snap on 24.04. While the package is not required by the product,
+# awscli is distributed via pip or snap on 24.04. While the package is not required by the product,
 # it is required by appliance-build itself.
-- name: Install aws-cli snap package
-  community.general.snap:
-    name: aws-cli
-    classic: true
+- name: Install awscli python package
+  ansible.builtin.pip:
+    name: awscli
+    break_system_packages: true
+  become: true
 
 - name: Load ZFS kernel module.
   community.general.modprobe:
