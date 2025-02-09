@@ -491,7 +491,7 @@ function fix_and_migrate_services() {
 		delphix-masking.service
 		nfs-mountd.service
 		nginx.service
-		ntp.service
+		ntpsec.service
 		postgresql.service
 		rpc-statd.service
 		rpcbind.service
