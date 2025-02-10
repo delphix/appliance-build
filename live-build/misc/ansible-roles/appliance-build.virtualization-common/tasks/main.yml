@@ -80,7 +80,7 @@
   with_items:
     - delphix-fluentd.service
     - delphix-masking.service
-    - ntp.service
+    - ntpsec.service
     - snmpd.service
 
 #
