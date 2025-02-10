@@ -86,5 +86,5 @@
 #
 - name: Enable NTP systemd service
   ansible.builtin.systemd_service:
-    name: ntp.service
+    name: ntpsec.service
     enabled: true

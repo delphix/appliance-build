@@ -370,6 +370,20 @@ zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	die "failed to mark as manual packages listed in packages.list.gz file"
 
 #
+# As part of the LTS upgrade project to 24.04, `ntp` was replaced by `ntpsec`.
+# To preserve and migrate the NTP configuration, we need to copy the
+# NTP configuration file to the new location after packages are upgraded,
+# but before they are removed so that NTP continues to function as expected.
+#
+if [[ -f "/etc/ntp/ntp.conf" ]]; then
+	cp /etc/ntp/ntp.conf /etc/ntpsec/ntp.conf ||
+		die "failed to copy /etc/ntp/ntp.conf to /etc/ntpsec/ntp.conf"
+	if [[ "$(systemctl is-enabled ntp.service)" == enabled ]]; then
+		systemctl enable ntpsec.service
+	fi
+fi
+
+#
 # After we've successfully installed the new packages and marked them
 # all as manual-ly installed, we need to remove all packages that are no
 # longer required. For example, if the old "delphix-entire" version
