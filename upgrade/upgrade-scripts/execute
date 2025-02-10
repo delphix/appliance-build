@@ -372,9 +372,9 @@ zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 
 #
 # As part of the LTS upgrade project to 24.04, `ntp` was replaced by `ntpsec`.
-# To preserve and restore the NTP configuration, we need to copy the
-# NTP configuration files to the new location after the upgrade so that NTP
-# continues to function as expected.
+# To preserve and migrate the NTP configuration, we need to copy the
+# NTP configuration file to the new location after packages are upgraded,
+# but before they are removed so that NTP continues to function as expected.
 #
 if [[ -f "/etc/ntp/ntp.conf" ]]; then
 	cp /etc/ntp/ntp.conf /etc/ntpsec/ntp.conf ||
