@@ -344,7 +344,6 @@ apt-mark manual "delphix-entire-$opt_p" ||
 [[ -f "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" ]] ||
 	die "delphix-entire's packages.list.gz file is missing"
 
-
 #
 # In DLPX-91387, we discovered that cloud-init's preinst script was
 # removing '/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg', which
