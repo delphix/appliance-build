@@ -104,3 +104,16 @@
   command: "systemctl disable {{ item }}"
   with_items:
     - docker.service
+
+#
+# We mask delphix-fluentd, which means that fluentd does not run on boot.
+# The fluentd log file /var/log/fluent/fluentd.log is not created until fluentd
+# is started. Yet, the upstream package `fluent-package` creates a logrotate
+# configuration for this log file. logrotate will fail unless `missingok` is
+# set in the logrotate configuration.
+#
+- name: Have logrotate ignore missing log files
+  lineinfile:
+    path: /etc/logrotate.d/fluentd
+    line: "  missingok"
+    insertafter: "daily"
