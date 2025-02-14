@@ -20,6 +20,8 @@
     name:
       - openjdk-8-jdk-headless
       - curl
+      - delphix-rust
+      - delphix-rust-src
       - docker.io
       - fakeroot
       - git
