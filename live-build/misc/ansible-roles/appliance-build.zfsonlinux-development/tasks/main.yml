@@ -27,6 +27,7 @@
       - curl
       - delphix-go
       - delphix-rust
+      - dh-dkms
       - dwarves
       - emacs-nox
       - fakeroot
@@ -40,6 +41,7 @@
       - libelf-dev
       - libselinux-dev
       - libssl-dev
+      - libtirpc-dev
       - libtool-bin
       - libudev-dev
       - llvm-14
