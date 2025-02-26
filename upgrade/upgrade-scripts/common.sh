@@ -492,6 +492,7 @@ function fix_and_migrate_services() {
 		nfs-mountd.service
 		nginx.service
 		ntpsec.service
+		ntpsec-rotate-stats.timer
 		postgresql.service
 		rpc-statd.service
 		rpcbind.service

@@ -387,6 +387,7 @@ if [[ -f "/etc/ntp/ntp.conf" ]]; then
 	cp /etc/ntp/ntp.conf /etc/ntpsec/ntp.conf ||
 		die "failed to copy /etc/ntp/ntp.conf to /etc/ntpsec/ntp.conf"
 	if [[ "$(systemctl is-enabled ntp.service)" == enabled ]]; then
+		systemctl disable --now ntp.service
 		systemctl enable ntpsec.service
 	fi
 fi
@@ -492,6 +493,15 @@ rm -f /etc/apt/sources.list.d/*
 #
 if [[ "$(systemctl is-enabled telegraf)" == enabled ]]; then
 	systemctl mask --now telegraf.service
+fi
+
+#
+# Upgrading to LTS 24.04 causes the `ntpsec` package to be installed. This package installs the
+# `ntpsec-rotate-stats.timer` timer which is enabled by default. Our product never enables
+# the collection of NTP stats, so we disable the timer to prevent it from running.
+#
+if [[ "$(systemctl is-enabled ntpsec-rotate-stats.timer)" == enabled ]]; then
+	systemctl mask --now ntpsec-rotate-stats.timer
 fi
 
 #
