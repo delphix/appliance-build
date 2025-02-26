@@ -43,6 +43,12 @@
     password:
       "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
 
+- name: Set 755 permissions on Delphix home directory
+  file:
+    path: /export/home/delphix
+    mode: 0755
+    state: directory
+
 - user:
     name: root
     password:
