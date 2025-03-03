@@ -84,3 +84,20 @@
     dest: '/usr/src/linux-headers-{{ item }}/vmlinux'
     state: link
   loop: '{{ kernel_versions.stdout_lines }}'
+
+
+#
+# The PCP framework which provides `dstat` required by `delphix-platform`
+# is not needed on the appliance. We disable and mask the services that
+# are part of the PCP framework. While removing the package would be
+# a better option, it is not possible due to the dependency on `dstat`.
+#
+- name: Disable and mask services that should not be running by default
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  with_items:
+    - pmcd.service
+    - pmlogger.service
