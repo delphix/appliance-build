@@ -20,3 +20,12 @@
     mode: 0644
     content: |
       allow_public_ssh_keys: true
+
+# awscli is distributed via pip or snap on 24.04. While the package is not required by the product,
+# many of our tests use it to interact with AWS services. We install it here to avoid having each
+# test install it separately.
+- name: Install awscli python package
+  ansible.builtin.pip:
+    name: awscli
+    break_system_packages: true
+  become: true
