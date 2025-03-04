@@ -24,16 +24,7 @@
       - fakeroot
       - git
       - gnupg
-      - python3-pip
     state: present
-
-# awscli is distributed via pip or snap on 24.04. While the package is not required by the product,
-# it is required by appliance-build itself.
-- name: Install awscli python package
-  ansible.builtin.pip:
-    name: awscli
-    break_system_packages: true
-  become: true
 
 - name: Add delphix user to docker group required by the virtualization package
   ansible.builtin.user:
