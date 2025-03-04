@@ -224,6 +224,11 @@ fix_and_migrate_services
 systemctl mask docker.service
 
 #
+#
+#
+dpkg --configure -a || die "failed to run dpkg --configure -a"
+
+#
 # Older versions (i.e. before 9.0.0.0 release) of the "nfs-kernel-server"
 # package had "rmtab" file delivered as part of the package. Thus, when
 # upgrading the package, the existing "rmtab" file would get replaced
