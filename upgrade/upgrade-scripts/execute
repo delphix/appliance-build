@@ -254,6 +254,19 @@ systemctl mask docker.service
 apt_get update || die "failed to update apt sources"
 
 #
+# The LTS 24.04 project removed the dependency of our internally forked `drgn`
+# package in favor of the upstream `python3-drgn` package. Installing the
+# `python3-drgn` package conflicts with the installed version `drgn`, if any.
+# `/usr/bin/drgn` is supplied by both packages, and to make way for the
+# `python3-drgn` package, we need to remove the `drgn` package.
+# While this introduces a small window where no version of this software is
+# installed, it was deemed acceptable as the `drgn` package is only used by `sdb`.
+#
+if ! dpkg-query -l drgn &>/dev/null; then
+	apt_get purge -y drgn || die "failed to purge drgn"
+fi
+
+#
 # Currently, we need to run the delphix-platform's "postinst" packaging hook
 # prior to the installation of the postgresql package. Further, right now,
 # the postgresql package is pulled in as a dependency of the
