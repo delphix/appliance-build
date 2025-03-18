@@ -254,6 +254,19 @@ systemctl mask docker.service
 apt_get update || die "failed to update apt sources"
 
 #
+# If the version of systemd changes enough during an upgrade, it's possible
+# for various systemd commands (e.g. systemctl disable) to fail, as the running
+# version of systemd might not match what the new packages expect. We've had
+# this happen when upgrading LTS versions. If those commands fail as part of
+# a package hook, that can cause the upgrade to as a whole to fail.
+#
+# Thus, to try and prevent this, we first upgrade the systemd package, and
+# restart the systemd process, before moving on to upgrading any other packages.
+#
+apt_get install -y "systemd" || die "failed to install systemd"
+systemctl daemon-reexec || die "'systemctl daemon-reexec' failed"
+
+#
 # Currently, we need to run the delphix-platform's "postinst" packaging hook
 # prior to the installation of the postgresql package. Further, right now,
 # the postgresql package is pulled in as a dependency of the
