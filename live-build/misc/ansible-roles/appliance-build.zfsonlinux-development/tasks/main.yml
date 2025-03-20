@@ -29,7 +29,6 @@
       - delphix-rust
       - dh-dkms
       - dwarves
-      - emacs-nox
       - fakeroot
       - flake8
       - gdebi
