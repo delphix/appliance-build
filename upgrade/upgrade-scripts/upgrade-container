@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,19 +50,6 @@ function create_cleanup() {
 	[[ -z "$CONTAINER" ]] && return
 
 	destroy "$CONTAINER"
-}
-
-function mount_upgrade_container_dataset() {
-	[[ -n "$1" ]] || die "failed to provide dataset to mount"
-	[[ -n "$2" ]] || die "failed to provide directory for mount"
-
-	mkdir -p "$2" || die "failed to create directory '$2'"
-	mount -t zfs "$1" "$2" || die "failed to mount dataset '$1' to '$2'"
-}
-
-function unmount_upgrade_container_dataset() {
-	[[ -n "$1" ]] || die "failed to provide dataset to unmount"
-	umount "$1" || die "failed to unmount dataset '$1'"
 }
 
 function create_upgrade_container() {
@@ -153,7 +140,7 @@ function create_upgrade_container() {
 	esac
 
 	case "$type" in
-	in-place | rollback)
+	in-place | not-in-place | rollback)
 		#
 		# For in-place and rollback containers, we create the
 		# root filesystem by cloning an existing container.
@@ -183,28 +170,6 @@ function create_upgrade_container() {
 
 		zfs mount "rpool/ROOT/$CONTAINER/root" ||
 			die "failed to mount upgrade / clone"
-		;;
-	not-in-place)
-		#
-		# For not-in-place containers, the root filesystem is
-		# created such that it won't immediately have delphix
-		# software installed on it. Thus, we don't set any
-		# version properties here, since there isn't any version
-		# of delphix software installed.
-		#
-		# Later, when the "execute" script is used to install
-		# the delphix software, we'll set the version
-		# properties.
-		#
-
-		zfs create \
-			-o canmount=noauto \
-			-o mountpoint="$DIRECTORY" \
-			"rpool/ROOT/$CONTAINER/root" ||
-			die "failed to create upgrade / filesystem"
-
-		zfs mount "rpool/ROOT/$CONTAINER/root" ||
-			die "failed to mount upgrade / filesystem"
 		;;
 	esac
 
@@ -239,90 +204,6 @@ function create_upgrade_container() {
 			"rpool/ROOT/$CONTAINER/vartmp" ||
 			die "failed to create upgrade /var/tmp clone"
 	fi
-
-	case "$type" in
-	not-in-place)
-		#
-		# We need to ensure all of the upgrade container's datasets
-		# are mounted before running "debootstrap". This way, if any
-		# packages installed by "debootstrap" happen to deliver
-		# files to any of these directories, they'll be propertly
-		# delivered to the correct dataset, rather than the root
-		# dataset.
-		#
-		mount_upgrade_container_dataset \
-			"rpool/ROOT/$CONTAINER/home" "$DIRECTORY/export/home"
-		mount_upgrade_container_dataset \
-			"rpool/ROOT/$CONTAINER/data" "$DIRECTORY/var/delphix"
-		mount_upgrade_container_dataset \
-			"rpool/ROOT/$CONTAINER/log" "$DIRECTORY/var/log"
-
-		if $TMP_DATASETS_EXIST; then
-			mount_upgrade_container_dataset \
-				"rpool/ROOT/$CONTAINER/tmp" "$DIRECTORY/tmp"
-			mount_upgrade_container_dataset \
-				"rpool/ROOT/$CONTAINER/vartmp" "$DIRECTORY/var/tmp"
-		fi
-
-		#
-		# This function needs to return the container's name to
-		# stdout, so that consumers of this function/script can
-		# consume that name and then later start/stop/destroy the
-		# container. Thus, we have to redirect the output from
-		# debootstrap away from stdout.
-		#
-		# Also, we need to include the "systemd-container" package
-		# when installing the base systemd with debootstrap so that
-		# starting the container will work properly. Otherwise,
-		# after starting the container, we won't be able to
-		# communicate and later run commands in the container with
-		# "systemd-run".
-		#
-		# On Ubuntu 20.04, in-order to satisfy some package
-		# dependencies, we must set the variant to "minbase" and list
-		# "ntp" in the include list before "systemd-container".
-		# Setting the variant to minbase removes systemd from the
-		# packages being installed by default. Systemd will still
-		# be installed, but in a later pass, as a dependency of
-		# systemd-container. The reason we need to go through those
-		# hoops is the following:
-		#  - systemd has a package dependency on a "time-daemon"
-		#    virtual package, which is provided by either "ntp" or
-		#    "systemd-timesyncd".
-		#  - If a time-deamon is not already installed when
-		#    installing systemd, then systemd will try to
-		#    install systemd-timesyncd.
-		#  - systemd-timesyncd is not available in our upgrade
-		#    images because we install ntp and ntp conflicts with
-		#    systemd-timesyncd.
-		#  - Setting variant as minbase and list ntp before
-		#    systemd-container in the include list allows debootstrap
-		#    to install ntp before systemd, thus satisfying the
-		#    package dependencies.
-		# Note that we do not run into those problems during live-build
-		# because debootstrap is already run with variant=minbase and
-		# systemd is not installed by debootstrap, but rather by
-		# delphix-platform which pulls both ntp and systemd.
-		#
-		debootstrap --no-check-gpg --variant=minbase \
-			--components=delphix --include=ntp,systemd-container \
-			noble "$DIRECTORY" "file://$IMAGE_PATH" 1>&2 ||
-			die "failed to debootstrap upgrade filesystem"
-
-		#
-		# Now that we've successfully run "deboostrap", we can
-		# unmount these datasets that were mounted above.
-		#
-		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/log"
-		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/data"
-		unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/home"
-
-		if $TMP_DATASETS_EXIST; then
-			unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/tmp"
-			unmount_upgrade_container_dataset "rpool/ROOT/$CONTAINER/vartmp"
-		fi
-		;;
-	esac
 
 	#
 	# We rely on the "/etc/fstab" file to mount the non-root ZFS
@@ -692,210 +573,9 @@ function convert_to_rootfs() {
 		die "zfs set mountpoint rpool/ROOT/$CONTAINER/root' failed"
 }
 
-function migrate_password_for_user() {
-	local user="$1"
-	local password
-
-	password="$(awk -F: "\$1 == \"$user\" {print \$2}" /etc/shadow)"
-	chroot "/var/lib/machines/$CONTAINER" usermod -p "$password" "$user" ||
-		die "'usermod -p ... $user' failed for '$CONTAINER'"
-}
-
-function migrate_file() {
-	local path="$1"
-	local parentdir
-
-	if [[ -f "$path" ]]; then
-		parentdir="$(dirname "$path")"
-		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
-			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
-		cp -Pp "$path" "/var/lib/machines/${CONTAINER}${path}" ||
-			die "'cp -Pp $path' failed for '$CONTAINER'"
-	else
-		#
-		# If the target file doesn't exist in the host then we
-		# delete the file. This case could happen if the host
-		# configuration doesn't exist but a fresh install placed
-		# package default configuration.
-		#
-		rm -f "/var/lib/machines/${CONTAINER}${path}" ||
-			die "failed to remove file '$path' in '$CONTAINER'"
-	fi
-}
-
-function migrate_dir() {
-	local path="$1"
-	local parentdir
-
-	if [[ -d "$path" ]]; then
-		parentdir="$(dirname "$path")"
-		mkdir -p "/var/lib/machines/${CONTAINER}${parentdir}" ||
-			die "'mkdir -p $parentdir' failed for '$CONTAINER'"
-		cp -prT "$path" "/var/lib/machines/${CONTAINER}${path}" ||
-			die "'cp -prT $path' failed for '$CONTAINER'"
-	else
-		#
-		# If the target dir doesn't exist in the host then
-		# we delete the dir. This case could happen if the host
-		# configuration doesn't exist but a fresh install placed
-		# package default configuration.
-		#
-		rm -rf "/var/lib/machines/${CONTAINER}${path}" ||
-			die "failed to remove directory '$path' in '$CONTAINER'"
-	fi
-}
-
-function migrate_configuration() {
-	#
-	# When performing a not-in-place upgrade, the root and delphix
-	# users will not have any password by default. Thus, we need to
-	# explicitly configure the passwords on the new root filesystem.
-	# Here, we ensure the passwords for the root and delphix user on
-	# the new root filesystem match their current values.
-	#
-	migrate_password_for_user delphix
-	migrate_password_for_user root
-
-	#
-	# These files are generic OS files that are required for the
-	# system to properly operate; these must be preserved acorss
-	# upgrades.
-	#
-	while read -r file; do
-		migrate_file "$file"
-	done <<-EOF
-		/etc/cloud/templates/hosts.debian.tmpl
-		/etc/default/nfs-kernel-server
-		/etc/hostid
-		/etc/hostname
-		/etc/hosts
-		/etc/iscsi/initiatorname.iscsi
-		/etc/machine-id
-		/etc/netplan/10-delphix.yaml
-		/etc/resolv.conf
-		/etc/ssh/ssh_host_dsa_key
-		/etc/ssh/ssh_host_dsa_key.pub
-		/etc/ssh/ssh_host_ecdsa_key
-		/etc/ssh/ssh_host_ecdsa_key.pub
-		/etc/ssh/ssh_host_ed25519_key
-		/etc/ssh/ssh_host_ed25519_key.pub
-		/etc/ssh/ssh_host_rsa_key
-		/etc/ssh/ssh_host_rsa_key.pub
-		/etc/sudoers.d/90-cloud-init-users
-		/etc/systemd/resolved.conf.d/delphix-static.conf
-		/etc/zfs/zpool.cache
-	EOF
-
-	#
-	# These paths are specific to the delphix virtualization and/or
-	# masking application, and must be preserved across upgrades.
-	# Ideally this list would be provided by the applications
-	# themselves, rather than specified here, but the infrastructure
-	# to enable the applications to do this doesn't yet exist. Thus,
-	# if the applications change in a way that requires changes to
-	# this list, we can it up with a flag-day situation.
-	#
-	# Note, we migrate the "/etc/modprobe.d/20-zfs.conf" file without
-	# verifying the tunables contained in that file make sense for the
-	# new rootfs. We're reliant on this file being verified by some
-	# other mechanism (e.g. the virtualization application's upgrade
-	# verification), and failing the upgrade if the file's contents is
-	# incompatible with the new appliance version. Without this
-	# verification, the file could contain tunables that are not
-	# appropriate for the new version, and could cause the appliance
-	# to mis-behave after booting to the new rootfs.
-	#
-	while read -r file; do
-		migrate_file "$file"
-	done <<-EOF
-		/etc/challenge_response.key
-		/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-		/etc/cloud/cloud.cfg.d/99-delphix-disable-network-config.cfg
-		/etc/delphix-interface-names.yaml
-		/etc/default/locale
-		/etc/engine-code
-		/etc/engine-uuid
-		/etc/engine.install
-		/etc/fluent/fluent.conf
-		/etc/issue
-		/etc/krb5.conf
-		/etc/krb5.keytab
-		/etc/mds_upgrader
-		/etc/modprobe.d/20-zfs.conf
-		/etc/ntp.conf
-		/etc/snmp/snmpd.conf
-		/etc/rtslib-fb-target/saveconfig.json
-		/var/opt/delphix/server.conf
-	EOF
-
-	while read -r dir; do
-		migrate_dir "$dir"
-	done <<-EOF
-		/etc/iscsi/nodes
-		/var/lib/nfs
-		/var/target/pr
-	EOF
-
-	#
-	# These directories and files are created by cloud-init. When
-	# cloud-init runs, it stores some metadata such as the instance id,
-	# hostname, timestamps for when given modules were last run.
-	# We also want to persist the network configuration auto-generated
-	# by cloud-init.
-	#
-	# If we do not migrate those files, cloud-init will consider this
-	# system as a new instance and re-configure it. This should not be
-	# an issue in most cases since we have tuned our cloud-init
-	# configuration to eliminate unwanted side-effects on new instance
-	# detection. However, those tunings were done as a precaution and
-	# are not guaranteed to be always sufficient to avoid side-effects.
-	#
-	while read -r dir; do
-		migrate_dir "$dir"
-	done <<-EOF
-		/var/lib/cloud/data
-		/var/lib/cloud/instances
-		/var/lib/cloud/sem
-	EOF
-
-	while read -r file; do
-		migrate_file "$file"
-	done <<-EOF
-		/etc/netplan/50-cloud-init.yaml
-		/var/lib/cloud/instance
-	EOF
-
-	#
-	# The files listed here are dynamically generated and/or
-	# modified by appliance-build.
-	#
-	while read -r file; do
-		migrate_file "$file"
-	done <<-EOF
-		/etc/cloud/cloud.cfg.d/99-delphix-development.cfg
-		/etc/cloud/cloud.cfg.d/99-delphix-internal.cfg
-		/etc/nftables.conf
-		/etc/systemd/system/delphix-masking.service.d/override.conf
-		/etc/systemd/system/delphix-mgmt.service.d/override.conf
-		/etc/systemd/system/delphix-postgres@.service.d/override.conf
-	EOF
-}
-
-function do_upgrade_container_in_place() {
+function do_upgrade_container() {
 	run "$IMAGE_PATH/execute" ||
 		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
-}
-
-function do_upgrade_container_not_in_place() {
-	[[ -f "/var/lib/delphix-appliance/platform" ]] ||
-		die "could not determine platform; file does not exist"
-
-	run "$IMAGE_PATH/execute" \
-		-p "$(cat /var/lib/delphix-appliance/platform)" ||
-		die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
-
-	migrate_configuration ||
-		die "failed to migrate configuration for '$CONTAINER'"
 }
 
 function get_type() {
@@ -919,13 +599,9 @@ function do_upgrade_container() {
 	local type
 	type=$(get_type)
 	case $type in
-	in-place)
-		do_upgrade_container_in_place ||
+	in-place | not-in-place)
+		do_upgrade_container ||
 			die "failed to upgrade the in-place container"
-		;;
-	not-in-place)
-		do_upgrade_container_not_in_place ||
-			die "failed to upgrade the not-in-place container"
 		;;
 	*)
 		die "unsupported upgrade container type specified: '$type'"
