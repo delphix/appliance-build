@@ -314,6 +314,15 @@ function create_upgrade_container() {
 			BindReadOnly=$device
 		EOF
 			die "failed to add '$device' to container config file"
+
+		pkname=$(lsblk -pn -o pkname "$device" | head -n1)
+		if [[ -n "$pkname" ]]; then
+			cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
+				BindReadOnly=$pkname
+			EOF
+				die "failed to add '$pkname' to container config file"
+		fi
+
 	done
 
 	#
