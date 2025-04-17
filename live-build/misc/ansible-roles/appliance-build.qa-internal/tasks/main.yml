@@ -25,6 +25,7 @@
       - ufw
       - nmap
       - gnupg
+      - python3-aiosmtpd
     state: present
   register: result
   until: result is not failed
