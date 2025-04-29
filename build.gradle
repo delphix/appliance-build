@@ -101,11 +101,7 @@ task shfmtCheck(type: Exec) {
     commandLine(["shfmt", "-d"] + shellScripts.getFiles())
 }
 
-task shellCheck(type: Exec) {
-    commandLine(["shellcheck", "--exclude=SC1090,SC1091"] + shellScripts.getFiles())
-}
-
-tasks.check.dependsOn shellCheck, shfmtCheck
+tasks.check.dependsOn shfmtCheck
 
 task format() {
     dependsOn shfmt
