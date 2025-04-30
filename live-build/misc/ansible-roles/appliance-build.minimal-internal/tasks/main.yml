@@ -40,8 +40,10 @@
 - name: Add s3 local bin dir to system-wide $PATH.
    vars:
       s3_bin_path: /usr/local/bin
-   copy:
-      dest: /etc/profile.d/s3-bin-path.sh
-      mode: 0644
-      content: 'PATH=$PATH:{{ s3_bin_path  }}'
+   tasks:
+   - name Create s3-bin-path.sh under profile.d
+      ansible.builtin.copy:
+         dest: /etc/profile.d/s3-bin-path.sh
+	 mode: 0644
+	 content: 'PATH=$PATH:{{ s3_bin_path  }}'
 
