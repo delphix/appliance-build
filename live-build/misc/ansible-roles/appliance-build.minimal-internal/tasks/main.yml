@@ -36,14 +36,15 @@
     break_system_packages: true
   become: true
 
-# Add /usr/local/bin to the PATH (awscli needs it)
-- name: Add s3 local bin dir to system-wide $PATH.
-   vars:
+# Set s3-bin-path
+- name: Set the s3_bin_path
+   set_fact:
       s3_bin_path: /usr/local/bin
-   tasks:
-   - name Create s3-bin-path.sh under profile.d
-      ansible.builtin.copy:
-         dest: /etc/profile.d/s3-bin-path.sh
-	 mode: 0644
-	 content: 'PATH=$PATH:{{ s3_bin_path  }}'
+
+# Add /usr/local/bin to the PATH (awscli needs it)
+- name: Create s3-bin-path.sh under profile.d
+   ansible.builtin.copy:
+      dest: /etc/profile.d/s3-bin-path.sh
+      mode: 0644
+      content: 'PATH=$PATH:{{ s3_bin_path }}'
 
