@@ -47,4 +47,3 @@
     dest: /etc/profile.d/s3-bin-path.sh
     mode: 0644
     content: 'PATH=$PATH:{{ s3_bin_path }}'
-
