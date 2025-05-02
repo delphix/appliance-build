@@ -35,3 +35,10 @@
     name: awscli
     break_system_packages: true
   become: true
+
+# Add /usr/local/bin to the PATH (awscli needs it)
+- name: Create s3-bin-path.sh under profile.d
+  ansible.builtin.copy:
+    dest: /etc/profile.d/s3-bin-path.sh
+    mode: 0644
+    content: 'PATH=$PATH:/usr/local/bin'
