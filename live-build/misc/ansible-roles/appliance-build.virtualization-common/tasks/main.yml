@@ -64,9 +64,9 @@
     systemctl disable {{ item }}
     systemctl mask {{ item }}
   with_items:
+    - fluentd.service
     - nginx.service
     - postgresql.service
-    - td-agent.service
     - telegraf.service
 
 #
