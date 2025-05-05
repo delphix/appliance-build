@@ -489,6 +489,7 @@ function fix_and_migrate_services() {
 	done <<-EOF
 		delphix-fluentd.service
 		delphix-masking.service
+		fluentd.service
 		nfs-mountd.service
 		nginx.service
 		ntpsec.service
@@ -499,7 +500,6 @@ function fix_and_migrate_services() {
 		rpcbind.socket
 		snmpd.service
 		systemd-timesyncd.service
-		td-agent.service
 		telegraf.service
 	EOF
 }
