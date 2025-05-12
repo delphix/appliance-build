@@ -1,5 +1,6 @@
+#!/bin/bash -eux
 #
-# Copyright 2019, 2025 Delphix
+# Copyright 2019 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +15,10 @@
 # limitations under the License.
 #
 
-deb @@URL@@ noble main multiverse universe contrib stable
-deb @@URL@@ noble-pgdg main
-deb @@URL@@ stable main
+#
+# Set /etc/hostname to an empty string to allow transient hostnames to be set
+# by systemd-hostnamed. systemd-hostnamed gives precedence to static hostnames
+# if set. Since live-build sets a static hostname, we need to clear it to allow
+# transient hostnames to be set.
+#
+chroot binary truncate -s 0 /etc/hostname

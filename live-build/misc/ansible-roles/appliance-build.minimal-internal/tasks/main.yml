@@ -20,3 +20,25 @@
     mode: 0644
     content: |
       allow_public_ssh_keys: true
+
+- name: Install pip
+  ansible.builtin.apt:
+    name:
+      - python3-pip
+    state: present
+
+# awscli is distributed via pip or snap on 24.04. While the package is not required by the product,
+# many of our tests use it to interact with AWS services. We install it here to avoid having each
+# test install it separately.
+- name: Install awscli python package
+  ansible.builtin.pip:
+    name: awscli
+    break_system_packages: true
+  become: true
+
+# Add /usr/local/bin to the PATH (awscli needs it)
+- name: Create s3-bin-path.sh under profile.d
+  ansible.builtin.copy:
+    dest: /etc/profile.d/s3-bin-path.sh
+    mode: 0644
+    content: 'PATH=$PATH:/usr/local/bin'
