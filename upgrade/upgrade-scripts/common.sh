@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 UPDATE_DIR="/var/dlpx-update"
 LOG_DIRECTORY="/var/tmp/delphix-upgrade"
 HOTFIX_PATH="/etc/hotfix"
+EFI_DIR="/boot/efi"
 
 #
 # The virtualization service uses a different umask than the default. Thus to account for the
@@ -373,6 +374,10 @@ function verify_upgrade_not_in_progress() {
 
 	. "$UPDATE_DIR/upgrade.properties" &>/dev/null
 	[[ -z "$UPGRADE_TYPE" ]] || die "upgrade currently in-progress"
+}
+
+function is_bootmode_uefi() {
+	[ -d /sys/firmware/efi/efivars ] && return 0 || return 1
 }
 
 function mask_service() {
