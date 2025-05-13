@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2019 Delphix
+# Copyright 2019, 2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,15 +83,19 @@ function get_bootloader_devices() {
 	# devices. We determine this by listing the devices used by the
 	# rpool. Additionally, we have to filter out devices that could
 	# be attached to the rpool, but would never be used for the
-	# bootloader. Finally, we need to strip off any parition
+	# bootloader. Finally, we need to strip off any partition
 	# information, since we want to install the bootloader directly
 	# to the device, rather than to a partition of the device.
 	#
 	zpool list -vH rpool |
 		awk '! /rpool|mirror|replacing|spare/ {print $1}' |
 		while read -r part; do
+		  # Skip if device doesn't exist or is not a block device
+			[[ -e "/dev/$part" ]] || continue
+			[[ -b "/dev/$part" ]] || continue
+
 			#
-			# If the rpool is not installed a parition, we throw
+			# If the rpool is not installed a partition, we throw
 			# an error. We expect this to never happen, and the
 			# calling code is likely untested in that case, so we
 			# throw an error rather than try to handle it.
@@ -100,6 +104,41 @@ function get_bootloader_devices() {
 				die "rpool installed on full disk \"$part\""
 			lsblk -no pkname "/dev/$part"
 		done
+}
+
+function mount_efi() {
+	#
+	# Find and mount the device and partition with EFI UUID
+	#
+	for dev in $(get_bootloader_devices); do
+		for part in $(lsblk -ln -o NAME,FSTYPE,PARTTYPE "/dev/$dev" | grep "$EFI_PART_UUID" | awk '{print $1}'); do
+			part_path="/dev/$part"
+			mount "$part_path" "$EFI_DIR"
+			return
+		done
+	done
+}
+
+function update_systemd_boot_entries() {
+	cp "${EFI_DIR}/loader/entries/delphix.conf" "${EFI_DIR}/loader/entries/delphix.conf.bak"
+	cp "${EFI_DIR}/loader/entries/delphix-single.conf" "${EFI_DIR}/loader/entries/delphix-single.conf.bak"
+
+	# Update default and single user entries
+	source /etc/default/grub.d/override.cfg
+	cat <<-EOF >"${EFI_DIR}/loader/entries/delphix.conf"
+	title   Delphix Engine
+	linux   /vmlinuz
+	initrd  /initrd.img
+	options root=ZFS=rpool/ROOT/${CONTAINER}/root ro $GRUB_CMDLINE_LINUX_DEFAULT
+	EOF
+
+	# Single user entry
+	cat <<-EOF >"${EFI_DIR}/loader/entries/delphix-single.conf"
+	title   Delphix Engine Single User mode
+	linux   /vmlinuz
+	initrd  /initrd.img
+	options root=ZFS=rpool/ROOT/${CONTAINER}/root ro single nomodeset dis_ucode_ldr
+	EOF
 }
 
 function set_bootfs_not_mounted_cleanup() {
@@ -147,30 +186,33 @@ function set_bootfs_not_mounted() {
 
 	PLATFORM=$(get-appliance-platform)
 
-	for dev in $(get_bootloader_devices); do
-		[[ -e "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not found"
+	# If using EFI firmware, update boot entries, vmlinuz, initrd, and bootloader
+	if is_bootmode_uefi; then
+		mount_efi
+		update_systemd_boot_entries
+		cp "/var/lib/machines/${CONTAINER}/boot/initrd.img" "$EFI_DIR"
+		cp "/var/lib/machines/${CONTAINER}/boot/vmlinuz" "$EFI_DIR"
+		chroot "/var/lib/machines/$CONTAINER" bootctl update
+		umount "$EFI_DIR"
+	else
+		for dev in $(get_bootloader_devices); do
+			opts="--root-directory=/mnt"
 
-		[[ -b "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not block device"
+			if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+				opts+=" --debug-image=all"
+				opts+=" -v"
+			fi
 
-		opts="--root-directory=/mnt"
+			# shellcheck disable=SC2086
+			chroot "/var/lib/machines/$CONTAINER" \
+				grub-install $opts "/dev/$dev" ||
+				die "'grub-install' for '$dev' failed in '$CONTAINER'"
+		done
 
-		if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
-			opts+=" --debug-image=all"
-			opts+=" -v"
-		fi
-
-		# shellcheck disable=SC2086
 		chroot "/var/lib/machines/$CONTAINER" \
-			grub-install $opts "/dev/$dev" ||
-			die "'grub-install' for '$dev' failed in '$CONTAINER'"
-	done
-
-	chroot "/var/lib/machines/$CONTAINER" \
-		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
-		die "'grub-mkconfig' failed in '$CONTAINER'"
-
+			grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+			die "'grub-mkconfig' failed in '$CONTAINER'"
+	fi
 	set_bootfs_not_mounted_cleanup
 	trap - EXIT
 
@@ -211,28 +253,31 @@ function set_bootfs_mounted() {
 
 	PLATFORM=$(get-appliance-platform)
 
-	for dev in $(get_bootloader_devices); do
-		[[ -e "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not found"
+	# If using EFI firmware, update boot entries, vmlinuz, initrd, and bootloader
+	if is_bootmode_uefi; then
+		mount_efi
+		update_systemd_boot_entries
+		cp /boot/initrd.img "$EFI_DIR"
+		cp /boot/vmlinuz "$EFI_DIR"
+		bootctl update
+		umount "$EFI_DIR"
+	else
+		for dev in $(get_bootloader_devices); do
+			opts="--root-directory=/mnt"
 
-		[[ -b "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not block device"
+			if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+				opts+=" --debug-image=all"
+				opts+=" -v"
+			fi
 
-		opts="--root-directory=/mnt"
+			# shellcheck disable=SC2086
+			grub-install $opts "/dev/$dev" ||
+				die "'grub-install' for '$dev' failed in '$CONTAINER'"
+		done
 
-		if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
-			opts+=" --debug-image=all"
-			opts+=" -v"
-		fi
-
-		# shellcheck disable=SC2086
-		grub-install $opts "/dev/$dev" ||
-			die "'grub-install' for '$dev' failed in '$CONTAINER'"
-	done
-
-	grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
-		die "'grub-mkconfig' failed in '$CONTAINER'"
-
+		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+			die "'grub-mkconfig' failed in '$CONTAINER'"
+	fi
 	set_bootfs_mounted_cleanup
 	trap - EXIT
 }
@@ -367,7 +412,7 @@ set-bootfs)
 	# We only have a single bootloader on any given appliance, so we
 	# need to ensure that only a single process is attempting to
 	# update the bootloader at any given time. The locking done here
-	# is to help prevent accidential corruption of the bootloader,
+	# is to help prevent accidental corruption of the bootloader,
 	# by ensuring only a single invocation of this script can set
 	# the boot filesystem at any given time.
 	#
