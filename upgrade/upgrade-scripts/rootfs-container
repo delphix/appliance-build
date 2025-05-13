@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2019 Delphix
+# Copyright 2019, 2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -102,6 +102,28 @@ function get_bootloader_devices() {
 		done
 }
 
+function update_systemd_boot_entries() {
+	cp "${EFI_DIR}/loader/entries/delphix.conf" "${EFI_DIR}/loader/entries/delphix.conf.bak"
+	cp "${EFI_DIR}/loader/entries/delphix-single.conf" "${EFI_DIR}/loader/entries/delphix-single.conf.bak"
+
+	# Update default and single user entries
+	source /etc/default/grub.d/override.cfg
+	cat <<-EOF >"${EFI_DIR}/loader/entries/delphix.conf"
+	title   Delphix Engine
+	linux   /vmlinuz
+	initrd  /initrd.img
+	options root=ZFS=rpool/ROOT/${CONTAINER}/root ro $GRUB_CMDLINE_LINUX_DEFAULT
+	EOF
+
+	# Single user entry
+	cat <<-EOF >"${EFI_DIR}/loader/entries/delphix-single.conf"
+	title   Delphix Engine Single User mode
+	linux   /vmlinuz
+	initrd  /initrd.img
+	options root=ZFS=rpool/ROOT/${CONTAINER}/root ro single nomodeset dis_ucode_ldr
+	EOF
+}
+
 function set_bootfs_not_mounted_cleanup() {
 	umount "/var/lib/machines/$CONTAINER/mnt" ||
 		warn "'umount' of '/var/lib/machines/$CONTAINER/mnt' failed"
@@ -147,30 +169,37 @@ function set_bootfs_not_mounted() {
 
 	PLATFORM=$(get-appliance-platform)
 
-	for dev in $(get_bootloader_devices); do
-		[[ -e "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not found"
+	# If using EFI firmware, update boot entries, vmlinuz, initrd, and bootloader
+	if is_bootmode_uefi; then
+		update_systemd_boot_entries
+		cp "/var/lib/machines/${CONTAINER}/boot/initrd.img" "$EFI_DIR"
+		cp "/var/lib/machines/${CONTAINER}/boot/vmlinuz" "$EFI_DIR"
+		chroot "/var/lib/machines/$CONTAINER" bootctl update
+	else
+		for dev in $(get_bootloader_devices); do
+			[[ -e "/dev/$dev" ]] ||
+				die "bootloader device '/dev/$dev' not found"
 
-		[[ -b "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not block device"
+			[[ -b "/dev/$dev" ]] ||
+				die "bootloader device '/dev/$dev' not block device"
 
-		opts="--root-directory=/mnt"
+			opts="--root-directory=/mnt"
 
-		if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
-			opts+=" --debug-image=all"
-			opts+=" -v"
-		fi
+			if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+				opts+=" --debug-image=all"
+				opts+=" -v"
+			fi
 
-		# shellcheck disable=SC2086
+			# shellcheck disable=SC2086
+			chroot "/var/lib/machines/$CONTAINER" \
+				grub-install $opts "/dev/$dev" ||
+				die "'grub-install' for '$dev' failed in '$CONTAINER'"
+		done
+
 		chroot "/var/lib/machines/$CONTAINER" \
-			grub-install $opts "/dev/$dev" ||
-			die "'grub-install' for '$dev' failed in '$CONTAINER'"
-	done
-
-	chroot "/var/lib/machines/$CONTAINER" \
-		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
-		die "'grub-mkconfig' failed in '$CONTAINER'"
-
+			grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+			die "'grub-mkconfig' failed in '$CONTAINER'"
+	fi
 	set_bootfs_not_mounted_cleanup
 	trap - EXIT
 
@@ -211,28 +240,35 @@ function set_bootfs_mounted() {
 
 	PLATFORM=$(get-appliance-platform)
 
-	for dev in $(get_bootloader_devices); do
-		[[ -e "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not found"
+	# If using EFI firmware, update boot entries, vmlinuz, initrd, and bootloader
+	if is_bootmode_uefi; then
+		update_systemd_boot_entries
+		cp /boot/initrd.img "$EFI_DIR"
+		cp /boot/vmlinuz "$EFI_DIR"
+		bootctl update
+	else
+		for dev in $(get_bootloader_devices); do
+			[[ -e "/dev/$dev" ]] ||
+				die "bootloader device '/dev/$dev' not found"
 
-		[[ -b "/dev/$dev" ]] ||
-			die "bootloader device '/dev/$dev' not block device"
+			[[ -b "/dev/$dev" ]] ||
+				die "bootloader device '/dev/$dev' not block device"
 
-		opts="--root-directory=/mnt"
+			opts="--root-directory=/mnt"
 
-		if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
-			opts+=" --debug-image=all"
-			opts+=" -v"
-		fi
+			if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+				opts+=" --debug-image=all"
+				opts+=" -v"
+			fi
 
-		# shellcheck disable=SC2086
-		grub-install $opts "/dev/$dev" ||
-			die "'grub-install' for '$dev' failed in '$CONTAINER'"
-	done
+			# shellcheck disable=SC2086
+			grub-install $opts "/dev/$dev" ||
+				die "'grub-install' for '$dev' failed in '$CONTAINER'"
+		done
 
-	grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
-		die "'grub-mkconfig' failed in '$CONTAINER'"
-
+		grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+			die "'grub-mkconfig' failed in '$CONTAINER'"
+	fi
 	set_bootfs_mounted_cleanup
 	trap - EXIT
 }
@@ -367,7 +403,7 @@ set-bootfs)
 	# We only have a single bootloader on any given appliance, so we
 	# need to ensure that only a single process is attempting to
 	# update the bootloader at any given time. The locking done here
-	# is to help prevent accidential corruption of the bootloader,
+	# is to help prevent accidental corruption of the bootloader,
 	# by ensuring only a single invocation of this script can set
 	# the boot filesystem at any given time.
 	#
