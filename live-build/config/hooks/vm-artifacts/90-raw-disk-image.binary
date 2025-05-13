@@ -101,6 +101,13 @@ sgdisk "$ARTIFACT_NAME.img" \
 	--set-alignment=1 --new=2:1m:+1m --typecode=2:EF02
 
 #
+# 250MB EFI boot partition which should be sufficient to store 5 initrd and
+# vmlinuz versions. GRUB files are ~11MB, initrd and vmlinuz are ~40MB, and
+# all boot loaders EFI directory are under 500K.
+#
+sgdisk "$ARTIFACT_NAME.img" \
+	--new=3::+250m --typecode=3:EF00 -c:3:"EFI Boot"
+#
 # Now we create the partition that we'll use for the zpool that will be
 # used for the root pool. We use a generic typecode for this partition
 # that simply maps to "Linux filesystem". The typecode here is simply
@@ -342,13 +349,43 @@ for dir in /dev /proc /sys; do
 	mount --make-rslave "${DIRECTORY}${dir}"
 done
 
+
 #
 # We need to use the dedicated grub dataset when running "grub-install"
 # and "grub-mkconfig", so we need to mount this dataset first.
 #
 chroot "$DIRECTORY" mount -t zfs "$FSNAME/grub" /mnt
-chroot "$DIRECTORY" grub-install --root-directory=/mnt "/dev/$LOOPNAME"
-chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
+
+EFI_DIR="/boot/efi"
+chroot "$DIRECTORY" mkdir -p $EFI_DIR
+chroot "$DIRECTORY" mkfs.vfat -F32 /dev/mapper/${LOOPNAME}p3
+
+#
+# Mount /boot/efi and do grub and bootctl install
+#
+chroot "$DIRECTORY" mount /dev/mapper/${LOOPNAME}p3 $EFI_DIR
+chroot "$DIRECTORY" mkdir -p $EFI_DIR/grub/
+chroot "$DIRECTORY" grub-install --target=x86_64-efi --efi-directory=$EFI_DIR \
+    --boot-directory=$EFI_DIR --recheck --no-floppy /dev/$LOOPNAME
+chroot "$DIRECTORY" grub-mkconfig -o ${EFI_DIR}/grub/grub.cfg
+
+# Copy the latest kernel into EFI boot directory
+
+chroot "$DIRECTORY" cp /boot/initrd.img $EFI_DIR
+chroot "$DIRECTORY" cp /boot/vmlinuz $EFI_DIR
+chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install
+
+# Get the GRUB_CMDLINE_LINUX_DEFAULT boot options from GRUB
+source $DIRECTORY/etc/default/grub.d/override.cfg 
+
+cat <<-EOF >"${DIRECTORY}/${EFI_DIR}/loader/entries/delphix.conf"
+title   Delphix Engine
+linux   /vmlinuz
+initrd  /initrd.img
+options root=ZFS=rpool/ROOT/${FSNAME}/root ro $GRUB_CMDLINE_LINUX_DEFAULT
+EOF
+
+chroot "$DIRECTORY" umount $EFI_DIR
 chroot "$DIRECTORY" umount /mnt
 
 for dir in /dev /proc /sys; do
