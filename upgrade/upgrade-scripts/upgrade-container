@@ -235,10 +235,11 @@ function create_upgrade_container() {
 	#
 	# DLPX-78307 - Similarly, we must disable "google-guest-agent".
 	# DLPX-94130 - Also, disable the "delphix-osadmin" service.
+	# DLPX-94115 - Also, disable "zfs-zed" service.
 	#
 	for svc in \
 		"nfs-mountd" "nfs-server" "rpc-statd" "rpc-statd-notify" \
-		"google-guest-agent" "delphix-osadmin"; do
+		"google-guest-agent" "delphix-osadmin" "zfs-zed"; do
 		[[ -e "$DIRECTORY/lib/systemd/system/$svc.service.d/override.conf" ]] &&
 			continue
 
