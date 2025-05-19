@@ -218,7 +218,6 @@ zfs mount "$FSNAME/ROOT/$FSNAME/root"
 mount --make-slave "$DIRECTORY"
 
 zfs create \
-	-o devices=off \
 	-o mountpoint=legacy \
 	"$FSNAME/ROOT/$FSNAME/home"
 
@@ -277,7 +276,7 @@ zfs create \
 # these mounts.
 #
 mkdir -p "$DIRECTORY/home"
-mount -t zfs -o nodev "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/home"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/home"
 
 mkdir -p "$DIRECTORY/var/delphix"
 mount -t zfs "$FSNAME/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
