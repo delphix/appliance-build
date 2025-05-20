@@ -1,6 +1,6 @@
 #!/bin/bash -ex
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -274,8 +274,8 @@ zfs create \
 # contents. During normal boot up, we'll rely on "/etc/fstab" to handle
 # these mounts.
 #
-mkdir -p "$DIRECTORY/export/home"
-mount -t zfs "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/export/home"
+mkdir -p "$DIRECTORY/home"
+mount -t zfs "$FSNAME/ROOT/$FSNAME/home" "$DIRECTORY/home"
 
 mkdir -p "$DIRECTORY/var/delphix"
 mount -t zfs "$FSNAME/ROOT/$FSNAME/data" "$DIRECTORY/var/delphix"
@@ -314,7 +314,7 @@ rsync --info=stats3 -WaAX binary/* "$DIRECTORY/"
 # automatically whenever we boot into the crash kernel.
 #
 cat <<-EOF >"$DIRECTORY/etc/fstab"
-	rpool/ROOT/$FSNAME/home /export/home zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/home /home zfs defaults,nodev,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/tmp  /tmp     zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
@@ -440,7 +440,7 @@ done
 
 umount "$DIRECTORY/var/log"
 umount "$DIRECTORY/var/delphix"
-umount "$DIRECTORY/export/home"
+umount "$DIRECTORY/home"
 umount "$DIRECTORY/tmp"
 umount "$DIRECTORY/var/tmp"
 umount "/var/crash"
