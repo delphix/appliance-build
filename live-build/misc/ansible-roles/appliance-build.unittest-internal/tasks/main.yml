@@ -1,5 +1,5 @@
 #
-# Copyright 2019 Delphix
+# Copyright 2019, 2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@
 - user:
     name: testrunner
     comment: "Delphix"
-    home: /export/home/testrunner
+    home: /home/testrunner
     groups: docker
     password:
       "$6$pWQE0MPZWgue7fNC$8RvR0u04Mt67792b.x4ao0G2Z/H/hrYPWezOqCkz59MIA\
