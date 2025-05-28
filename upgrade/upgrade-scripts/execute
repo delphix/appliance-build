@@ -435,6 +435,15 @@ apt_get purge -y $(apt-mark showauto | grep -v "$(uname -r)") ||
 	die "failed to remove no-longer-needed packages"
 
 #
+# Additionally, we've seen packages get removed but remain in the "rc"
+# state; i.e. the package is removed, but configuration files linger.
+#
+# Thus, we explicitly purge all packages in that state.
+#
+apt_get purge -y $(dpkg -l | grep ^rc | awk '{print $2}') ||
+	die "failed to remove 'rc' packages"
+
+#
 # Package configuration files are only automatically removed by the
 # package manager when the package that "owns" the file is "purged".
 # Thus, when upgrading a package to a new version that no longer
