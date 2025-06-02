@@ -237,6 +237,19 @@ function set_bootfs_mounted() {
 	trap - EXIT
 }
 
+function quiesce_sources() {
+	local jmxtool="/opt/delphix/server/bin/jmxtool"
+
+	#
+	# Quiescing sources are a virtualization service concept. Thus, if
+	# we're running on a variant that doesn't have the virtualization
+	# package installed, skip the alert.
+	#
+	[[ ! -x "$jmxtool" ]] && return
+
+	$jmxtool -w upgrade quiesce_sources &>/dev/null
+}
+
 #
 # The purpose of this function is to convert an existing rootfs container
 # (specified by the $CONTAINER global variable) to be used as the boot
@@ -268,6 +281,24 @@ function set_bootfs() {
 	# the root pool (i.e. the rpool/grub dataset) are safe on disk.
 	#
 	zpool sync rpool || die "'zpool sync rpool' failed."
+
+	#
+	# This is a hack, but upgrades to 2025.4.0.0 will require a reboot,
+	# and the virtualization's upgrade logic will not quiesce sources,
+	# potentially leading to VDB outages and their inability to be
+	# properly unquiesce after the upgrade.
+	#
+	# Thus, to try and mitigate the impact, we attempt to quiesce sources
+	# here, on a best-effort basis. If quiescing fails, we don't want the
+	# entire upgrade to fail, as there's legitimate cases where this
+	# operation is not guaranteed to succeed.
+	#
+	# Further, we're assuming the virtualization's upgrade logic will
+	# perform the reboot immediately after this operation, and that
+	# sources will be unquiesced upon the system coming back up after
+	# the reboot.
+	#
+	quiesce_sources || warn "quiescing sources failed."
 }
 
 function usage() {
