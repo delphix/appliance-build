@@ -17,6 +17,7 @@
 ---
 - name: Remove default apt sources
   ansible.builtin.command: bash -c 'rm -rf /etc/apt/sources.list.d/*'
+  changed_when: True
 
 - name: Configure apt sources
   vars:
