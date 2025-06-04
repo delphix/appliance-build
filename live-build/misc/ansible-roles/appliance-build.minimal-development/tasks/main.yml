@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2018-2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,13 +15,6 @@
 #
 
 ---
-- copy:
-    dest: /etc/cloud/cloud.cfg.d/99-delphix-development.cfg
-    mode: 0644
-    content: |
-      apt:
-        preserve_sources_list: false
-
 #
 # We use "no_log" here to ensure we don't accidentally leak the contents
 # of these AWS_* environment variables to stdout; e.g. this would happen
