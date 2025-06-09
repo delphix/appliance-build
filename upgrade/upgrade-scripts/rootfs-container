@@ -237,7 +237,7 @@ function set_bootfs_mounted() {
 	trap - EXIT
 }
 
-function quiesce_sources() {
+function quiesce_sources_if_needed() {
 	local jmxtool="/opt/delphix/server/bin/jmxtool"
 
 	#
@@ -246,6 +246,25 @@ function quiesce_sources() {
 	# package installed, skip the alert.
 	#
 	[[ ! -x "$jmxtool" ]] && return
+
+	#
+	# If we're not performing an upgrade, then don't quiesce sources.
+	#
+	[[ ! -f "$UPDATE_DIR/upgrade.properties" ]] && return 0
+
+	source_upgrade_properties
+
+	#
+	# If we're not performing a FULL upgrade, then don't quiesce sources.
+	#
+	[[ "$UPGRADE_TYPE" != "FULL" ]] && return 0
+
+	#
+	# If the version we're coming from is greater than 2025.3.0.1, then
+	# don't quiesce sources. All versions 2025.3.0.1 and greater, should
+	# quiesce sources properly from the stack's upgrade logic.
+	#
+	compare_versions "$UPGRADE_BASE_VERSION" ge "2025.3.0.1-0" || return 0
 
 	$jmxtool -w upgrade quiesce_sources &>/dev/null
 }
@@ -298,7 +317,7 @@ function set_bootfs() {
 	# sources will be unquiesced upon the system coming back up after
 	# the reboot.
 	#
-	quiesce_sources || warn "quiescing sources failed."
+	quiesce_sources_if_needed || warn "quiescing sources failed."
 }
 
 function usage() {
