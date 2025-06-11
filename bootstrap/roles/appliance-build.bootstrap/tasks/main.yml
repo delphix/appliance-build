@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 Delphix
+# Copyright 2018-2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,27 @@
 #
 
 ---
+- name: Remove default apt sources
+  ansible.builtin.command: bash -c 'rm -rf /etc/apt/sources.list.d/*'
+  changed_when: true
+
+- name: Configure apt sources
+  vars:
+    mirror_url: "{{ lookup('env', 'DELPHIX_PACKAGE_MIRROR_MAIN') }}"
+  block:
+    - name: Configure noble apt source
+      ansible.builtin.apt_repository:
+        repo: "deb {{ mirror_url }} noble main restricted multiverse universe"
+        state: present
+    - name: Configure noble-updates apt source
+      ansible.builtin.apt_repository:
+        repo: "deb {{ mirror_url }} noble-updates main restricted multiverse universe"
+        state: present
+    - name: Configure noble-security apt source
+      ansible.builtin.apt_repository:
+        repo: "deb {{ mirror_url }} noble-security main"
+        state: present
+
 - name: Stop unattended-upgrades systemd service in preparation for package removal
   ansible.builtin.systemd:
     name: unattended-upgrades
