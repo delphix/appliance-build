@@ -390,16 +390,11 @@ function mask_service() {
 	fi
 }
 
-function is_svc_new_or_masked_or_disabled() {
+function is_svc_not_found_or_disabled() {
 	local svc="$1"
 
-	systemctl cat "$svc" &>/dev/null
-	if [ $? -eq 1 ]; then
-		return 0
-	fi
-
 	state=$(systemctl is-enabled "$svc")
-	if [[ "$state" == masked || "$state" == disabled ]]; then
+	if [[ "$state" == not-found || "$state" == disabled ]]; then
 		return 0
 	fi
 
@@ -483,8 +478,16 @@ function fix_and_migrate_services() {
 	# or disabled, and that the logic that unmasks them will also
 	# enable them.
 	#
+	# note that once a service is masked, even if it was a "new" service (i.e. not-found)
+	# once masked, it will report as masked. Additionally, any service, regardless of it
+	# being enabled or disabled, will always report "masked" once it is masked.
+	#
+	# Also note, that up until 2025-4, this code would attempt to mask already masked services,
+	# and if there was a transient problem with service registration it would fail to re-mask,
+	# and abort an upgrade. (DLPX-93758)
+	#
 	while read -r svc; do
-		is_svc_new_or_masked_or_disabled "$svc" &&
+		is_svc_not_found_or_disabled "$svc" &&
 			mask_service "$svc" "$container"
 	done <<-EOF
 		delphix-fluentd.service
