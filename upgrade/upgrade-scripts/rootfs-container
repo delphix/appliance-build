@@ -145,7 +145,7 @@ function set_bootfs_not_mounted() {
 	mount -t zfs rpool/grub "/var/lib/machines/$CONTAINER/mnt" ||
 		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
 
-	PLATFORM=$(get_appliance_platform)
+	PLATFORM=$(get-appliance-platform)
 
 	for dev in $(get_bootloader_devices); do
 		[[ -e "/dev/$dev" ]] ||
@@ -209,7 +209,7 @@ function set_bootfs_mounted() {
 	mount -t zfs rpool/grub "/mnt" ||
 		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
 
-	PLATFORM=$(get_appliance_platform)
+	PLATFORM=$(get-appliance-platform)
 
 	for dev in $(get_bootloader_devices); do
 		[[ -e "/dev/$dev" ]] ||
