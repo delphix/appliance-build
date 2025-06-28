@@ -1,6 +1,6 @@
 #!/bin/bash -eux
 #
-# Copyright 2018 Delphix
+# Copyright 2018-2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,14 +23,19 @@
 # mechanism that is capable of upgrading itself without network
 # connectivity to these external APT repositories. Thus to avoid any
 # source of confusion or mistakes, we actually remove the default
-# list(s) here.
+# list(s) here. N.b: We use bash here so that the glob gets evaluated
+# inside of the chroot environment.
 #
-chroot binary rm -f /etc/apt/sources.list
+chroot binary bash -c 'rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*'
 
 #
-# We must use bash here, so the glob gets evaluated inside the chroot
-# environment, and matches the files installed in the chroot's
-# directory. Otherwise it would evaluate on the host system, and
-# matching the files found on the host system.
+# For developer convenience, we configure the internal-dev variant with an apt
+# sources configuration that points to our internal Ubuntu mirror.
 #
-chroot binary bash -c 'rm -f /etc/apt/sources.list.d/*.list'
+if [[ $APPLIANCE_VARIANT = "internal-dev" ]]; then
+	cat <<-EOF >/etc/apt/sources.list.d/delphix.list
+		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble main restricted multiverse universe
+		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble-updates main restricted multiverse universe
+		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble-security main
+	EOF
+fi

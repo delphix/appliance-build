@@ -145,7 +145,7 @@ function set_bootfs_not_mounted() {
 	mount -t zfs rpool/grub "/var/lib/machines/$CONTAINER/mnt" ||
 		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
 
-	PLATFORM=$(get_appliance_platform)
+	PLATFORM=$(get-appliance-platform)
 
 	for dev in $(get_bootloader_devices); do
 		[[ -e "/dev/$dev" ]] ||
@@ -209,7 +209,7 @@ function set_bootfs_mounted() {
 	mount -t zfs rpool/grub "/mnt" ||
 		die "'mount -t zfs rpool/grub' failed for '$CONTAINER'"
 
-	PLATFORM=$(get_appliance_platform)
+	PLATFORM=$(get-appliance-platform)
 
 	for dev in $(get_bootloader_devices); do
 		[[ -e "/dev/$dev" ]] ||
@@ -235,6 +235,54 @@ function set_bootfs_mounted() {
 
 	set_bootfs_mounted_cleanup
 	trap - EXIT
+}
+
+function quiesce_sources_if_needed() {
+	local jmxtool="/opt/delphix/server/bin/jmxtool"
+
+	#
+	# Quiescing sources are a virtualization service concept. Thus, if
+	# we're running on a variant that doesn't have the virtualization
+	# package installed, don't attempt to quiesce sources.
+	#
+	[[ ! -x "$jmxtool" ]] && return
+
+	#
+	# If we're not performing an upgrade, then don't quiesce sources.
+	#
+	[[ ! -f "$UPDATE_DIR/upgrade.properties" ]] && return 0
+
+	source_upgrade_properties
+
+	#
+	# If we're not performing a FULL upgrade, then don't quiesce sources.
+	#
+	[[ "$UPGRADE_TYPE" != "FULL" ]] && return 0
+
+	#
+	# If the version we're going to is less than 2025.4.0.0, then don't
+	# quiesce sources. Only upgrades going to 2025.4.0.0 or greater need
+	# this hack to quiesce sources.
+	#
+	compare_versions "$UPGRADE_VERSION" lt "2025.4.0.0-0" || return 0
+
+	#
+	# Also, if the version we're coming from is 2025.3.0.1 or greater, then
+	# don't quiesce sources. All versions 2025.3.0.1 and greater, should
+	# quiesce sources properly from the stack's upgrade logic.
+	#
+	compare_versions "$UPGRADE_BASE_VERSION" ge "2025.3.0.1-0" || return 0
+
+	#
+	# At this point, we know we're:
+	#
+	#  1. performing an upgrade,
+	#  2. going to a version 2025.4.0.0 or greater, and
+	#  3. coming from a version 2025.3.0.0 or less.
+	#
+	# Thus, we need this hack to quiesce sources prior to the reboot.
+	#
+	$jmxtool -w upgrade quiesce_sources &>/dev/null
 }
 
 #
@@ -268,6 +316,24 @@ function set_bootfs() {
 	# the root pool (i.e. the rpool/grub dataset) are safe on disk.
 	#
 	zpool sync rpool || die "'zpool sync rpool' failed."
+
+	#
+	# This is a hack, but upgrades to 2025.4.0.0 will require a reboot,
+	# and the virtualization's upgrade logic will not quiesce sources,
+	# potentially leading to VDB outages and their inability to be
+	# properly unquiesce after the upgrade.
+	#
+	# Thus, to try and mitigate the impact, we attempt to quiesce sources
+	# here, on a best-effort basis. If quiescing fails, we don't want the
+	# entire upgrade to fail, as there's legitimate cases where this
+	# operation is not guaranteed to succeed.
+	#
+	# Further, we're assuming the virtualization's upgrade logic will
+	# perform the reboot immediately after this operation, and that
+	# sources will be unquiesced upon the system coming back up after
+	# the reboot.
+	#
+	quiesce_sources_if_needed || warn "quiescing sources failed."
 }
 
 function usage() {
