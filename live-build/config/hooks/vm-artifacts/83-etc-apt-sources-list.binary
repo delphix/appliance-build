@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+set -x
+
 #
 # We specifically do not want the appliance to attempt to upgrade, nor
 # install, any packages by contacting servers listed in the default list
