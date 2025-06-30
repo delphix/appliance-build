@@ -33,7 +33,7 @@ chroot binary bash -c 'rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*'
 # sources configuration that points to our internal Ubuntu mirror.
 #
 if [[ $APPLIANCE_VARIANT = "internal-dev" ]]; then
-	cat <<-EOF >/etc/apt/sources.list.d/delphix.list
+	chroot binary cat <<-EOF >/etc/apt/sources.list.d/delphix.list
 		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble main restricted multiverse universe
 		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble-updates main restricted multiverse universe
 		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble-security main
