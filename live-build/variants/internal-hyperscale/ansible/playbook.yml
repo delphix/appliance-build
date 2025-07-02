@@ -15,8 +15,9 @@
 #
 
 ---
-- hosts: all
-  gather_facts: no
+- name: Configure Appliance for Hyperscale Compliance
+  hosts: all
+  gather_facts: false
   vars:
     ansible_python_interpreter: /usr/bin/python3
   roles:
