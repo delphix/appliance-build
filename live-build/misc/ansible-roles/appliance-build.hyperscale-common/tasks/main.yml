@@ -15,6 +15,7 @@
 #
 
 ---
-- apt:
+- name: Install the Hyperscale Compliance package
+  ansible.builtin.apt:
     name: delphix-hyperscale
     state: present
