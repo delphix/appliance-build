@@ -149,6 +149,31 @@ function download_dct_artifacts() {
 	popd &>/dev/null || exit 1
 }
 
+function download_hyperscale_artifacts() {
+	local hyperscale_artifacts_uri="$1"
+	local target_dir="$2"
+
+	if [[ -z "$hyperscale_artifacts_uri" ]]; then
+		HYPERSCALE_S3_DIR="s3://snapshot-de-images"
+		HYPERSCALE_LATEST_PREFIX="builds/jenkins-masking/github/delphix/hyperscale-masking/build/debian-pkg/feature-closed-appliance/latest"
+
+		aws s3 cp "$HYPERSCALE_S3_DIR/$HYPERSCALE_LATEST_PREFIX" .
+
+		HYPERSCALE_PACKAGE_PREFIX=$(cat latest)
+		rm -f latest
+
+		hyperscale_artifacts_uri="$HYPERSCALE_S3_DIR/$HYPERSCALE_PACKAGE_PREFIX"
+	fi
+
+	mkdir "$target_dir/hyperscale"
+	pushd "$target_dir/hyperscale" &>/dev/null || exit 1
+
+	aws s3 sync "$hyperscale_artifacts_uri" .
+	sha256sum -c SHA256SUMS
+
+	popd &>/dev/null || exit 1
+}
+
 #
 # Find all .deb and .ddeb packages in source directory tree and move them
 # to target directory.
