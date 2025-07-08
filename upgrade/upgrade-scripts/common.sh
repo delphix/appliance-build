@@ -391,11 +391,20 @@ function mask_service() {
 	fi
 }
 
-function is_svc_not_found_or_disabled() {
+
+function should_mask_service() {
 	local svc="$1"
 
 	state=$(systemctl is-enabled "$svc")
+	if [ $? -eq 1]; then
+		# we should not mask the service if we have any issue determining 
+		# whether it is enabled or not.
+		# this prevents downstream failures that could block the upgrade.
+		return 0
+	fi
 	if [[ "$state" == not-found || "$state" == disabled ]]; then
+		# only mask services that are not-found (2024-4 and greater) or 
+		# disabled.
 		return 0
 	fi
 
@@ -490,7 +499,7 @@ function fix_and_migrate_services() {
 	# registration it would fail to re-mask and abort an upgrade. (DLPX-93758)
 	#
 	while read -r svc; do
-		is_svc_not_found_or_disabled "$svc" &&
+		should_mask_service "$svc" &&
 			mask_service "$svc" "$container"
 	done <<-EOF
 		delphix-fluentd.service
