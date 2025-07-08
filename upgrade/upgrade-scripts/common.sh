@@ -398,9 +398,13 @@ function should_mask_service() {
 	state=$(systemctl is-enabled "$svc")
 	if [ $? -eq 1]; then
 		# we should not mask the service if we have any issue determining 
-		# whether it is enabled or not.
+		# whether it is enabled or not, except for an error returned on 
+		# 2023-3 indicating the service is not yet found, 
 		# this prevents downstream failures that could block the upgrade.
-		return 0
+		if [[ "$state" == *"No such file or directory"* ]]; then
+			return 0
+		fi
+		return 1
 	fi
 	if [[ "$state" == not-found || "$state" == disabled ]]; then
 		# only mask services that are not-found (2024-4 and greater) or 
