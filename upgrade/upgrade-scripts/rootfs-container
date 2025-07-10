@@ -264,14 +264,14 @@ function quiesce_sources_if_needed() {
 	# quiesce sources. Only upgrades going to 2025.4.0.0 or greater need
 	# this hack to quiesce sources.
 	#
-	compare_versions "$UPGRADE_VERSION" lt "2025.4.0.0-0" || return 0
+	compare_versions "$UPGRADE_VERSION" lt "2025.4.0.0-0" && return 0
 
 	#
 	# Also, if the version we're coming from is 2025.3.0.1 or greater, then
 	# don't quiesce sources. All versions 2025.3.0.1 and greater, should
 	# quiesce sources properly from the stack's upgrade logic.
 	#
-	compare_versions "$UPGRADE_BASE_VERSION" ge "2025.3.0.1-0" || return 0
+	compare_versions "$UPGRADE_BASE_VERSION" ge "2025.3.0.1-0" && return 0
 
 	#
 	# At this point, we know we're:
