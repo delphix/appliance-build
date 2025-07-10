@@ -445,6 +445,18 @@ apt_get purge -y $(dpkg -l | grep ^rc | awk '{print $2}') ||
 	die "failed to remove 'rc' packages"
 
 #
+# After removing the td-agent package above, the td-agent will be removed,
+# but we've see this user still referenced via dpkg-statoverride, which
+# causes future package commands to fail (e.g. dpkg, apt-get). As a workaround,
+# we're explicitly removing these references here. Ideally, this would be
+# handled by the td-agent package itself, on removal.
+#
+grep ^td-agent /var/lib/dpkg/statoverride | \
+	awk '{ print $4 }' | \
+	xargs -n1 dpkg-statoverride --remove ||
+	die "failed to remove td-agent from dpkg-statoverride"
+
+#
 # Package configuration files are only automatically removed by the
 # package manager when the package that "owns" the file is "purged".
 # Thus, when upgrading a package to a new version that no longer
