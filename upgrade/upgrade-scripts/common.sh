@@ -396,11 +396,13 @@ function should_mask_service() {
 	local svc="$1"
 
 	state=$(systemctl is-enabled "$svc")
-	if [ $? -eq 1]; then
-		# we should not mask the service if we have any issue determining 
-		# whether it is enabled or not, except for an error returned on 
-		# 2023-3 indicating the service is not yet found, 
+	if [ $? -eq 1 ]; then
+		# we should not mask the service if we have any issue determining
+		# whether it is enabled or not, except for an error returned on
+		# 2023-3 indicating the service is not yet found,
 		# this prevents downstream failures that could block the upgrade.
+		# (reread state to get it from stderr)
+		state=$(systemctl is-enabled "$svc" 2>&1)
 		if [[ "$state" == *"No such file or directory"* ]]; then
 			return 0
 		fi
