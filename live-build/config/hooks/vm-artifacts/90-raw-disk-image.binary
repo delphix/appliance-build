@@ -314,7 +314,7 @@ rsync --info=stats3 -WaAX binary/* "$DIRECTORY/"
 # automatically whenever we boot into the crash kernel.
 #
 cat <<-EOF >"$DIRECTORY/etc/fstab"
-	rpool/ROOT/$FSNAME/home /home zfs defaults,nodev,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/home /home zfs defaults,nodev,nosuid,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/tmp  /tmp     zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
