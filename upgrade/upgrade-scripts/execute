@@ -430,9 +430,9 @@ zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 # NTP configuration file to the new location after packages are upgraded,
 # but before they are removed so that NTP continues to function as expected.
 #
-if [[ -f "/etc/ntp/ntp.conf" ]]; then
-	cp /etc/ntp/ntp.conf /etc/ntpsec/ntp.conf ||
-		die "failed to copy /etc/ntp/ntp.conf to /etc/ntpsec/ntp.conf"
+if [[ -f "/etc/ntp.conf" ]]; then
+	cp /etc/ntp.conf /etc/ntpsec/ntp.conf ||
+		die "failed to copy /etc/ntp.conf to /etc/ntpsec/ntp.conf"
 	if [[ "$(systemctl is-enabled ntp.service)" == enabled ]]; then
 		systemctl disable --now ntp.service
 		systemctl enable ntpsec.service
