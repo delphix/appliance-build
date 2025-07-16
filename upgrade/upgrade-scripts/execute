@@ -424,18 +424,26 @@ zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	cut -d= -f1 | xargs apt-mark manual ||
 	die "failed to mark as manual packages listed in packages.list.gz file"
 
-#
-# As part of the LTS upgrade project to 24.04, `ntp` was replaced by `ntpsec`.
-# To preserve and migrate the NTP configuration, we need to copy the
-# NTP configuration file to the new location after packages are upgraded,
-# but before they are removed so that NTP continues to function as expected.
-#
-if [[ -f "/etc/ntp/ntp.conf" ]]; then
-	cp /etc/ntp/ntp.conf /etc/ntpsec/ntp.conf ||
-		die "failed to copy /etc/ntp/ntp.conf to /etc/ntpsec/ntp.conf"
-	if [[ "$(systemctl is-enabled ntp.service)" == enabled ]]; then
-		systemctl disable --now ntp.service
-		systemctl enable ntpsec.service
+if [[ -f "/etc/ntp.conf" ]]; then
+	NTP_CONF_MD5SUM_ORIGINAL=$(dpkg --status ntp | grep /etc/ntp.conf | awk '{ print $2 }')
+	NTP_CONF_MD5SUM_ACTUAL=$(md5sum /etc/ntp.conf | awk '{ print $1 }')
+
+	#
+	# As part of the LTS upgrade project to 24.04, `ntp` was replaced by `ntpsec`.
+	#
+	# To preserve and migrate the NTP configuration, we need to copy the
+	# NTP configuration file to the new location after packages are upgraded,
+	# but before they are removed so that NTP continues to function as expected.
+	#
+	# We only do this if the configuration no longer matches what's installed by
+	# default, as that indicates NTP was configured and enabled on the appliance.
+	#
+	if [[ "$NTP_CONF_MD5SUM_ORIGINAL" != "$NTP_CONF_MD5SUM_ACTUAL" ]]; then
+		cp /etc/ntp.conf /etc/ntpsec/ntp.conf ||
+			die "failed to copy /etc/ntp.conf to /etc/ntpsec/ntp.conf"
+
+		systemctl unmask ntpsec.service || die "failed to unmask ntpsec.service"
+		systemctl enable ntpsec.service || die "failed to enable ntpsec.service"
 	fi
 fi
 
