@@ -442,6 +442,22 @@ if [[ -f "/etc/ntp.conf" ]]; then
 		cp /etc/ntp.conf /etc/ntpsec/ntp.conf ||
 			die "failed to copy /etc/ntp.conf to /etc/ntpsec/ntp.conf"
 
+		#
+		# On removal, the "ntp" package will mask the "ntp" service. As
+		# a result, enable of the "ntpsec" service will fail, due to it
+		# having an alias to the "ntp" service name, and that service
+		# being masked.
+		#
+		# As a workaround, we explicitly "purge" the "ntp" package,
+		# which will remove the masked "ntp" service, so that it
+		# doesn't impact the enable of "netpsec".
+		#
+		# This doesn't impact the end state of the system, as the ntp
+		# package would have been purged later in this script; but we
+		# need to do it here, prior to attempting to enable "ntpsec".
+		#
+		apt_get purge -y ntp || die "failed to purge ntp package"
+
 		systemctl unmask ntpsec.service || die "failed to unmask ntpsec.service"
 		systemctl enable ntpsec.service || die "failed to enable ntpsec.service"
 	fi
