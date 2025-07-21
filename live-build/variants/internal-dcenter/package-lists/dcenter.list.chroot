@@ -21,7 +21,6 @@ git
 gnupg
 isc-dhcp-server
 libldap2-dev
-libsasl2-dev
 nfs-kernel-server
 openjdk-11-jdk-headless
 openjdk-17-jdk-headless
