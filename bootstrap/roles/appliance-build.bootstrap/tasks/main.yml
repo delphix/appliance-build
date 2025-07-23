@@ -89,6 +89,14 @@
     name: awscli
     break_system_packages: true
     extra_args: "--no-cache-dir"
+  environment:
+    PIP_NO_CACHE_DIR: "yes"
+  become: true
+
+- name: Remove pip cache directory
+  ansible.builtin.file:
+    path: "/export/home/delphix/.cache"
+    state: absent
   become: true
 
 - name: Load ZFS kernel module.
