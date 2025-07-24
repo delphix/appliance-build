@@ -34,6 +34,15 @@
   ansible.builtin.pip:
     name: awscli
     break_system_packages: true
+    extra_args: "--no-cache-dir"
+  environment:
+    PIP_NO_CACHE_DIR: "yes"
+  become: true
+
+- name: Clean up pip cache directory
+  ansible.builtin.file:
+    path: "/export/home/delphix/.cache"
+    state: absent
   become: true
 
 # Add /usr/local/bin to the PATH (awscli needs it)
