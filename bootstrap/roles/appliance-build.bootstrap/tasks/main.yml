@@ -93,7 +93,7 @@
     PIP_NO_CACHE_DIR: "yes"
   become: true
 
-- name: Remove pip cache directory
+- name: Clean up pip cache directory
   ansible.builtin.file:
     path: "/export/home/delphix/.cache"
     state: absent
