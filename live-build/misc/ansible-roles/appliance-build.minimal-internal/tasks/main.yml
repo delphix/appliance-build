@@ -39,12 +39,6 @@
     PIP_NO_CACHE_DIR: "yes"
   become: true
 
-- name: Clean up pip cache directory
-  ansible.builtin.file:
-    path: "/export/home/delphix/.cache"
-    state: absent
-  become: true
-
 # Add /usr/local/bin to the PATH (awscli needs it)
 - name: Create s3-bin-path.sh under profile.d
   ansible.builtin.copy:
