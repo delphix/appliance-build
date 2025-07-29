@@ -77,7 +77,7 @@ internal-buildserver)
 	RAW_DISK_SIZE_GB=512
 	;;
 internal-*)
-	RAW_DISK_SIZE_GB=70
+	RAW_DISK_SIZE_GB=48
 	;;
 *)
 	die "Invalid variant specified: '$APPLIANCE_VARIANT'"

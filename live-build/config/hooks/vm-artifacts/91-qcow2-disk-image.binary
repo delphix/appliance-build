@@ -26,4 +26,4 @@
 
 source /usr/share/livecd-rootfs/live-build/functions
 rm -f "$ARTIFACT_NAME.qcow2"
-convert_to_qcow2 "$ARTIFACT_NAME.img" "$ARTIFACT_NAME.qcow2"
+cp "$ARTIFACT_NAME.img" "$ARTIFACT_NAME.qcow2"
