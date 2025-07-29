@@ -77,7 +77,7 @@ internal-buildserver)
 	RAW_DISK_SIZE_GB=512
 	;;
 internal-*)
-	RAW_DISK_SIZE_GB=70
+	RAW_DISK_SIZE_GB=48
 	;;
 *)
 	die "Invalid variant specified: '$APPLIANCE_VARIANT'"
@@ -98,14 +98,14 @@ sgdisk --zap-all "$ARTIFACT_NAME.img"
 # require space for their own internal purposes.
 #
 sgdisk "$ARTIFACT_NAME.img" --set-alignment=1 \
-	--new=2:1m:+250m --typecode=2:EF00 -c:2:"EFI Boot"
+	--new=1:1m:+250m --typecode=1:EF00 -c:1:"EFI Boot"
 #
 # Now we create the partition that we'll use for the zpool that will be
 # used for the root pool. We use a generic typecode for this partition
 # that simply maps to "Linux filesystem". The typecode here is simply
 # cosmetic, as there's nothing that relies on it being set.
 #
-sgdisk "$ARTIFACT_NAME.img" --new=1:: --typecode=1:8300
+sgdisk "$ARTIFACT_NAME.img" --new=2:: --typecode=2:8300
 
 #
 # This is done simply for debugging and/or diagnostic purposes. When
@@ -146,7 +146,7 @@ zpool create -d \
 	-O compression=on \
 	-R "$DIRECTORY" \
 	-t "$FSNAME" \
-	rpool "/dev/mapper/${LOOPNAME}p1"
+	rpool "/dev/mapper/${LOOPNAME}p2"
 
 zfs create \
 	-o canmount=off \
@@ -293,8 +293,8 @@ mkdir -p "/var/crash"
 mount -t zfs "$FSNAME/crashdump" "/var/crash"
 
 # Make the vfat partition and get its FSID
-mkfs.vfat -F32 /dev/mapper/${LOOPNAME}p2
-efi_part_fsid=`blkid -s UUID -o value /dev/mapper/${LOOPNAME}p2`
+mkfs.vfat -F32 /dev/mapper/${LOOPNAME}p1
+efi_part_fsid=`blkid -s UUID -o value /dev/mapper/${LOOPNAME}p1`
 
 #
 # Populate the root filesystem with the contents of the "binary" directory
@@ -351,7 +351,7 @@ done
 #
 EFI_DIR="/mnt/boot/efi"
 chroot "$DIRECTORY" mkdir -p $EFI_DIR
-chroot "$DIRECTORY" mount /dev/mapper/${LOOPNAME}p2 $EFI_DIR
+chroot "$DIRECTORY" mount /dev/mapper/${LOOPNAME}p1 $EFI_DIR
 
 # Copy the latest kernel into EFI boot directory
 chroot "$DIRECTORY" cp /boot/initrd.img $EFI_DIR
