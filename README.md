@@ -19,7 +19,6 @@ Log into that VM using the "delphix" user, and run these commands:
 
     $ git clone https://github.com/delphix/appliance-build.git
     $ cd appliance-build
-    $ export DELPHIX_PACKAGE_MIRROR_MAIN="http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu"
     $ ansible-playbook bootstrap/playbook.yml
     $ sudo ./gradlew buildInternalMinimalKvm
     $ sudo qemu-system-x86_64 -nographic -m 1G \
