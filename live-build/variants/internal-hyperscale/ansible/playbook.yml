@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Delphix
+# Copyright 2025 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,5 +15,18 @@
 #
 
 ---
-dependencies:
-  - role: appliance-build.virtualization-common
+- name: Configure Appliance for Hyperscale Compliance
+  hosts: all
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  roles:
+    - appliance-build.minimal-common
+    - appliance-build.minimal-internal
+    - appliance-build.minimal-development
+    - appliance-build.hyperscale-common
+    - appliance-build.masking-common
+    - appliance-build.masking-development
+    - appliance-build.virtualization-common
+    - appliance-build.virtualization-development
+    - appliance-build.qa-internal
