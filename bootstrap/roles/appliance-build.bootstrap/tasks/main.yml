@@ -19,6 +19,11 @@
   ansible.builtin.command: bash -c 'rm -rf /etc/apt/sources.list.d/*'
   changed_when: true
 
+- name: Turn off all swap now
+  become: yes
+  command: swapoff -a
+  changed_when: false
+
 - name: Configure apt sources
   vars:
     mirror_url: "{{ lookup('env', 'DELPHIX_PACKAGE_MIRROR_MAIN') }}"

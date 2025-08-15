@@ -125,10 +125,12 @@ sgdisk "$ARTIFACT_NAME.img" --print
 # consumers can easily build the names of the individual partitions as
 # needed.
 #
-LOOPNAME=$(kpartx -asv "$ARTIFACT_NAME.img" |
-	head -n1 |
-	awk '{ print $3 }' |
-	sed 's/^\(loop[0-9]\+\)p[0-9]\+$/\1/')
+# LOOPNAME=$(kpartx -asv "$ARTIFACT_NAME.img" |
+#	head -n1 |
+#	awk '{ print $3 }' |
+#	sed 's/^\(loop[0-9]\+\)p[0-9]\+$/\1/')
+
+LOOPNAME=$(losetup --find --partscan --show "$ARTIFACT_NAME.img")
 
 #
 # We use a consistent naming scheme for the root filesystems that are
@@ -146,7 +148,7 @@ zpool create -d \
 	-O compression=on \
 	-R "$DIRECTORY" \
 	-t "$FSNAME" \
-	rpool "/dev/mapper/${LOOPNAME}p1"
+	rpool "${LOOPNAME}p1"
 
 zfs create \
 	-o canmount=off \
@@ -293,7 +295,7 @@ mkdir -p "/var/crash"
 mount -t zfs "$FSNAME/crashdump" "/var/crash"
 
 # Make the vfat partition
-mkfs.vfat -F32 /dev/mapper/${LOOPNAME}p2
+mkfs.vfat -F32 ${LOOPNAME}p2
 
 #
 # Populate the root filesystem with the contents of the "binary" directory
@@ -345,16 +347,25 @@ for dir in /dev /proc /sys; do
 done
 
 #
-# Mount /boot/efi and do grub and bootctl install
+# Mount ESP and bootctl install
 #
-EFI_DIR="/mnt/boot/efi"
-chroot "$DIRECTORY" mkdir -p $EFI_DIR
-chroot "$DIRECTORY" mount /dev/mapper/${LOOPNAME}p2 $EFI_DIR
+EFI_DIR=$(chroot "$DIRECTORY" mktemp -d -p "/var/tmp/" -t delphix_efi.XXXXXXX)
+chroot "$DIRECTORY" mount -o umask=077 ${LOOPNAME}p2 $EFI_DIR
+
+ESP=$EFI_DIR
+BOOTLOADER_ID="${BOOTLOADER_ID:-systemd}"
+echo "[*] Installing systemd-boot to $ESP..."
+# 1. Create required directories
+chroot "$DIRECTORY" mkdir -p "$ESP/EFI/systemd" "$ESP/EFI/BOOT" "$ESP/loader/entries"
+
+# 2. Copy systemd-boot binaries
+chroot "$DIRECTORY" cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi "$ESP/EFI/$BOOTLOADER_ID/"
+chroot "$DIRECTORY" cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi "$ESP/EFI/BOOT/BOOTX64.EFI"
 
 # Copy the latest kernel into EFI boot directory
 chroot "$DIRECTORY" cp /boot/initrd.img $EFI_DIR
 chroot "$DIRECTORY" cp /boot/vmlinuz $EFI_DIR
-chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install --no-variables
+# chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install --no-variables
 
 # Use GRUB_CMDLINE_LINUX_DEFAULT boot options
 source $DIRECTORY/etc/default/grub.d/override.cfg
@@ -385,6 +396,7 @@ auto-firmware yes
 EOF
 
 chroot "$DIRECTORY" umount $EFI_DIR
+chroot "$DIRECTORY" rm -r $EFI_DIR
 
 for dir in /dev /proc /sys; do
 	retry 5 10 umount -R "${DIRECTORY}${dir}"
@@ -398,4 +410,5 @@ umount "$DIRECTORY/var/tmp"
 umount "/var/crash"
 retry 5 10 zfs umount "$FSNAME/ROOT/$FSNAME/root"
 retry 5 10 zpool export "$FSNAME"
-kpartx -d "$ARTIFACT_NAME.img"
+# kpartx -d "$ARTIFACT_NAME.img"
+losetup -d $LOOPNAME
