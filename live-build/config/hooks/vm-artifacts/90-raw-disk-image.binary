@@ -354,7 +354,16 @@ chroot "$DIRECTORY" mount /dev/mapper/${LOOPNAME}p2 $EFI_DIR
 # Copy the latest kernel into EFI boot directory
 chroot "$DIRECTORY" cp /boot/initrd.img $EFI_DIR
 chroot "$DIRECTORY" cp /boot/vmlinuz $EFI_DIR
-chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install --no-variables
+
+# Actual
+# chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install --no-variables
+
+# Alternative 1
+#chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR --no-variables --graceful install 2>/dev/null || true
+
+# Alternative - Going with this.
+chroot "$DIRECTORY" mkdir -p $EFI_DIR/EFI/BOOT $EFI_DIR/loader/entries
+chroot "$DIRECTORY" cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi $EFI_DIR/EFI/BOOT/BOOTX64.EFI
 
 # Use GRUB_CMDLINE_LINUX_DEFAULT boot options
 source $DIRECTORY/etc/default/grub.d/override.cfg
