@@ -19,7 +19,7 @@
 UPDATE_DIR="/var/dlpx-update"
 LOG_DIRECTORY="/var/tmp/delphix-upgrade"
 HOTFIX_PATH="/etc/hotfix"
-EFI_DIR="/boot/efi"
+EFI_DIR="/mnt/boot/efi"
 EFI_PART_UUID="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
 
 #

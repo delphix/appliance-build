@@ -345,7 +345,35 @@ for dir in /dev /proc /sys; do
 done
 
 #
-# Mount /boot/efi and do grub and bootctl install
+# Kernel modules, ZFS modules, and vmlinuz are signed. So sign only
+# systemd-bootx64.efi and copy certs onto image
+#
+SB_KEYS_DIR="/var/tmp/delphix-sb-keys"
+S3_KEYS_URL="s3://secure-boot-keys-prod/release"
+aws s3 cp --recursive "$S3_KEYS_URL/db/" $SB_KEYS_DIR
+
+#
+# debsums -c during sync-* jobs would fail if original file is replaced.
+# Keep both original .efi and new .signed versions, bootctl install will use
+# the .signed file.
+#
+# Alternatively, build our own systemd-boot-efi package and sign
+# systemd-bootx64.efi there.
+#
+SYSTEMD_BOOT_PATH="${DIRECTORY}/usr/lib/systemd/boot/efi/systemd-bootx64.efi"
+sbsign --key ${SB_KEYS_DIR}/db.key --cert ${SB_KEYS_DIR}/db.crt --output "${SYSTEMD_BOOT_PATH}.signed" "${SYSTEMD_BOOT_PATH}"
+sbverify --list "${SYSTEMD_BOOT_PATH}.signed"
+
+# Copy Secure Boot certs onto image then delete keys/certs from build server
+DLPX_KEYS_DIR="${DIRECTORY}/var/delphix/server/sb_certs"
+mkdir -p $DLPX_KEYS_DIR
+
+aws s3 cp --recursive "$S3_KEYS_URL/pub/" $SB_KEYS_DIR
+cp ${SB_KEYS_DIR}/*.auth "${DLPX_KEYS_DIR}"
+rm -r "${SB_KEYS_DIR}"
+
+#
+# Mount /boot/efi and do bootctl install
 #
 EFI_DIR="/mnt/boot/efi"
 chroot "$DIRECTORY" mkdir -p $EFI_DIR

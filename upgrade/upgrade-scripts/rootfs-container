@@ -110,6 +110,7 @@ function mount_efi() {
 	#
 	# Find and mount the device and partition with EFI UUID
 	#
+	mkdir -p "$EFI_DIR"
 	for dev in $(get_bootloader_devices); do
 		for part in $(lsblk -ln -o NAME,FSTYPE,PARTTYPE "/dev/$dev" | grep "$EFI_PART_UUID" | awk '{print $1}'); do
 			part_path="/dev/$part"
@@ -192,7 +193,7 @@ function set_bootfs_not_mounted() {
 		update_systemd_boot_entries
 		cp "/var/lib/machines/${CONTAINER}/boot/initrd.img" "$EFI_DIR"
 		cp "/var/lib/machines/${CONTAINER}/boot/vmlinuz" "$EFI_DIR"
-		chroot "/var/lib/machines/$CONTAINER" bootctl update
+		chroot "/var/lib/machines/$CONTAINER" bootctl --esp-path="$EFI_DIR" update
 		umount "$EFI_DIR"
 	else
 		for dev in $(get_bootloader_devices); do
@@ -259,7 +260,7 @@ function set_bootfs_mounted() {
 		update_systemd_boot_entries
 		cp /boot/initrd.img "$EFI_DIR"
 		cp /boot/vmlinuz "$EFI_DIR"
-		bootctl update
+		bootctl --esp-path="$EFI_DIR" update
 		umount "$EFI_DIR"
 	else
 		for dev in $(get_bootloader_devices); do
