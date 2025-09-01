@@ -34,9 +34,6 @@
   ansible.builtin.pip:
     name: awscli
     break_system_packages: true
-    extra_args: "--no-cache-dir"
-  environment:
-    PIP_NO_CACHE_DIR: "yes"
   become: true
 
 # Add /usr/local/bin to the PATH (awscli needs it)
