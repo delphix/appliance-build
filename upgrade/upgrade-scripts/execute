@@ -249,7 +249,12 @@ fix_and_migrate_services
 # needs to be unmasked before that point. As such, docker is
 # unmasked at the end of this script.
 #
-systemctl mask docker.service
+# We've removed the need to mask the docker service in 2025.6.0.0.
+#
+if [[ -n "$CURRENT_VERSION" ]] &&
+	compare_versions "$CURRENT_VERSION" "lt" "2025.6.0.0-0"; then
+	systemctl mask docker.service
+fi
 
 #
 # When an upgrade gets interrupted while it’s in the middle of upgrading
@@ -598,7 +603,12 @@ fi
 # Unmask docker, which was masked at the beginning of the upgrade due
 # to DLPX-77949.
 #
-systemctl unmask docker.service
+# We've removed the need to mask the docker service in 2025.6.0.0.
+#
+if [[ -n "$CURRENT_VERSION" ]] &&
+	compare_versions "$CURRENT_VERSION" "lt" "2025.6.0.0-0"; then
+	systemctl unmask docker.service
+fi
 
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
