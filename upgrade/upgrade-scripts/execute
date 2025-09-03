@@ -238,6 +238,20 @@ start_stderr_redirect_to_system_log
 fix_and_migrate_services
 
 #
+# Due to DLPX-77949, docker needs to be masked for the duration
+# of the upgrade so that it does not get restarted automatically on
+# upgrade, which would also force a restart of the delphix-mgmt
+# service (since the latter has a dependency on docker.service), and
+# thus interrupt the upgrade.
+#
+# Once the upgrade is done we restart delphix.target, which will
+# attempt to restart both delphix-mgmt and docker, so docker
+# needs to be unmasked before that point. As such, docker is
+# unmasked at the end of this script.
+#
+systemctl mask docker.service
+
+#
 # When an upgrade gets interrupted while it’s in the middle of upgrading
 # packages, the package manager can get into a state where “dpkg --configure -a”
 # needs to be manually run to enable the upgrade to be restarted.
@@ -579,6 +593,12 @@ fi
 if [[ "$(systemctl is-enabled ntpsec-rotate-stats.timer)" == enabled ]]; then
 	systemctl mask --now ntpsec-rotate-stats.timer
 fi
+
+#
+# Unmask docker, which was masked at the beginning of the upgrade due
+# to DLPX-77949.
+#
+systemctl unmask docker.service
 
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
