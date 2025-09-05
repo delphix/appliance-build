@@ -70,6 +70,7 @@
       - make
       - man
       - openjdk-8-jdk-headless
+      - openjdk-17-jdk-headless
       - pigz
       - python3-passlib
       - python3-pip

@@ -18,6 +18,7 @@
 - apt:
     name:
       - openjdk-8-jdk-headless
+      - openjdk-17-jdk-headless
       - ant
       - bash
       - build-essential
