@@ -356,6 +356,17 @@ chroot "$DIRECTORY" cp /boot/initrd.img $EFI_DIR
 chroot "$DIRECTORY" cp /boot/vmlinuz $EFI_DIR
 chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install --no-variables
 
+#
+# Install GRUB if building for OCI
+#
+if [[ "$APPLIANCE_PLATFORM" == oci ]]; then
+  chroot "$DIRECTORY" mount -t zfs "$FSNAME/grub" /mnt
+  # chroot "$DIRECTORY" grub-install --root-directory=/mnt "/dev/$LOOPNAME"
+  chroot "$DIRECTORY" grub-install --target=x86_64-efi --efi-directory=/mnt/boot/efi --bootloader-id=GRUB
+  chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
+  chroot "$DIRECTORY" umount /mnt
+fi
+
 # Use GRUB_CMDLINE_LINUX_DEFAULT boot options
 source $DIRECTORY/etc/default/grub.d/override.cfg
 cat <<-EOF >"${DIRECTORY}/${EFI_DIR}/loader/entries/delphix.conf"
