@@ -133,6 +133,8 @@ function update_systemd_boot_entries() {
 	options root=ZFS=rpool/ROOT/${CONTAINER}/root ro $GRUB_CMDLINE_LINUX_DEFAULT
 	EOF
 
+# XXX Set console option for cloud platforms
+
 	# Single user entry
 	cat <<-EOF >"${EFI_DIR}/loader/entries/delphix-single.conf"
 	title   Delphix Engine Single User mode
@@ -194,14 +196,29 @@ function set_bootfs_not_mounted() {
 		cp "/var/lib/machines/${CONTAINER}/boot/initrd.img" "$EFI_DIR"
 		cp "/var/lib/machines/${CONTAINER}/boot/vmlinuz" "$EFI_DIR"
 		chroot "/var/lib/machines/$CONTAINER" bootctl --esp-path="$EFI_DIR" update
+
+	  # Update GRUB boot loader and config
+		if [[ -f "$EFI_DIR/EFI/GRUB/grubx64.efi" ]]; then
+			opts="--root-directory=/mnt --bootloader-id=GRUB --no-nvram"
+			if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+				opts+=" --debug-image=all -v"
+			fi
+			# shellcheck disable=SC2086
+			chroot "/var/lib/machines/$CONTAINER" \
+			  grub-install --target=x86_64-efi --efi-directory="$EFI_DIR" $opts ||
+				die "'grub-install' for '$EFI_DIR' failed in '$CONTAINER'"
+
+		  chroot "/var/lib/machines/$CONTAINER" \
+			  grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+			  die "'grub-mkconfig' failed in '$CONTAINER'"
+    fi
 		umount "$EFI_DIR"
 	else
 		for dev in $(get_bootloader_devices); do
 			opts="--root-directory=/mnt"
 
 			if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
-				opts+=" --debug-image=all"
-				opts+=" -v"
+				opts+=" --debug-image=all -v"
 			fi
 
 			# shellcheck disable=SC2086
@@ -261,6 +278,20 @@ function set_bootfs_mounted() {
 		cp /boot/initrd.img "$EFI_DIR"
 		cp /boot/vmlinuz "$EFI_DIR"
 		bootctl --esp-path="$EFI_DIR" update
+
+		# Update GRUB boot loader and config
+		if [[ -f "$EFI_DIR/EFI/GRUB/grubx64.efi" ]]; then
+			opts="--root-directory=/mnt --bootloader-id=GRUB --no-nvram"
+			if [[ "$PLATFORM" == "esx" ]] || [[ "$PLATFORM" == "oci" ]]; then
+				opts+=" --debug-image=all -v"
+			fi
+			# shellcheck disable=SC2086
+			grub-install --target=x86_64-efi --efi-directory="$EFI_DIR" $opts ||
+				die "'grub-install' for '$EFI_DIR' failed in '$CONTAINER'"
+
+			grub-mkconfig -o /mnt/boot/grub/grub.cfg ||
+			  die "'grub-mkconfig' failed in '$CONTAINER'"
+    fi
 		umount "$EFI_DIR"
 	else
 		for dev in $(get_bootloader_devices); do
