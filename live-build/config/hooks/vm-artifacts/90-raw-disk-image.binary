@@ -347,7 +347,7 @@ done
 #
 # Mount /boot/efi and do grub and bootctl install
 #
-EFI_DIR="/mnt/boot/efi"
+EFI_DIR="/boot/efi"
 chroot "$DIRECTORY" mkdir -p $EFI_DIR
 chroot "$DIRECTORY" mount /dev/mapper/${LOOPNAME}p2 $EFI_DIR
 
@@ -355,6 +355,18 @@ chroot "$DIRECTORY" mount /dev/mapper/${LOOPNAME}p2 $EFI_DIR
 chroot "$DIRECTORY" cp /boot/initrd.img $EFI_DIR
 chroot "$DIRECTORY" cp /boot/vmlinuz $EFI_DIR
 chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install --no-variables
+
+#
+# Install GRUB if building for OCI
+#
+if [[ "$APPLIANCE_PLATFORM" == oci ]] || [[ "$APPLIANCE_PLATFORM" == oci ]]; then
+  chroot "$DIRECTORY" mount -t zfs "$FSNAME/grub" /mnt
+  # chroot "$DIRECTORY" grub-install --root-directory=/mnt "/dev/$LOOPNAME"
+  chroot "$DIRECTORY" grub-install --target=x86_64-efi --efi-directory="$EFI_DIR" \
+    --root-directory=/mnt --bootloader-id=GRUB --no-nvram
+  chroot "$DIRECTORY" grub-mkconfig -o /mnt/boot/grub/grub.cfg
+  chroot "$DIRECTORY" umount /mnt
+fi
 
 # Use GRUB_CMDLINE_LINUX_DEFAULT boot options
 source $DIRECTORY/etc/default/grub.d/override.cfg
