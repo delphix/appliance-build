@@ -27,6 +27,12 @@
       - python3-minimal
     state: present
 
+- name: Set java to java-8-openjdk-amd64
+  community.general.alternatives:
+    name: java
+    path: /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+    priority: 1800
+
 #
 # Prior to running the unit tests, the Jenkins automation will execute a
 # script (enable-swap.sh) that formats a disk to use as a swap device.
