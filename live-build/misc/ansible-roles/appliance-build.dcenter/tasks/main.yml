@@ -24,10 +24,10 @@
     update: false
   when: lookup('env', 'GITHUB_TOKEN') != ''
 
-- name: Set java to java-8-openjdk-amd64
+- name: Set java to java-17-openjdk-amd64
   community.general.alternatives:
     name: java
-    path: /usr/lib/jvm/java-8-openjdk-amd64/bin/java
+    path: /usr/lib/jvm/java-17-openjdk-amd64/bin/java
 
 #
 # By default, ubuntu restricts directories where dhcpd and named

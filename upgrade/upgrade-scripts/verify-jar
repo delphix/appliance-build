@@ -18,6 +18,14 @@
 # shellcheck disable=SC1090
 . "${BASH_SOURCE%/*}/common.sh"
 
+# JDK Upgrade Note:
+# These parameters are required to switch from JDK 8 to JDK 17.
+# They ensure that the application runs with Java 17, which is needed
+# to support jars compiled with JDK 17.
+export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
+export PATH=$JAVA_HOME/bin:$PATH
+JAVA_BIN="$JAVA_HOME/bin/java"
+
 # We source the version information to bring in values from
 # the version.info file, such as
 #   - VERSION : the appliance version
@@ -172,6 +180,8 @@ find "$IMAGE_PATH" -name "delphix-upgrade-verification*.deb" |
 JAVA_PARAMETERS=(
 	"-Dlog.dir=/var/delphix/server/upgrade-verify"
 	"-Dmdsverify=true"
+	"--add-opens=java.base/java.lang=ALL-UNNAMED"
+	"--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
 	"-jar" "/opt/delphix-upgrade-verification/upgrade-verify.jar"
 )
 
@@ -219,7 +229,7 @@ trap verify_jar_verify_cleanup EXIT
 
 report_progress 20 "Running application upgrade verification"
 
-/usr/bin/java "${JAVA_PARAMETERS[@]}" "${VERIFY_OPTIONS[@]}" ||
+"$JAVA_BIN" "${JAVA_PARAMETERS[@]}" "${VERIFY_OPTIONS[@]}" ||
 	die "'upgrade-verify.jar' failed in verification container"
 
 #
