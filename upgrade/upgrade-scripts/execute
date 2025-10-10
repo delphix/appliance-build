@@ -238,18 +238,24 @@ start_stderr_redirect_to_system_log
 fix_and_migrate_services
 
 #
-# Due to DLPX-77949, docker needs to be masked for the duration
-# of the upgrade so that it does not get restarted automatically on
-# upgrade, which would also force a restart of the delphix-mgmt
-# service (since the latter has a dependency on docker.service), and
-# thus interrupt the upgrade.
+# Starting in 2025.6.0.0, the virtualization service no longer "requires" the
+# docker service, so we no longer need to mask the docker service.
 #
-# Once the upgrade is done we restart delphix.target, which will
-# attempt to restart both delphix-mgmt and docker, so docker
-# needs to be unmasked before that point. As such, docker is
-# unmasked at the end of this script.
-#
-systemctl mask docker.service
+if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
+	#
+	# Due to DLPX-77949, docker needs to be masked for the duration
+	# of the upgrade so that it does not get restarted automatically on
+	# upgrade, which would also force a restart of the delphix-mgmt
+	# service (since the latter has a dependency on docker.service), and
+	# thus interrupt the upgrade.
+	#
+	# Once the upgrade is done we restart delphix.target, which will
+	# attempt to restart both delphix-mgmt and docker, so docker
+	# needs to be unmasked before that point. As such, docker is
+	# unmasked at the end of this script.
+	#
+	systemctl mask docker.service
+fi
 
 #
 # When an upgrade gets interrupted while it’s in the middle of upgrading
@@ -594,11 +600,13 @@ if [[ "$(systemctl is-enabled ntpsec-rotate-stats.timer)" == enabled ]]; then
 	systemctl mask --now ntpsec-rotate-stats.timer
 fi
 
-#
-# Unmask docker, which was masked at the beginning of the upgrade due
-# to DLPX-77949.
-#
-systemctl unmask docker.service
+if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
+	#
+	# Unmask docker, which was masked at the beginning of the upgrade due
+	# to DLPX-77949.
+	#
+	systemctl unmask docker.service
+fi
 
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
