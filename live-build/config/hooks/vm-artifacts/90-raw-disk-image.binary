@@ -393,8 +393,15 @@ initrd  /initrd.img
 options root=ZFS=rpool/ROOT/${FSNAME}/root ro $GRUB_CMDLINE_LINUX_DEFAULT
 EOF
 
-# Single user mode. Need the console options from GRUB
-console_options=$(awk -F'"' '/console=tty/ {print $2}' $DIRECTORY/etc/default/grub.d/override.cfg)
+# Single user mode. ESX and HyperV needs tty0 and clouds uses serial
+#console_options=$(awk -F'"' '/console=tty/ {print $2}' $DIRECTORY/etc/default/grub.d/override.cfg)
+echo "XXX $APPLIANCE_PLATFORM"
+if [[ "$APPLIANCE_PLATFORM" == "esx" || "$APPLIANCE_PLATFORM" == "hyperv"]]; then
+	console_options="console=tty0"
+else
+	console_options="console=ttyS0"
+
+fi
 cat <<-EOF >"${DIRECTORY}/${EFI_DIR}/loader/entries/delphix-single.conf"
 title   Delphix Engine Single User mode
 linux   /vmlinuz
