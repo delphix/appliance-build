@@ -155,7 +155,7 @@ function download_hyperscale_artifacts() {
 
 	if [[ -z "$hyperscale_artifacts_uri" ]]; then
 		HYPERSCALE_S3_DIR="s3://snapshot-de-images"
-		HYPERSCALE_LATEST_PREFIX="builds/jenkins-masking/github/delphix/hyperscale-masking/build/debian-pkg/feature-closed-appliance/latest"
+		HYPERSCALE_LATEST_PREFIX="builds/jenkins-masking/github/delphix/hyperscale-masking/build/debian-pkg/develop/latest"
 
 		aws s3 cp "$HYPERSCALE_S3_DIR/$HYPERSCALE_LATEST_PREFIX" .
 
