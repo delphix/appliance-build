@@ -19,6 +19,7 @@
   ansible.builtin.apt:
     name:
       - openjdk-8-jdk-headless
+      - openjdk-17-jdk-headless
       - curl
       - docker.io
       - fakeroot
