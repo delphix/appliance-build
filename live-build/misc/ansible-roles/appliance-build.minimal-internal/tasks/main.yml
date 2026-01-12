@@ -34,7 +34,9 @@
   ansible.builtin.pip:
     name: awscli
     break_system_packages: true
+    extra_args: --no-cache-dir
   become: true
+
 
 # Add /usr/local/bin to the PATH (awscli needs it)
 - name: Create s3-bin-path.sh under profile.d
