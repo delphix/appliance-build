@@ -212,19 +212,19 @@ function create_upgrade_container() {
 	# associated with that rootfs dataset. The mounts need to happen
 	# before the zfs-import service is run.
 	#
-	cat <<-EOF >"$DIRECTORY/etc/fstab"
-		rpool/ROOT/$CONTAINER/home /home zfs defaults,nodev,nosuid,x-systemd.before=zfs-import-cache.service 0 0
-		rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
-		rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
-		rpool/crashdump            /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
-	EOF
+    cat <<-EOF >"$DIRECTORY/etc/fstab"
+      rpool/ROOT/$CONTAINER/home /home zfs defaults,nodev,nosuid,x-systemd.before=zfs-import-cache.service 0 0
+      rpool/ROOT/$CONTAINER/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+      rpool/ROOT/$CONTAINER/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
+      rpool/crashdump            /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
+    EOF
 
-	if $TMP_DATASETS_EXIST; then
-		cat <<-EOF >>"$DIRECTORY/etc/fstab"
-			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
-			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
-		EOF
-	fi
+    if $TMP_DATASETS_EXIST; then
+      cat <<-EOF >>"$DIRECTORY/etc/fstab"
+                 rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+                 rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
+      EOF
+    fi
 
 	#
 	# DLPX-75089 - Since older versions of Delphix did not properly
