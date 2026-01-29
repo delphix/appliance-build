@@ -183,6 +183,13 @@ if [[ -n "$CURRENT_VERSION" ]]; then
 	[[ -n "$ROOTFS_CONTAINER" ]] ||
 		die "unable to determine currently mounted rootfs container"
 
+  #
+  # Update fstab for security compliance before performing any upgrade
+  # operations. This ensures the system is properly configured before
+  # package installation and snapshot creation.
+  #
+  update_fstab_for_upgrade
+
 	#
 	# It's possible for this script to be run multiple times,
 	# and each time this script is run, we want to keep a
