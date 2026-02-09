@@ -453,6 +453,13 @@ function start() {
 		die "'default.target' inactive in container '$CONTAINER'"
 }
 
+function needs_ip_forwarding() {
+	platform=$(get-appliance-variant)
+	[[ "$platform" =~ "dct" ]] && return 0
+	[[ "$platform" =~ "hyperscale" ]] && return 0
+	return 1
+}
+
 function stop() {
 	systemctl restart systemd-reexec.service 2>/dev/null
 	machinectl terminate "$CONTAINER" ||
@@ -476,9 +483,14 @@ function stop() {
 	#
 	# Starting the upgrade container would have enabled ip forwarding
 	# on the host (and in turn disabled LRO). Reset these settings
-	# on a best effor basis.
+	# on a best effort basis, unless this is a DCT or hyperscale
+	# appliance which require net.ipv4.ip_forward to be enabled
+	# so that docker containers can have network access.
 	#
-	sysctl -w net.ipv4.ip_forward=0 || warn "failed to disable ip port forwarding"
+	if ! needs_ip_forwarding; then
+		sysctl -w net.ipv4.ip_forward=0 ||
+		    warn "failed to disable ip forwarding"
+	fi
 
 	#
 	# Find all the interfaces configured on the host and set
