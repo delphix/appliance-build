@@ -483,7 +483,7 @@ function stop() {
 	#
 	# Starting the upgrade container would have enabled ip forwarding
 	# on the host (and in turn disabled LRO). Reset these settings
-	# on a best effor basis, unless this is a DCT or hyperscale
+	# on a best effort basis, unless this is a DCT or hyperscale
 	# appliance which require net.ipv4.ip_forward to be enabled
 	# so that docker containers can have network access.
 	#
