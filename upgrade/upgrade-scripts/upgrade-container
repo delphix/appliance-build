@@ -489,7 +489,7 @@ function stop() {
 	#
 	if ! needs_ip_forwarding; then
 		sysctl -w net.ipv4.ip_forward=0 ||
-		    warn "failed to disable ip port forwarding"
+		    warn "failed to disable ip forwarding"
 	fi
 
 	#
