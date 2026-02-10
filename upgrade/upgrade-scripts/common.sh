@@ -541,14 +541,6 @@ function update_fstab_for_upgrade() {
   # Update legacy /export/home paths to /home
   sed -i 's|/export/home|/home|g' /etc/fstab /etc/passwd || warn "failed to update legacy /export/home paths"
 
-  # Add nodev,nosuid only if not already present
-  if grep -qE '^[^#].*\s/home\s' /etc/fstab; then
-    if ! grep -qE '^[^#].*\s/home\s.*nodev' /etc/fstab || \
-      ! grep -qE '^[^#].*\s/home\s.*nosuid' /etc/fstab; then
-        sed -i '/^[^#].*\s\/home\s/ s/defaults/defaults,nodev,nosuid/' /etc/fstab
-    fi
-  fi
-
   # Ensure /home directory exists
   mkdir -p /home || die "failed to create /home directory"
 
