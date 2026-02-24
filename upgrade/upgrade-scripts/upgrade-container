@@ -593,6 +593,117 @@ function shell() {
 	machinectl shell "$CONTAINER"
 }
 
+function is_upgrade_container() {
+	local container="$1"
+
+	[[ -d "/var/lib/machines/$container" ]] || return 1
+	[[ -f "/etc/systemd/nspawn/$container.nspawn" ]] || return 1
+	zfs list "rpool/ROOT/$container" &>/dev/null || return 1
+
+	return 0
+}
+
+function is_container_running() {
+	local container="$1"
+	machinectl status "$container" &>/dev/null
+}
+
+function list_started() {
+	local machine
+
+	while IFS= read -r machine; do
+		[[ -n "$machine" ]] || continue
+
+		if is_upgrade_container "$machine"; then
+			echo "$machine"
+		fi
+	done < <(machinectl list --no-legend --no-pager | awk '{ print $1 }')
+}
+
+function list_all() {
+	local container
+
+	for container_dir in /var/lib/machines/*; do
+		[[ -d "$container_dir" ]] || continue
+		container=$(basename "$container_dir")
+
+		if is_upgrade_container "$container"; then
+			echo "$container"
+		fi
+	done
+}
+
+function cleanup_container() {
+	local container="$1"
+	local preview="$2"
+
+	if ! is_upgrade_container "$container"; then
+		die "container '$container' non-existent or mis-configured"
+	fi
+
+	if is_container_running "$container"; then
+		if $preview; then
+			echo "would stop container '$container'"
+		else
+			echo "stopping container '$container'"
+			CONTAINER="$container"
+			stop
+		fi
+	fi
+
+	if $preview; then
+		echo "would destroy container '$container'"
+	else
+		echo "destroying container '$container'"
+		CONTAINER="$container"
+		destroy
+	fi
+}
+
+function cleanup() {
+	local preview=false
+	local cleanup_all=false
+	local target=
+	local container
+	local cleaned=0
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--preview)
+			preview=true
+			;;
+		--all | all)
+			cleanup_all=true
+			;;
+		*)
+			if [[ -n "$target" ]]; then
+				usage "too many arguments specified"
+			fi
+			target="$1"
+			;;
+		esac
+		shift
+	done
+
+	if $cleanup_all; then
+		[[ -z "$target" ]] || usage "cannot specify both container and all"
+
+		while IFS= read -r container; do
+			[[ -n "$container" ]] || continue
+			cleanup_container "$container" "$preview"
+			cleaned=$((cleaned + 1))
+		done < <(list_all)
+
+		if [[ "$cleaned" -eq 0 ]]; then
+			echo "no upgrade containers found"
+		fi
+		return
+	fi
+
+	[[ -n "$target" ]] || usage "missing container name or --all"
+	cleanup_container "$target" "$preview"
+}
+
 function convert_to_rootfs() {
 	#
 	# We're relying on the "mountpoint" property for the "data" and
@@ -659,6 +770,9 @@ function usage() {
 	echo "$PREFIX_SPACES destroy <container>"
 	echo "$PREFIX_SPACES run <container> <command>"
 	echo "$PREFIX_SPACES shell <container>"
+	echo "$PREFIX_SPACES list-started"
+	echo "$PREFIX_SPACES list-all"
+	echo "$PREFIX_SPACES cleanup [--preview] [--all|all|<container>]"
 	echo "$PREFIX_SPACES upgrade <container>"
 	echo "$PREFIX_SPACES convert-to-rootfs <container>"
 	echo "$PREFIX_SPACES get-type <container>"
@@ -712,6 +826,18 @@ shell)
 	CONTAINER="$2"
 	shift 2
 	shell
+	;;
+list-started)
+	[[ $# -gt 1 ]] && usage "too many arguments specified"
+	list_started
+	;;
+list-all)
+	[[ $# -gt 1 ]] && usage "too many arguments specified"
+	list_all
+	;;
+cleanup)
+	shift
+	cleanup "$@"
 	;;
 upgrade)
 	[[ $# -lt 2 ]] && usage "too few arguments specified"
