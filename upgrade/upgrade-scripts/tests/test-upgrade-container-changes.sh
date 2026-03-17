@@ -102,6 +102,7 @@ require_prereqs() {
 	[[ -x "$UPGRADE_CONTAINER_SCRIPT" ]] || fail "missing executable: $UPGRADE_CONTAINER_SCRIPT"
 	command -v machinectl >/dev/null || fail "machinectl not found"
 	command -v awk >/dev/null || fail "awk not found"
+	command -v grep >/dev/null || fail "grep not found"
 }
 
 main() {

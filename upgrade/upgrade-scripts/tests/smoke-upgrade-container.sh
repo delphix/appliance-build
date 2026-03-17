@@ -61,6 +61,7 @@ require_prereqs() {
 	[[ "$EUID" -eq 0 ]] || fail "must run as root"
 	[[ -x "$UC_SCRIPT" ]] || fail "missing executable script: $UC_SCRIPT"
 	command -v grep >/dev/null || fail "grep not found"
+	command -v machinectl >/dev/null || fail "machinectl not found"
 }
 
 contains_line() {
