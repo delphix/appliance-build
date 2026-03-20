@@ -268,7 +268,9 @@ fi
 # When an upgrade gets interrupted while it’s in the middle of upgrading
 # packages, the package manager can get into a state where “dpkg --configure -a”
 # needs to be manually run to enable the upgrade to be restarted.
-dpkg --configure -a || die "failed to run dpkg --configure -a"
+DEBIAN_FRONTEND=noninteractive dpkg --configure -a \
+	--force-confdef --force-confold ||
+	die "failed to run dpkg --configure -a"
 
 #
 # Older versions (i.e. before 9.0.0.0 release) of the "nfs-kernel-server"
