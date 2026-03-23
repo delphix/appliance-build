@@ -58,7 +58,7 @@
       - bc
       - coreutils
       - devscripts
-      - docker.io
+      - docker-ce
       - equivs
       - gdisk
       - git

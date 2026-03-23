@@ -22,7 +22,7 @@
       - ant
       - bash
       - build-essential
-      - docker.io
+      - docker-ce
       - git
       - python3-minimal
     state: present
