@@ -183,13 +183,6 @@ if [[ -n "$CURRENT_VERSION" ]]; then
 	[[ -n "$ROOTFS_CONTAINER" ]] ||
 		die "unable to determine currently mounted rootfs container"
 
-  #
-  # Update fstab for security compliance before performing any upgrade
-  # operations. This ensures the system is properly configured before
-  # package installation and snapshot creation.
-  #
-  update_fstab_for_upgrade
-
 	#
 	# It's possible for this script to be run multiple times,
 	# and each time this script is run, we want to keep a
@@ -759,6 +752,25 @@ if ! systemd-detect-virt -qc; then
 
 	"$IMAGE_PATH/rootfs-container" set-bootfs "$ROOTFS_CONTAINER" ||
 		die "failed to set-bootfs '$ROOTFS_CONTAINER'"
+fi
+
+#
+# Ensure nodev and nosuid mount options are present for the /home entry
+# in /etc/fstab on the running host system. This is required for CIS
+# compliance on systems being upgraded that predate this hardening.
+# New upgrade containers already have these options set by upgrade-container.
+# This check is idempotent and only runs outside a container, consistent
+# with the pattern used for the GRUB update above.
+#
+if ! systemd-detect-virt -qc; then
+	if grep -qE '^[^#].*[[:space:]]/home[[:space:]]' /etc/fstab; then
+		if ! grep -qE '^[^#].*[[:space:]]/home[[:space:]].*nodev' /etc/fstab ||
+			! grep -qE '^[^#].*[[:space:]]/home[[:space:]].*nosuid' /etc/fstab; then
+			sed -i '/^[^#].*[[:space:]]\/home[[:space:]]/ s/defaults/defaults,nodev,nosuid/' \
+				/etc/fstab ||
+				die "failed to add nodev,nosuid to /home entry in /etc/fstab"
+		fi
+	fi
 fi
 
 systemctl reload delphix-platform.service ||
