@@ -237,34 +237,34 @@ function create_upgrade_container() {
 	# DLPX-94130 - Also, disable the "delphix-osadmin" service.
 	# DLPX-94115 - Also, disable "zfs-zed" service.
 	#
-	for svc in \
-		"nfs-mountd" "nfs-server" "rpc-statd" "rpc-statd-notify" \
-		"google-guest-agent" "delphix-osadmin" "zfs-zed"; do
+  for svc in \
+    "nfs-mountd" "nfs-server" "rpc-statd" "rpc-statd-notify" \
+    "google-guest-agent" "delphix-osadmin" "zfs-zed"; do
 
-		if [[ "$svc" == "zfs-zed" ]]; then
-			#
-			# The delphix-platform package already delivers the
-			# "override.conf" file for "zfs-zed" service. Thus, we
-			# need to use a different filename to avoid conflicting
-			# with that pre-existing override file.
-			#
-			filename="upgrade-container.conf"
-		else
-			filename="override.conf"
-		fi
+    if [[ "$svc" == "zfs-zed" ]]; then
+      #
+      # The delphix-platform package already delivers the
+      # "override.conf" file for "zfs-zed" service. Thus, we
+      # need to use a different filename to avoid conflicting
+      # with that pre-existing override file.
+      #
+      filename="upgrade-container.conf"
+    else
+      filename="override.conf"
+    fi
 
-		[[ -e "$DIRECTORY/lib/systemd/system/$svc.service.d/$filename" ]] &&
-			continue
+    [[ -e "$DIRECTORY/lib/systemd/system/$svc.service.d/$filename" ]] &&
+      continue
 
-		mkdir -p "$DIRECTORY/lib/systemd/system/$svc.service.d" ||
-			die "failed to create override directory for '$svc' service"
+    mkdir -p "$DIRECTORY/lib/systemd/system/$svc.service.d" ||
+      die "failed to create override directory for '$svc' service"
 
-		cat >"$DIRECTORY/lib/systemd/system/$svc.service.d/$filename" <<-EOF ||
-			[Unit]
-			ConditionVirtualization=!container
-		EOF
-			die "failed to create override file for '$svc' service"
-	done
+    cat >"$DIRECTORY/lib/systemd/system/$svc.service.d/$filename" <<-EOF ||
+      [Unit]
+      ConditionVirtualization=!container
+    EOF
+      die "failed to create override file for '$svc' service"
+  done
 
 	mkdir -p "/etc/systemd/nspawn" ||
 		die "failed to create directory: '/etc/systemd/nspawn'"
