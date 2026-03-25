@@ -529,32 +529,3 @@ function fix_and_migrate_services() {
 		telegraf.service
 	EOF
 }
-
-
-function update_fstab_for_upgrade() {
-  # shellcheck disable=SC2155
-  fstab_backup="/etc/fstab.bak.$(date +%s)"
-
-  # Backup current fstab
-  cp /etc/fstab "$fstab_backup" || die "failed to backup /etc/fstab to $fstab_backup"
-
-  # Update legacy /export/home paths to /home
-  sed -i 's|/export/home|/home|g' /etc/fstab /etc/passwd || warn "failed to update legacy /export/home paths"
-
-  # Ensure /home directory exists
-  mkdir -p /home || die "failed to create /home directory"
-
-  # Attempt to mount /home with new flags
-  if ! mount /home 2>/dev/null; then
-    warn "failed to mount /home with new fstab configuration"
-  fi
-
-  # Validate the entire fstab by attempting to mount all entries
-  if ! mount -a 2>/dev/null; then
-    warn "fstab validation failed, restoring backup"
-    cp "$fstab_backup" /etc/fstab || die "failed to restore fstab backup from $fstab_backup"
-    die "fstab modification failed validation; backup restored"
-  fi
-
-  echo "Successfully updated /etc/fstab with security compliance flags (nodev,nosuid)"
-}
