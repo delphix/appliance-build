@@ -183,13 +183,6 @@ if [[ -n "$CURRENT_VERSION" ]]; then
 	[[ -n "$ROOTFS_CONTAINER" ]] ||
 		die "unable to determine currently mounted rootfs container"
 
-  #
-  # Update fstab for security compliance before performing any upgrade
-  # operations. This ensures the system is properly configured before
-  # package installation and snapshot creation.
-  #
-  update_fstab_for_upgrade
-
 	#
 	# It's possible for this script to be run multiple times,
 	# and each time this script is run, we want to keep a
@@ -226,6 +219,27 @@ if [[ -n "$CURRENT_VERSION" ]]; then
 		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
 	copy_optional_dataset_property "$PROP_PACKAGED_APP_VERSION" \
 		"$ROOTFS_CONTAINER" "$ROOTFS_CONTAINER@execute-upgrade.$UNIQUE"
+fi
+
+#
+# Home directories were previously mounted under /export/home, and this was
+# changed to /home. This upgrade logic updates the /etc/fstab and /etc/passwd
+# files to reflect that change.
+#
+# Home directories will be mounted in both /export/home and /home until the
+# system is rebooted to ensure that running processes referencing the old
+# /export/home paths continue to function while also enabling new logins
+# under /home to work.
+#
+if grep -q "/export/home" /etc/fstab; then
+	sed -i 's|/export/home|/home|g' /etc/fstab ||
+		die "failed to update /export/home to /home in /etc/fstab"
+	mount /home || die "failed to mount /home"
+fi
+
+if grep -q "/export/home" /etc/passwd; then
+	sed -i 's|/export/home|/home|g' /etc/passwd ||
+		die "failed to update /export/home to /home in /etc/passwd"
 fi
 
 #
@@ -759,6 +773,25 @@ if ! systemd-detect-virt -qc; then
 
 	"$IMAGE_PATH/rootfs-container" set-bootfs "$ROOTFS_CONTAINER" ||
 		die "failed to set-bootfs '$ROOTFS_CONTAINER'"
+fi
+
+#
+# Ensure nodev and nosuid mount options are present for the /home entry
+# in /etc/fstab on the running host system. This is required for CIS
+# compliance on systems being upgraded that predate this hardening.
+# New upgrade containers already have these options set by upgrade-container.
+# This check is idempotent and only runs outside a container, consistent
+# with the pattern used for the GRUB update above.
+#
+if ! systemd-detect-virt -qc; then
+	if grep -qE '^[^#].*[[:space:]]/home[[:space:]]' /etc/fstab; then
+		if ! grep -qE '^[^#].*[[:space:]]/home[[:space:]].*nodev' /etc/fstab ||
+			! grep -qE '^[^#].*[[:space:]]/home[[:space:]].*nosuid' /etc/fstab; then
+			sed -i '/^[^#].*[[:space:]]\/home[[:space:]]/ s/defaults/defaults,nodev,nosuid/' \
+				/etc/fstab ||
+				die "failed to add nodev,nosuid to /home entry in /etc/fstab"
+		fi
+	fi
 fi
 
 systemctl reload delphix-platform.service ||
