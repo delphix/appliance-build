@@ -514,13 +514,12 @@ function fix_and_migrate_services() {
 		should_mask_service "$svc" &&
 			mask_service "$svc" "$container"
 	done <<-EOF
+		chrony.service
 		delphix-fluentd.service
 		delphix-masking.service
 		fluentd.service
 		nfs-mountd.service
 		nginx.service
-		ntpsec.service
-		ntpsec-rotate-stats.timer
 		postgresql.service
 		rpc-statd.service
 		rpcbind.service
