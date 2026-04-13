@@ -19,7 +19,9 @@ usage() {
 	  - list-all
 	  - cleanup dry-run (default)
 	  - cleanup --force (single container)
-	  - cleanup --all (dry-run by default, force optional)
+	  - cleanup --all (dry-run by default)
+	  - cleanup --confirm --all (interactive destructive mode)
+	  - cleanup --force --all (non-interactive destructive mode)
 
 	By default, cleanup runs in dry-run mode and does not mutate state.
 	Use --run-destructive-all only on a dedicated test box.

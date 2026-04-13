@@ -10,7 +10,9 @@ This validates the new commands/features:
 - `list-all`
 - `cleanup <container>` (dry-run by default)
 - `cleanup --force <container>`
-- `cleanup --all` (dry-run) and `cleanup --force --all`
+- `cleanup --all` (dry-run)
+- `cleanup --confirm --all` (interactive destructive mode)
+- `cleanup --force --all` (non-interactive destructive mode)
 
 ### Prerequisites
 
@@ -43,6 +45,7 @@ Examples:
 - Running container appears in `list-started`
 - `cleanup --force <container>` stops (if needed) and destroys container
 - `cleanup --all` (without `--force`) reports actions for all upgrade containers
+- `cleanup --confirm --all` asks for explicit confirmation before destructive cleanup
 - Optional destructive `cleanup --force --all` behavior (when explicitly enabled)
 
 ### Expected output
@@ -92,4 +95,5 @@ Automated equivalent:
 
 - The harness always performs real create/start/destroy operations for its test containers.
 - Destructive `cleanup --all` is disabled by default and only runs with `--run-destructive-all`.
+- `cleanup --preview` is accepted as a compatibility alias for dry-run behavior.
 - The script includes best-effort exit cleanup for containers it creates.

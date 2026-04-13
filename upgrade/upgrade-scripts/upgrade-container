@@ -660,20 +660,45 @@ function cleanup_container() {
 	fi
 }
 
+function confirm_cleanup() {
+	local scope="$1"
+	local count="$2"
+	local answer
+
+	[[ -t 0 ]] || usage "option '--confirm' requires an interactive terminal"
+
+	echo ""
+	echo "About to run destructive cleanup for $scope ($count container(s))."
+	echo "Type 'yes' to continue:"
+	read -r answer
+
+	if [[ "$answer" != "yes" ]]; then
+		echo "aborted cleanup; no changes made"
+		return 1
+	fi
+
+	return 0
+}
+
 function cleanup() {
 	local force=false
+	local confirm=false
 	local cleanup_all=false
 	local target=
 	local container
 	local cleaned=0
+	local -a containers=()
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--force)
 			force=true
 			;;
+		--confirm)
+			confirm=true
+			;;
 		--preview)
-			usage "option '--preview' is no longer supported; omit it for dry-run or pass --force to make changes"
+			# Compatibility no-op: cleanup defaults to dry-run.
 			;;
 		--all | all)
 			cleanup_all=true
@@ -688,23 +713,55 @@ function cleanup() {
 		shift
 	done
 
+	$force && $confirm && usage "cannot specify both --force and --confirm"
+
 	if $cleanup_all; then
 		[[ -z "$target" ]] || usage "cannot specify both container and all"
 
 		while IFS= read -r container; do
 			[[ -n "$container" ]] || continue
-			cleanup_container "$container" "$force"
+			containers+=("$container")
 			cleaned=$((cleaned + 1))
 		done < <(list_all)
 
 		if [[ "$cleaned" -eq 0 ]]; then
 			echo "no upgrade containers found"
+			return
+		fi
+
+		if $force; then
+			for container in "${containers[@]}"; do
+				cleanup_container "$container" true
+			done
+			return
+		fi
+
+		for container in "${containers[@]}"; do
+			cleanup_container "$container" false
+		done
+
+		if $confirm; then
+			confirm_cleanup "all upgrade containers" "$cleaned" || return
+			for container in "${containers[@]}"; do
+				cleanup_container "$container" true
+			done
 		fi
 		return
 	fi
 
 	[[ -n "$target" ]] || usage "missing container name or --all"
-	cleanup_container "$target" "$force"
+
+	if $force; then
+		cleanup_container "$target" true
+		return
+	fi
+
+	cleanup_container "$target" false
+
+	if $confirm; then
+		confirm_cleanup "container '$target'" 1 || return
+		cleanup_container "$target" true
+	fi
 }
 
 function convert_to_rootfs() {
@@ -775,7 +832,7 @@ function usage() {
 	echo "$PREFIX_SPACES shell <container>"
 	echo "$PREFIX_SPACES list-started"
 	echo "$PREFIX_SPACES list-all"
-	echo "$PREFIX_SPACES cleanup [--force] [--all|all|<container>]"
+	echo "$PREFIX_SPACES cleanup [--preview] [--force|--confirm] [--all|all|<container>]"
 	echo "$PREFIX_SPACES upgrade <container>"
 	echo "$PREFIX_SPACES convert-to-rootfs <container>"
 	echo "$PREFIX_SPACES get-type <container>"
