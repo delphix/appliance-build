@@ -136,6 +136,13 @@ shift $((OPTIND - 1))
 [[ $# -ne 0 ]] && usage "too many arguments specified"
 [[ "$EUID" -ne 0 ]] && die "must be run as root"
 
+#
+# This script is non-interactive. Redirect stdin from /dev/null so
+# background execution cannot be stopped by terminal input job-control
+# signals (e.g. SIGTTIN) from subcommands.
+#
+exec </dev/null
+
 if [[ -z "$opt_p" ]]; then
 	opt_p="$(get-appliance-platform)" ||
 		usage "platform must be specified"
@@ -261,7 +268,9 @@ fi
 # When an upgrade gets interrupted while it’s in the middle of upgrading
 # packages, the package manager can get into a state where “dpkg --configure -a”
 # needs to be manually run to enable the upgrade to be restarted.
-dpkg --configure -a || die "failed to run dpkg --configure -a"
+DEBIAN_FRONTEND=noninteractive dpkg --configure -a \
+	--force-confdef --force-confold ||
+	die "failed to run dpkg --configure -a"
 
 #
 # Older versions (i.e. before 9.0.0.0 release) of the "nfs-kernel-server"
