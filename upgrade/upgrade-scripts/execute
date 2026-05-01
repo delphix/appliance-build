@@ -465,7 +465,7 @@ fi
 
 if [[ -n "$NTP_CONF_SOURCE" ]]; then
 	CHRONY_CONF="/etc/chrony/chrony.conf"
-	CHRONY_DRIFT_FILE="/var/lib/chrony/drift"
+	CHRONY_DRIFT_FILE="/var/lib/chrony/chrony.drift"
 
 	{
 		grep "^pool " "$NTP_CONF_SOURCE" || true
