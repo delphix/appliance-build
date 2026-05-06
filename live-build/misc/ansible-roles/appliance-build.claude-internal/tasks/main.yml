@@ -1,0 +1,119 @@
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+- name: Assert GITHUB_TOKEN is set
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'GITHUB_TOKEN') | length > 0
+    fail_msg: "GITHUB_TOKEN must be set to build the internal-claude variant."
+
+- name: Install NFS client
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+
+- name: Create support-tools group
+  ansible.builtin.group:
+    name: support-tools
+    gid: 4000
+    state: present
+
+- name: Add delphix user to support-tools group
+  ansible.builtin.user:
+    name: delphix
+    groups: support-tools
+    append: true
+
+- name: Create /nas mount point
+  ansible.builtin.file:
+    path: /nas
+    state: directory
+    mode: "0755"
+
+- name: Add /nas fstab entry for support-tools NFS share
+  ansible.posix.mount:
+    path: /nas
+    src: "support-tools-nas.delphix.com:/"
+    fstype: nfs4
+    opts: "defaults,_netdev"
+    state: present
+
+- name: Install Claude CLI
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://claude.ai/install.sh | bash
+  args:
+    creates: /usr/local/bin/claude
+    executable: /bin/bash
+
+- name: Create /export/home/delphix/src directory
+  ansible.builtin.file:
+    path: /export/home/delphix/src
+    state: directory
+    owner: delphix
+    group: staff
+    mode: "g+w"
+
+- name: Clone product repositories
+  ansible.builtin.git:
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/{{ item.org }}/{{ item.name }}.git"
+    dest: "/export/home/delphix/src/{{ item.name }}"
+    version: "{{ item.version }}"
+    update: false
+  loop:
+    - { org: delphix, name: dlpx-app-gate, version: develop }
+    - { org: delphix, name: dms-core-gate, version: develop }
+    - { org: delphix, name: zfs,           version: develop }
+    - { org: delphix, name: cd-aidlc,      version: main }
+    - { org: delphix, name: git-utils,     version: main }
+  no_log: true
+
+- name: Reset clone URLs to SSH (strips the build-time bot token)
+  ansible.builtin.command:
+    cmd: >
+      git -C /export/home/delphix/src/{{ item.name }}
+      remote set-url origin git@github.com:{{ item.org }}/{{ item.name }}.git
+  loop:
+    - { org: delphix, name: dlpx-app-gate }
+    - { org: delphix, name: dms-core-gate }
+    - { org: delphix, name: zfs }
+    - { org: delphix, name: cd-aidlc }
+    - { org: delphix, name: git-utils }
+  no_log: true
+
+- name: Ensure ~delphix/src is owned by delphix:staff with group-write
+  ansible.builtin.file:
+    path: /export/home/delphix/src
+    state: directory
+    owner: delphix
+    group: staff
+    mode: "g+w"
+    recurse: true
+
+- name: Allow apt sources to be modified post-boot
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-delphix-claude.cfg
+    mode: "0644"
+    content: |
+      apt:
+        preserve_sources_list: false
+
+- name: Add git-utils/bin to PATH for login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/git-utils-path.sh
+    mode: "0644"
+    content: 'export PATH="$PATH:/export/home/delphix/src/git-utils/bin"'
