@@ -98,6 +98,7 @@
     update: false
   loop:
     - { org: delphix, name: dlpx-app-gate, version: develop }
+    - { org: delphix, name: dlpx-qa-gate,  version: develop }
     - { org: delphix, name: dms-core-gate, version: develop }
     - { org: delphix, name: zfs,           version: develop }
     - { org: delphix, name: cd-aidlc,      version: main }
@@ -111,6 +112,7 @@
       remote set-url origin git@github.com:{{ item.org }}/{{ item.name }}.git
   loop:
     - { org: delphix, name: dlpx-app-gate }
+    - { org: delphix, name: dlpx-qa-gate }
     - { org: delphix, name: dms-core-gate }
     - { org: delphix, name: zfs }
     - { org: delphix, name: cd-aidlc }
