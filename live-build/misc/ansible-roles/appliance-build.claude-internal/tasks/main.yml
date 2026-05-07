@@ -44,13 +44,30 @@
     state: directory
     mode: "0755"
 
-- name: Add /nas fstab entry for support-tools NFS share
-  ansible.posix.mount:
-    path: /nas
-    src: "support-tools-nas.delphix.com:/"
-    fstype: nfs4
-    opts: "defaults,_netdev"
-    state: present
+- name: Install nas.mount systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nas.mount
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Support Tools NAS
+      After=network-online.target
+      Wants=network-online.target
+
+      [Mount]
+      What=support-tools-nas.delphix.com:/
+      Where=/nas
+      Type=nfs4
+      Options=defaults
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable nas.mount unit
+  ansible.builtin.systemd:
+    name: nas.mount
+    enabled: true
+    daemon_reload: true
 
 - name: Install curl, git, and Node.js
   ansible.builtin.apt:

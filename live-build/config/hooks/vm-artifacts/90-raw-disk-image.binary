@@ -323,15 +323,6 @@ cat <<-EOF >"$DIRECTORY/etc/fstab"
 EOF
 
 #
-# The internal-claude variant mounts the support-tools NAS share. The
-# ansible role uses "state: present" to add this entry, but the heredoc
-# above overwrites /etc/fstab, so we append it here instead.
-#
-if [[ "$APPLIANCE_VARIANT" == "internal-claude" ]]; then
-	echo "support-tools-nas.delphix.com:/ /nas nfs4 defaults,_netdev 0 0" >>"$DIRECTORY/etc/fstab"
-fi
-
-#
 # Now we need to install the bootloader. In order to do that, we'll chroot
 # into the newly populated root filesystem, so that we use the grub-install
 # and update-grub binaries installed in that filesystem.  Additionally, we
