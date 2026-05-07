@@ -67,7 +67,6 @@
   ansible.builtin.systemd:
     name: nas.mount
     enabled: true
-    daemon_reload: true
 
 - name: Install curl, git, and Node.js
   ansible.builtin.apt:
