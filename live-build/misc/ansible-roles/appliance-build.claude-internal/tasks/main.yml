@@ -52,13 +52,19 @@
     opts: "defaults,_netdev"
     state: present
 
-- name: Install Claude CLI
-  ansible.builtin.shell: |
-    set -o pipefail
-    curl -fsSL https://claude.ai/install.sh | bash
+- name: Install curl, git, and Node.js
+  ansible.builtin.apt:
+    name:
+      - curl
+      - git
+      - nodejs
+      - npm
+    state: present
+
+- name: Install Claude CLI via npm
+  ansible.builtin.shell: npm install -g @anthropic-ai/claude-code
   args:
     creates: /usr/local/bin/claude
-    executable: /bin/bash
 
 - name: Create /export/home/delphix/src directory
   ansible.builtin.file:
