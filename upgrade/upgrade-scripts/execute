@@ -439,43 +439,50 @@ zcat "/usr/share/doc/delphix-entire-$opt_p/packages.list.gz" |
 	cut -d= -f1 | xargs apt-mark manual ||
 	die "failed to mark as manual packages listed in packages.list.gz file"
 
-if [[ -f "/etc/ntp.conf" ]]; then
-	NTP_CONF_MD5SUM_ORIGINAL=$(dpkg --status ntp | grep /etc/ntp.conf | awk '{ print $2 }')
-	NTP_CONF_MD5SUM_ACTUAL=$(md5sum /etc/ntp.conf | awk '{ print $1 }')
+#
+# Migrate any active NTP configuration to chrony. We handle two cases:
+#   1. ntpsec was the active NTP service (most recent prior implementation)
+#   2. The legacy ntp package was the active NTP service (older engines
+#      that never received the ntpsec migration)
+#
+# In both cases, pool entries are preserved as-is and multicastclient
+# entries are converted to their chrony equivalent (server ... iburst).
+# ntpsec-specific restrict directives are dropped since chrony does not
+# use them.
+#
+NTP_CONF_SOURCE=""
 
+if [[ "$(systemctl is-enabled ntpsec.service 2>/dev/null)" == "enabled" ]]; then
+	NTP_CONF_SOURCE="/etc/ntpsec/ntp.conf"
+elif [[ "$(systemctl is-enabled ntp.service 2>/dev/null)" == "enabled" ]]; then
+	NTP_CONF_SOURCE="/etc/ntp.conf"
 	#
-	# As part of the LTS upgrade project to 24.04, `ntp` was replaced by `ntpsec`.
+	# On removal, the ntp package masks ntp.service. Purge it now so
+	# that masked state does not linger for the rest of the upgrade.
 	#
-	# To preserve and migrate the NTP configuration, we need to copy the
-	# NTP configuration file to the new location after packages are upgraded,
-	# but before they are removed so that NTP continues to function as expected.
-	#
-	# We only do this if the configuration no longer matches what's installed by
-	# default, as that indicates NTP was configured and enabled on the appliance.
-	#
-	if [[ "$NTP_CONF_MD5SUM_ORIGINAL" != "$NTP_CONF_MD5SUM_ACTUAL" ]]; then
-		cp /etc/ntp.conf /etc/ntpsec/ntp.conf ||
-			die "failed to copy /etc/ntp.conf to /etc/ntpsec/ntp.conf"
+	apt_get purge -y ntp || die "failed to purge ntp package"
+fi
 
-		#
-		# On removal, the "ntp" package will mask the "ntp" service. As
-		# a result, enable of the "ntpsec" service will fail, due to it
-		# having an alias to the "ntp" service name, and that service
-		# being masked.
-		#
-		# As a workaround, we explicitly "purge" the "ntp" package,
-		# which will remove the masked "ntp" service, so that it
-		# doesn't impact the enable of "netpsec".
-		#
-		# This doesn't impact the end state of the system, as the ntp
-		# package would have been purged later in this script; but we
-		# need to do it here, prior to attempting to enable "ntpsec".
-		#
-		apt_get purge -y ntp || die "failed to purge ntp package"
+if [[ -n "$NTP_CONF_SOURCE" ]]; then
+	CHRONY_CONF="/etc/chrony/chrony.conf"
+	CHRONY_DRIFT_FILE="/var/lib/chrony/chrony.drift"
 
-		systemctl unmask ntpsec.service || die "failed to unmask ntpsec.service"
-		systemctl enable ntpsec.service || die "failed to enable ntpsec.service"
+	if [[ -f "$CHRONY_CONF" ]]; then
+		cp "$CHRONY_CONF" "${CHRONY_CONF}.bak" ||
+			die "failed to back up $CHRONY_CONF"
 	fi
+
+	{
+		grep "^pool " "$NTP_CONF_SOURCE" || true
+		grep "^multicastclient " "$NTP_CONF_SOURCE" |
+			sed 's/^multicastclient \(.*\)/server \1 iburst/' || true
+		echo "driftfile $CHRONY_DRIFT_FILE"
+		echo "makestep 1.0 3"
+		echo "rtcsync"
+	} >"$CHRONY_CONF" || die "failed to write $CHRONY_CONF"
+
+	systemctl unmask chrony.service || die "failed to unmask chrony.service"
+	systemctl enable chrony.service || die "failed to enable chrony.service"
 fi
 
 #
@@ -598,15 +605,6 @@ rm -f /etc/apt/sources.list.d/*
 #
 if [[ "$(systemctl is-enabled telegraf)" == enabled ]]; then
 	systemctl mask --now telegraf.service
-fi
-
-#
-# Upgrading to LTS 24.04 causes the `ntpsec` package to be installed. This package installs the
-# `ntpsec-rotate-stats.timer` timer which is enabled by default. Our product never enables
-# the collection of NTP stats, so we disable the timer to prevent it from running.
-#
-if [[ "$(systemctl is-enabled ntpsec-rotate-stats.timer)" == enabled ]]; then
-	systemctl mask --now ntpsec-rotate-stats.timer
 fi
 
 if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
