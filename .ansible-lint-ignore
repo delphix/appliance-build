@@ -7,6 +7,7 @@ bootstrap/roles/appliance-build.bootstrap/tasks/main.yml syntax-check[unknown-mo
 bootstrap/roles/appliance-build.bootstrap/tasks/main.yml yaml[truthy]
 live-build/misc/ansible-roles/appliance-build.buildserver-internal/tasks/main.yml fqcn[action-core]
 live-build/misc/ansible-roles/appliance-build.buildserver-internal/tasks/main.yml name[missing]
+live-build/misc/ansible-roles/appliance-build.claude-internal/tasks/main.yml command-instead-of-module
 live-build/misc/ansible-roles/appliance-build.dcenter/tasks/main.yml command-instead-of-module
 live-build/misc/ansible-roles/appliance-build.dcenter/tasks/main.yml fqcn[action-core]
 live-build/misc/ansible-roles/appliance-build.dcenter/tasks/main.yml name[missing]
