@@ -29,21 +29,22 @@ if [[ -e /etc/resolv.conf ]]; then
 	cp /etc/resolv.conf binary/etc/resolv.conf
 fi
 
+cleanup() {
+	for dir in /dev /sys /proc; do
+		umount -R "binary/${dir}" 2>/dev/null || true
+	done
+	if [[ -e binary/etc/resolv.conf ]]; then
+		rm binary/etc/resolv.conf
+	fi
+	if [[ -e binary/etc/resolv.conf.orig || -L binary/etc/resolv.conf ]]; then
+		mv binary/etc/resolv.conf.orig binary/etc/resolv.conf
+	fi
+}
+trap cleanup EXIT
+
 for dir in /proc /sys /dev; do
 	mount --rbind "$dir" "binary/${dir}"
 	mount --make-rslave "binary/${dir}"
 done
 
 ansible-playbook -vv -c chroot -i binary, ansible/playbook.yml
-
-for dir in /proc /sys /dev; do
-	umount -R "binary/${dir}"
-done
-
-if [[ -e binary/etc/resolv.conf ]]; then
-	rm binary/etc/resolv.conf
-fi
-
-if [[ -e binary/etc/resolv.conf.orig || -L binary/etc/resolv.conf ]]; then
-	mv binary/etc/resolv.conf.orig binary/etc/resolv.conf
-fi
