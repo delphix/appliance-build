@@ -166,7 +166,22 @@ function download_ucf_artifacts() {
 	mkdir "$target_dir/ucf"
 	pushd "$target_dir/ucf" &>/dev/null || exit 1
 
-	aws s3 sync "$ucf_artifacts_uri" .
+	#
+	# The UCF bucket usually lives in a different AWS account than
+	# Delphix's linux-build-publish IAM user. If UCF-specific credentials
+	# are exposed via AWS_UCF_ACCESS_KEY_ID / AWS_UCF_SECRET_ACCESS_KEY,
+	# use them for this sync; otherwise fall back to the ambient
+	# AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (which Delphix's pipeline
+	# sets to linux-build-publish credentials).
+	#
+	if [[ -n "${AWS_UCF_ACCESS_KEY_ID:-}" && -n "${AWS_UCF_SECRET_ACCESS_KEY:-}" ]]; then
+		AWS_ACCESS_KEY_ID="$AWS_UCF_ACCESS_KEY_ID" \
+		AWS_SECRET_ACCESS_KEY="$AWS_UCF_SECRET_ACCESS_KEY" \
+			aws s3 sync "$ucf_artifacts_uri" .
+	else
+		aws s3 sync "$ucf_artifacts_uri" .
+	fi
+
 	#
 	# UCF packages are produced by an external GitHub Actions workflow
 	# and may not ship a SHA256SUMS file; verify only if present.
