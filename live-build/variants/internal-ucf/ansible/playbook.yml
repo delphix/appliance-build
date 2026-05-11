@@ -19,11 +19,15 @@
   gather_facts: no
   vars:
     ansible_python_interpreter: /usr/bin/python3
+  #
+  # UCF ships with just Delphix's locked-down appliance + admin console
+  # (virtualization-common) plus the UCF/CDS app. We skip the
+  # virtualization-development and qa-internal roles which target the
+  # full Delphix dev workflow (clones dlpx-app-gate, etc.) and are not
+  # applicable to UCF.
+  #
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
-    - appliance-build.minimal-development
     - appliance-build.virtualization-common
-    - appliance-build.virtualization-development
     - appliance-build.ucf-common
-    - appliance-build.qa-internal
