@@ -149,6 +149,35 @@ function download_dct_artifacts() {
 	popd &>/dev/null || exit 1
 }
 
+function download_ucf_artifacts() {
+	local ucf_artifacts_uri="$1"
+	local target_dir="$2"
+
+	#
+	# UCF is a new product line; unlike DCT/Hyperscale we do not infer
+	# a "latest" S3 path. The caller (devops-gate ucf-engine-release
+	# pipeline) must pass AWS_S3_URI_UCF_PACKAGES explicitly.
+	#
+	if [[ -z "$ucf_artifacts_uri" ]]; then
+		echo "No AWS_S3_URI_UCF_PACKAGES set; skipping UCF artifact download." 1>&2
+		return 0
+	fi
+
+	mkdir "$target_dir/ucf"
+	pushd "$target_dir/ucf" &>/dev/null || exit 1
+
+	aws s3 sync "$ucf_artifacts_uri" .
+	#
+	# UCF packages are produced by an external GitHub Actions workflow
+	# and may not ship a SHA256SUMS file; verify only if present.
+	#
+	if [[ -f SHA256SUMS ]]; then
+		sha256sum -c SHA256SUMS
+	fi
+
+	popd &>/dev/null || exit 1
+}
+
 function download_hyperscale_artifacts() {
 	local hyperscale_artifacts_uri="$1"
 	local target_dir="$2"
