@@ -300,6 +300,18 @@ DEBIAN_FRONTEND=noninteractive dpkg --configure -a \
 [[ -e /var/lib/dpkg/info/nfs-kernel-server.list ]] &&
 	sed -i '/\/var\/lib\/nfs\/rmtab/d' /var/lib/dpkg/info/nfs-kernel-server.list
 
+#
+# DLPX-97204: delphix-platform-$opt_p 1.0.0-delphix.2026.05.05.22.17 (2026.3)
+# ships /etc/modprobe.d/disable-algif_aead.conf, but kmod 31+20240202-2ubuntu7.2
+# in the 2026.4 upgrade pool also claims it as a conffile. Disown the file so
+# kmod can take ownership cleanly during the package install below.
+# Safe to remove once 2026.3 is no longer a supported upgrade source.
+#
+[[ -e /var/lib/dpkg/info/delphix-platform-"$opt_p".list ]] &&
+	sed -i '\|/etc/modprobe.d/disable-algif_aead.conf|d' \
+		/var/lib/dpkg/info/delphix-platform-"$opt_p".list
+rm -f /etc/modprobe.d/disable-algif_aead.conf
+
 apt_get update || die "failed to update apt sources"
 
 #
