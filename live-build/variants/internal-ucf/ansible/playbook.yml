@@ -20,14 +20,17 @@
   vars:
     ansible_python_interpreter: /usr/bin/python3
   #
-  # UCF ships with just Delphix's locked-down appliance + admin console
-  # (virtualization-common) plus the UCF/CDS app. We skip the
-  # virtualization-development and qa-internal roles which target the
-  # full Delphix dev workflow (clones dlpx-app-gate, etc.) and are not
-  # applicable to UCF.
+  # UCF ships with Delphix's locked-down appliance + admin console
+  # (virtualization-common + masking-common) plus the UCF/CDS app.
+  # masking-common is required even though UCF doesn't use the masking
+  # workflow — the Delphix mgmt JVM hard-requires /opt/delphix/masking
+  # and setup_masking.sh on startup. We skip virtualization-development
+  # and qa-internal which target the full Delphix dev workflow (clones
+  # dlpx-app-gate, etc.) and are not applicable to UCF.
   #
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
+    - appliance-build.masking-common
     - appliance-build.virtualization-common
     - appliance-build.ucf-common
