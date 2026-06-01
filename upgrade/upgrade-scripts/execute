@@ -752,6 +752,25 @@ if ! systemd-detect-virt -qc; then
 		die "failed to set-bootfs '$ROOTFS_CONTAINER'"
 fi
 
+#
+# Migrate the home dataset's mountpoint from /export/home to /home for
+# engines upgrading from a release that predates this change. The function
+# (in common.sh) self-guards on the fstab entry: it is a no-op unless the
+# home dataset is still mapped to /export/home, which only happens on an
+# in-place upgrade of a pre-change engine (fresh installs and upgrade
+# containers already use /home). It must run before the nodev/nosuid block
+# below, which hardens the /home fstab entry this migration creates.
+#
+migrate_export_home_to_home
+
+#
+# Harden the /home mount options (nodev,nosuid) in /etc/fstab for CIS
+# compliance. The function (in common.sh) self-guards and is a no-op where
+# the options are already present; it must run after the migration above
+# creates the /home entry.
+#
+harden_home_mount_options
+
 systemctl reload delphix-platform.service ||
 	die "failed to reload delphix-platform.service"
 
