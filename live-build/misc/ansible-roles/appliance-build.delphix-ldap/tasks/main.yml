@@ -63,10 +63,6 @@
     group: root
     mode: 0755
 
-- lineinfile:
-    dest: etc/auto.master
-    line: "/home   auto_home    -nobrowse"
-
 - copy:
     src: 80-internal-ldap
     dest: /etc/sudoers.d/
