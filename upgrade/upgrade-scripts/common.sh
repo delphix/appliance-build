@@ -529,3 +529,88 @@ function fix_and_migrate_services() {
 		telegraf.service
 	EOF
 }
+
+#
+# Home directories were historically mounted at /export/home. For CIS
+# compliance, the home dataset is now mounted at /home instead. This
+# function migrates an engine that is being upgraded in place from the
+# old layout to the new one.
+#
+# The home dataset uses a legacy ZFS mountpoint, so /etc/fstab controls
+# where it is mounted. We repoint the home dataset's fstab entry and any
+# affected /etc/passwd home directory from /export/home to /home, then
+# mount the dataset at /home.
+#
+# The pre-existing /export/home mount is intentionally left in place: the
+# dataset stays mounted at both /export/home and /home until the next
+# reboot. This avoids disrupting processes that hold /export/home open and
+# prevents a busy unmount from failing the upgrade. After a reboot only
+# /home is mounted, since /export/home is no longer present in fstab.
+#
+# The function is idempotent. If /etc/fstab no longer maps the home
+# dataset to /export/home -- because the engine was already migrated, or
+# the image was built to use /home -- it returns without making changes.
+# This also makes it a harmless no-op inside an upgrade container, whose
+# fstab is generated with the /home mountpoint already.
+#
+function migrate_export_home_to_home() {
+	#
+	# Identify the home dataset's fstab entry: a "<pool>/.../home"
+	# source mounted at /export/home. If it is absent, there is
+	# nothing to migrate.
+	#
+	if ! grep -qE '^[^#]*/home[[:space:]]+/export/home[[:space:]]' /etc/fstab; then
+		return
+	fi
+
+	#
+	# Repoint only the home dataset's mountpoint field, leaving every
+	# other fstab entry (and any comments) untouched.
+	#
+	sed -i -E \
+		'/^[^#]*\/home[[:space:]]+\/export\/home[[:space:]]/ s|/export/home|/home|' \
+		/etc/fstab ||
+		die "failed to update home mountpoint in /etc/fstab"
+
+	#
+	# Repoint the home-directory field (field 6) of any user whose home
+	# lived under /export/home, so logins resolve to the new location.
+	#
+	sed -i -E \
+		's|^([^:]*:[^:]*:[^:]*:[^:]*:[^:]*:)/export/home|\1/home|' \
+		/etc/passwd ||
+		die "failed to update home directories in /etc/passwd"
+
+	#
+	# Mount the home dataset at its new /home location. The existing
+	# /export/home mount is deliberately left mounted until reboot.
+	#
+	mkdir -p /home || die "failed to create /home mountpoint"
+	mount /home || die "failed to mount /home"
+}
+
+#
+# Ensure the /home entry in /etc/fstab carries the nodev and nosuid mount
+# options, required for CIS compliance on systems being upgraded that
+# predate this hardening. This is idempotent and a no-op where the options
+# are already present (fresh installs and upgrade containers set them via
+# their fstab templates), so it is safe to call regardless of context.
+#
+function harden_home_mount_options() {
+	#
+	# Nothing to do if there is no /home entry in /etc/fstab.
+	#
+	grep -qE '^[^#].*[[:space:]]/home[[:space:]]' /etc/fstab || return
+
+	#
+	# Nothing to do if both options are already present.
+	#
+	if grep -qE '^[^#].*[[:space:]]/home[[:space:]].*nodev' /etc/fstab &&
+		grep -qE '^[^#].*[[:space:]]/home[[:space:]].*nosuid' /etc/fstab; then
+		return
+	fi
+
+	sed -i '/^[^#].*[[:space:]]\/home[[:space:]]/ s/defaults/defaults,nodev,nosuid/' \
+		/etc/fstab ||
+		die "failed to add nodev,nosuid to /home entry in /etc/fstab"
+}
