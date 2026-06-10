@@ -356,29 +356,28 @@ function create_upgrade_container() {
 		die "failed to add '$UPDATE_DIR' to container config file"
 
 	#
-	# We also need to make "/domain0" available from within the
-	# container, since that's required by the "upgrade-verify" JAR
-	# that's run later. This allows the Virtualization upgrade
-	# verification to verify the contents of it's database (e.g. run
-	# flyway migration) is compatible with the new version of the
-	# Virtualization application.
+	# Note that we intentionally do *not* bind-mount "/domain0" into
+	# the container. The "upgrade-verify" JAR needs to verify the
+	# contents of its database (e.g. run flyway migration) against the
+	# new version of the Virtualization application, but the root
+	# "/domain0" filesystem holds no files of its own; the data lives
+	# in child datasets (e.g. the MDS database) that are cloned and
+	# mounted into "/domain0" within the container's own mount
+	# namespace at verify time. Since "zfs" is available inside the
+	# container (via the "/dev/zfs" bind above), those mounts land in
+	# the container without "/domain0" needing to be exposed from the
+	# host at all.
 	#
-	# We use "norbind" to make this a non-recursive bind mount, so
-	# that only the top-level "/domain0" filesystem is mounted in
-	# the container, rather than it and all of the (potentially,
-	# tens of thousands of) per-VDB filesystems mounted underneath
-	# it. The "daemon-reload" of systemd inside the container (e.g.
-	# run via the packaging scripts during upgrade) scales with the
-	# number of mounts in the container, so we must avoid these
-	# per-VDB mounts in the container, to avoid multi-minute reload
-	# times on systems with many VDBs; see DLPX-97456 for details.
+	# A recursive "Bind=/domain0" was previously used, but "Bind=" is
+	# recursive by default, so every per-VDB filesystem mounted under
+	# "/domain0" on the host (tens of thousands on a large engine) was
+	# inherited into the container's mount namespace. systemd's
+	# "daemon-reload" scales with the number of mount units, so on
+	# Ubuntu 24.04 (systemd 255, where the reload became quadratic)
+	# the in-container package phase spent hours in reloads. Dropping
+	# the bind entirely avoids both the per-VDB mounts and the cost of
+	# the bind itself; see DLPX-97456 for details.
 	#
-	if [[ -d "/domain0" ]]; then
-		cat >>"/etc/systemd/nspawn/$CONTAINER.nspawn" <<-EOF ||
-			Bind=/domain0:/domain0:norbind
-		EOF
-			die "failed to add '/domain0' to container config file"
-	fi
 
 	#
 	# Lastly, we create the log directory and bind mount this into
