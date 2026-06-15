@@ -27,26 +27,16 @@
     deb: https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.deb
     state: present
 
-# The hyperscale playbooks run with gather_facts: false, so ansible_architecture is
-# undefined. Query the Debian/Ubuntu architecture directly (x86_64 reports as 'amd64')
-# to gate the x86_64-only blobfuse2 package.
-- name: Determine package architecture
-  ansible.builtin.command: dpkg --print-architecture
-  register: dpkg_architecture
-  changed_when: false
-
 - name: Add Microsoft packages apt repository for blobfuse2
   ansible.builtin.apt:
     deb: https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
     state: present
-  when: dpkg_architecture.stdout == 'amd64'
 
-- name: Install blobfuse2 v2 (Azure Blob FUSE mounter, x86_64 only)
+- name: Install blobfuse2 v2 (Azure Blob FUSE mounter)
   ansible.builtin.apt:
     name: blobfuse2
     state: present
     update_cache: true
-  when: dpkg_architecture.stdout == 'amd64'
 
 - name: Install the Hyperscale Compliance package
   ansible.builtin.apt:
