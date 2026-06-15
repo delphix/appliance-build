@@ -15,6 +15,37 @@
 #
 
 ---
+# The packages below (mount-s3, blobfuse2) are third-party FUSE drivers required by
+# the Snowflake connector to mount S3 and Azure Blob staging areas at /mnt/hyperscale.
+# They are installed from the internal Delphix apt mirror (OSRB DLPXECO-13872 tracks
+# vendoring them) — the closed appliance has no external network access, so apt is the
+# only supported install path. These must be present BEFORE delphix-hyperscale.
+- name: Install FUSE runtime dependencies (fuse3, libfuse2t64)
+  ansible.builtin.apt:
+    name:
+      - fuse3
+      - libfuse2t64
+    state: present
+
+- name: Install mount-s3 (S3 FUSE mounter, all architectures)
+  ansible.builtin.apt:
+    name: mount-s3
+    state: present
+
+# The hyperscale playbooks run with gather_facts: false, so ansible_architecture is
+# undefined. Query the Debian/Ubuntu architecture directly (x86_64 reports as 'amd64')
+# to gate the x86_64-only blobfuse2 package.
+- name: Determine package architecture
+  ansible.builtin.command: dpkg --print-architecture
+  register: dpkg_architecture
+  changed_when: false
+
+- name: Install blobfuse2 v2 (Azure Blob FUSE mounter, x86_64 only)
+  ansible.builtin.apt:
+    name: blobfuse2
+    state: present
+  when: dpkg_architecture.stdout == 'amd64'
+
 - name: Install the Hyperscale Compliance package
   ansible.builtin.apt:
     name: delphix-hyperscale
