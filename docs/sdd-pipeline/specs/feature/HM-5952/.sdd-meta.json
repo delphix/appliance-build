@@ -6,7 +6,7 @@
   "spec_dir": "docs/sdd-pipeline/specs/feature/HM-5952",
   "template_dir": "~/.claude/plugins/cache/dlpx-claude-plugins/sdd-pipeline/0.1.6/specs/templates/default",
   "plugin_version": "0.1.6",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-06-15T06:06:43.472689+00:00",
   "updated_at": "2026-06-15T06:06:43.472689+00:00",
   "worktree_path": "~/Desktop/Codebase/appliance-build/.claude/worktrees/sdd+feature+hm-5952",
@@ -15,7 +15,8 @@
   "steps_completed": {
     "0": "2026-06-15T06:07:25.247079+00:00",
     "5": "2026-06-15T06:13:17.497901Z",
-    "6": "2026-06-15T06:17:41.205917Z"
+    "6": "2026-06-15T06:17:41.205917Z",
+    "8": "2026-06-15T06:21:19.451236Z"
   },
   "available_skills": [],
   "unavailable_skills": [],
@@ -68,5 +69,9 @@
     }
   ],
   "skip_specs": true,
-  "skip_specs_source": "flag"
+  "skip_specs_source": "flag",
+  "spec_commit_sha": "7de5c67104c15a7dfd8b92fe61492aaeb3bb8172",
+  "pr_branch": "dlpx/pr/kautilya-perforce/aaf7d9f4-761b-4238-92b3-4fc3bfb0ce36",
+  "pr_url": "https://github.com/delphix/appliance-build/pull/872",
+  "completed": "2026-06-15T06:21:19.451236Z"
 }
