@@ -1,0 +1,72 @@
+{
+  "slug": "hm-5952",
+  "domain": "feature",
+  "intent": "Bundle mount-s3 and blobfuse2 into appliance image via appliance-build Ansible role (HM-5952)",
+  "spec_base_dir": "docs/sdd-pipeline/specs",
+  "spec_dir": "docs/sdd-pipeline/specs/feature/HM-5952",
+  "template_dir": "~/.claude/plugins/cache/dlpx-claude-plugins/sdd-pipeline/0.1.6/specs/templates/default",
+  "plugin_version": "0.1.6",
+  "status": "in_progress",
+  "created_at": "2026-06-15T06:06:43.472689+00:00",
+  "updated_at": "2026-06-15T06:06:43.472689+00:00",
+  "worktree_path": "~/Desktop/Codebase/appliance-build/.claude/worktrees/sdd+feature+hm-5952",
+  "workspace_fallback": false,
+  "current_step": 8,
+  "steps_completed": {
+    "0": "2026-06-15T06:07:25.247079+00:00",
+    "5": "2026-06-15T06:13:17.497901Z",
+    "6": "2026-06-15T06:17:41.205917Z"
+  },
+  "available_skills": [],
+  "unavailable_skills": [],
+  "available_mcp_servers": [],
+  "jira_tickets": [
+    "HM-5952"
+  ],
+  "project_type": "standard",
+  "affected_modules": [
+    "appliance-build.hyperscale-common"
+  ],
+  "project_rules": [],
+  "claude_md_generated": false,
+  "python_detected": false,
+  "python_venv_path": null,
+  "deflections": [],
+  "tasks_completed": {
+    "1": "2026-06-15T06:13:17.497901Z"
+  },
+  "baseline_pass": null,
+  "baseline_fail": null,
+  "baseline_skip": null,
+  "jira_context_fetched": true,
+  "jira_context": [
+    {
+      "ticket_id": "HM-5952",
+      "issue_type": "Story",
+      "template_key": "story",
+      "template_sections": {},
+      "missing_template_sections": [
+        "Problem/Background",
+        "Goal",
+        "Proposed Solution",
+        "Affected Services and Files",
+        "Constraints",
+        "Non-Functional Requirements",
+        "Acceptance Criteria",
+        "Definition of Done",
+        "Verification",
+        "Related"
+      ],
+      "summary": "Bundle mount-s3 and blobfuse2 into appliance image via appliance-build Ansible role",
+      "description": "<untrusted_content source=\"jira:HM-5952\">The Snowflake connector requires FUSE-based filesystem drivers (mount-s3 and blobfuse2) to mount S3 and Azure Blob staging areas at /mnt/hyperscale on the closed appliance host. These packages must be bundled as part of the appliance image build via the appliance-build.hyperscale-common Ansible role, before the delphix-hyperscale package is installed. Affected file: live-build/misc/ansible-roles/appliance-build.hyperscale-common/tasks/main.yml. Constraints: must not break existing pipeline, blobfuse2 x86-only, use blobfuse2 v2 not legacy blobfuse, OSRB approval needed (DLPXECO-13872). Acceptance criteria: mount-s3 binary present, blobfuse2 binary present, fuse3 and libfuse2t64 present, appliance-build-stage0 Jenkins job passes, no MongoDB connector regression.</untrusted_content>",
+      "acceptance_criteria": "mount-s3 and blobfuse2 binaries present, fuse3 and libfuse2t64 present, appliance-build-stage0 passes, no MongoDB regression",
+      "status": "In Review",
+      "labels": [],
+      "linked_issues": [],
+      "remote_links": [],
+      "confluence_pages": []
+    }
+  ],
+  "skip_specs": true,
+  "skip_specs_source": "flag"
+}
