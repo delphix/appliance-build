@@ -9,7 +9,7 @@
   "status": "completed",
   "created_at": "2026-06-15T06:06:43.472689+00:00",
   "updated_at": "2026-06-15T06:06:43.472689+00:00",
-  "worktree_path": "~/Desktop/Codebase/appliance-build/.claude/worktrees/sdd+feature+hm-5952",
+  "worktree_path": null,
   "workspace_fallback": false,
   "current_step": 8,
   "steps_completed": {
