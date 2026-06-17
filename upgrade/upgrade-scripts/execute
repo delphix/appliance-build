@@ -265,6 +265,25 @@ if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
 fi
 
 #
+# Migrate the home dataset's mountpoint from /export/home to /home, and
+# harden it with nodev,nosuid, for engines upgrading from a release that
+# predates this change.
+#
+# This must run *before* the package phase below. Package maintainer
+# scripts (e.g. the delphix-platform postinst) now operate in terms of
+# /home, so the home dataset must already be mounted there by the time they
+# run; otherwise they would create/modify content under a /home directory on
+# the root filesystem that the dataset mount later shadows.
+#
+# Both functions (in common.sh) self-guard and are no-ops once the engine
+# already uses /home -- i.e. on fresh installs and inside upgrade
+# containers, whose fstab maps the dataset to /home. migrate must run before
+# harden, which hardens the /home fstab entry the migration creates.
+#
+migrate_export_home_to_home
+harden_home_mount_options
+
+#
 # When an upgrade gets interrupted while it’s in the middle of upgrading
 # packages, the package manager can get into a state where “dpkg --configure -a”
 # needs to be manually run to enable the upgrade to be restarted.
