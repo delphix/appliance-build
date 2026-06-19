@@ -265,6 +265,26 @@ if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
 fi
 
 #
+# DLPX-97495: mask (do NOT stop) delphix-mgmt for the duration of the package
+# upgrade. The management JVM holds open file descriptors to shared libraries
+# (libcrypto, libzfs, JVM libs, ...) that the dpkg phase below replaces; a
+# routine API request (e.g. "GET /delphix/about" spawning a helper) mid-dpkg
+# can fork/exec against the yanked libraries and abort() the JVM (SIGABRT).
+# Masking does not stop the running JVM, but ensures that IF it crashes,
+# systemd's Restart=always does NOT bring it back up mid-upgrade. A mid-upgrade
+# restart desyncs the upgrade version state machine and clears
+# upgrade.properties, which strands the FULL finish-deferred auto-reboot
+# trigger and leaves the engine in DEFERRED on the old kernel. We unmask at the
+# end, before the final "systemctl restart delphix.target" brings mgmt up
+# exactly once. Unconditional (unlike the version-gated docker mask above)
+# because the crash applies to any source version doing a package upgrade.
+#
+# Note: "mask" (not "disable", which does not block Restart=, and not
+# "mask --now", which would proactively stop the running JVM).
+#
+systemctl mask delphix-mgmt.service
+
+#
 # Migrate the home dataset's mountpoint from /export/home to /home, and
 # harden it with nodev,nosuid, for engines upgrading from a release that
 # predates this change.
@@ -633,6 +653,17 @@ if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
 	#
 	systemctl unmask docker.service
 fi
+
+#
+# DLPX-97495: unmask delphix-mgmt (masked near the start of the upgrade) so the
+# "systemctl restart delphix.target" below can bring it up exactly once -- a
+# masked unit cannot be started, so this unmask is required for the management
+# stack to come back. If the JVM crashed while masked, the unit is left in
+# "failed" state; reset it so the target restart starts it cleanly (restart
+# clears "failed" on its own, so this is belt-and-suspenders).
+#
+systemctl unmask delphix-mgmt.service
+systemctl reset-failed delphix-mgmt.service 2>/dev/null || true
 
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
