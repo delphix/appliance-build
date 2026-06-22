@@ -265,24 +265,42 @@ if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
 fi
 
 #
-# DLPX-97495: mask (do NOT stop) delphix-mgmt for the duration of the package
-# upgrade. The management JVM holds open file descriptors to shared libraries
-# (libcrypto, libzfs, JVM libs, ...) that the dpkg phase below replaces; a
-# routine API request (e.g. "GET /delphix/about" spawning a helper) mid-dpkg
-# can fork/exec against the yanked libraries and abort() the JVM (SIGABRT).
-# Masking does not stop the running JVM, but ensures that IF it crashes,
-# systemd's Restart=always does NOT bring it back up mid-upgrade. A mid-upgrade
-# restart desyncs the upgrade version state machine and clears
-# upgrade.properties, which strands the FULL finish-deferred auto-reboot
-# trigger and leaves the engine in DEFERRED on the old kernel. We unmask at the
-# end, before the final "systemctl restart delphix.target" brings mgmt up
-# exactly once. Unconditional (unlike the version-gated docker mask above)
-# because the crash applies to any source version doing a package upgrade.
+# DLPX-97495: disarm delphix-mgmt's automatic restart for the duration of the
+# package upgrade, without stopping the running JVM. The management JVM holds
+# open file descriptors to shared libraries (libcrypto, libzfs, JVM libs, ...)
+# that the dpkg phase below replaces; a routine API request (e.g.
+# "GET /delphix/about" spawning a helper) mid-dpkg can fork/exec against the
+# yanked libraries and abort() the JVM (SIGABRT). The unit ships Restart=always
+# (RestartUSec=100ms), so systemd would otherwise resurrect the mgmt stack
+# mid-upgrade -- which desyncs the upgrade version state machine and clears
+# upgrade.properties, stranding the FULL finish-deferred auto-reboot trigger and
+# leaving the engine in DEFERRED on the old kernel.
 #
-# Note: "mask" (not "disable", which does not block Restart=, and not
-# "mask --now", which would proactively stop the running JVM).
+# We install a "Restart=no" drop-in (admin-owned, so the delphix-mgmt package
+# upgrade does not clobber it) and reload so the change applies to the already
+# running unit. This leaves the JVM running but ensures that IF it crashes,
+# systemd does NOT bring it back up. We remove the drop-in at the end, before
+# the final "systemctl restart delphix.target" brings mgmt up exactly once (an
+# explicit restart starts the unit regardless of Restart=). Unconditional
+# (unlike the version-gated docker mask above) because the crash applies to any
+# source version doing a package upgrade.
 #
-systemctl mask delphix-mgmt.service
+# NB: we deliberately do NOT "systemctl mask" the unit. A masked unit cannot be
+# enabled, and delphix-virtualization's postinst runs "systemctl enable
+# delphix-mgmt.service" during the dpkg phase below; masking makes that postinst
+# fail, which fails the whole package install (DLPX-97495 verify regression).
+# "disable" is also insufficient -- it does not block Restart=.
+#
+MGMT_RESTART_DROPIN_DIR=/etc/systemd/system/delphix-mgmt.service.d
+mkdir -p "$MGMT_RESTART_DROPIN_DIR" ||
+	die "failed to create $MGMT_RESTART_DROPIN_DIR"
+cat >"$MGMT_RESTART_DROPIN_DIR/dlpx-97495-no-restart.conf" <<-EOF ||
+	[Service]
+	Restart=no
+	EOF
+	die "failed to write delphix-mgmt Restart=no drop-in"
+systemctl daemon-reload ||
+	die "failed to reload systemd after installing delphix-mgmt drop-in"
 
 #
 # Migrate the home dataset's mountpoint from /export/home to /home, and
@@ -655,14 +673,18 @@ if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
 fi
 
 #
-# DLPX-97495: unmask delphix-mgmt (masked near the start of the upgrade) so the
-# "systemctl restart delphix.target" below can bring it up exactly once -- a
-# masked unit cannot be started, so this unmask is required for the management
-# stack to come back. If the JVM crashed while masked, the unit is left in
-# "failed" state; reset it so the target restart starts it cleanly (restart
+# DLPX-97495: remove the delphix-mgmt "Restart=no" drop-in installed near the
+# start of the upgrade, restoring the unit's normal Restart=always policy before
+# the "systemctl restart delphix.target" below brings mgmt up exactly once. If
+# the JVM crashed while restart was disabled, the unit is left in "failed"
+# state; reset it so the target restart starts it cleanly (an explicit restart
 # clears "failed" on its own, so this is belt-and-suspenders).
 #
-systemctl unmask delphix-mgmt.service
+rm -f "$MGMT_RESTART_DROPIN_DIR/dlpx-97495-no-restart.conf" ||
+	die "failed to remove delphix-mgmt Restart=no drop-in"
+rmdir "$MGMT_RESTART_DROPIN_DIR" 2>/dev/null || true
+systemctl daemon-reload ||
+	die "failed to reload systemd after removing delphix-mgmt drop-in"
 systemctl reset-failed delphix-mgmt.service 2>/dev/null || true
 
 stop_stdout_redirect_to_system_log
