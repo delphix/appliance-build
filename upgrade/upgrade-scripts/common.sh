@@ -424,6 +424,65 @@ function should_mask_service() {
 }
 
 #
+# DLPX-97495: admin-owned drop-in (under /etc/systemd/system, so the delphix-mgmt
+# package upgrade cannot clobber it) used to disarm delphix-mgmt's restart during
+# a package upgrade. See disarm_mgmt_restart() / rearm_mgmt_restart() below.
+#
+MGMT_RESTART_DROPIN_DIR=/etc/systemd/system/delphix-mgmt.service.d
+MGMT_RESTART_DROPIN_FILE="$MGMT_RESTART_DROPIN_DIR/dlpx-97495-no-restart.conf"
+
+#
+# DLPX-97495: disarm delphix-mgmt's automatic restart for the duration of the
+# package upgrade, without stopping the running JVM. The live JVM has the shared
+# libraries that the dpkg phase replaces mapped, so a fork/exec mid-dpkg can
+# abort() it (SIGABRT). The unit ships Restart=always, so systemd would then
+# resurrect the mgmt stack mid-upgrade -- which desyncs the upgrade version state
+# machine and clears upgrade.properties, stranding the FULL finish-deferred
+# auto-reboot trigger and leaving the engine stuck in DEFERRED on the old kernel.
+#
+# A "Restart=no" drop-in (plus a reload, so it applies to the already running
+# unit) leaves the JVM up but stops systemd from restarting it if it crashes.
+# rearm_mgmt_restart() removes it before the final "systemctl restart
+# delphix.target", which starts mgmt exactly once regardless of Restart=.
+#
+# We can't "mask" the unit instead: a masked unit can't be enabled, and
+# delphix-virtualization's postinst runs "systemctl enable delphix-mgmt.service"
+# during the dpkg phase, so masking fails the package install (verify
+# regression). "disable" does not work either -- it does not block Restart=.
+#
+function disarm_mgmt_restart() {
+	mkdir -p "$MGMT_RESTART_DROPIN_DIR" ||
+		die "failed to create $MGMT_RESTART_DROPIN_DIR"
+	cat >"$MGMT_RESTART_DROPIN_FILE" <<-EOF ||
+		[Service]
+		Restart=no
+		EOF
+		die "failed to write delphix-mgmt Restart=no drop-in"
+	systemctl daemon-reload ||
+		die "failed to reload systemd after installing delphix-mgmt drop-in"
+}
+
+#
+# DLPX-97495: re-arm delphix-mgmt's restart by removing the drop-in that
+# disarm_mgmt_restart() installed, restoring Restart=always before the final
+# delphix.target restart. If the JVM crashed while disarmed the unit is left
+# "failed"; reset it so the restart starts cleanly (belt-and-suspenders -- an
+# explicit restart clears "failed" anyway).
+#
+function rearm_mgmt_restart() {
+	rm -f "$MGMT_RESTART_DROPIN_FILE" ||
+		die "failed to remove delphix-mgmt Restart=no drop-in"
+	#
+	# Best-effort: rmdir only removes an empty directory, so leave it (and don't
+	# fail the upgrade) if another drop-in is installed in delphix-mgmt.service.d.
+	#
+	rmdir "$MGMT_RESTART_DROPIN_DIR" 2>/dev/null || true
+	systemctl daemon-reload ||
+		die "failed to reload systemd after removing delphix-mgmt drop-in"
+	systemctl reset-failed delphix-mgmt.service 2>/dev/null || true
+}
+
+#
 # This function has 2 tasks:
 #  1. Fix/update the state of some services to be in line with what is expected
 #     in this version of the appliance.
