@@ -294,6 +294,15 @@ if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
 fi
 
 #
+# DLPX-97495: disarm delphix-mgmt's restart so a JVM that crashes against
+# dpkg-replaced libraries isn't resurrected mid-upgrade (which would strand the
+# FULL auto-reboot trigger). Re-armed before the final delphix.target restart.
+# Unconditional, unlike the version-gated docker mask above, because the crash
+# applies to any source version. See disarm_mgmt_restart() in common.sh.
+#
+disarm_mgmt_restart
+
+#
 # Migrate the home dataset's mountpoint from /export/home to /home, and
 # harden it with nodev,nosuid, for engines upgrading from a release that
 # predates this change.
@@ -662,6 +671,13 @@ if compare_versions "$CURRENT_VERSION" lt "2025.6.0.0-0"; then
 	#
 	systemctl unmask docker.service
 fi
+
+#
+# DLPX-97495: re-arm delphix-mgmt's automatic restart (disarmed near the start
+# of the upgrade) before the "systemctl restart delphix.target" below brings
+# mgmt up exactly once. See rearm_mgmt_restart() in common.sh.
+#
+rearm_mgmt_restart
 
 stop_stdout_redirect_to_system_log
 stop_stderr_redirect_to_system_log
