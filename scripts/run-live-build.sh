@@ -219,18 +219,27 @@ done
 # the build). Syft is run with the dpkg-db cataloger only against the chroot
 # rootfs so the document is grounded in the authoritative installed-package set
 # from /var/lib/dpkg/status rather than a heuristic filesystem scan.
+# cyclonedx-cli validates the emitted document against the CycloneDX 1.6 schema.
 #
 # DELPHIX_APPLIANCE_VERSION is provided by the Gradle task environment.
 #
 (
 	SYFT_VERSION="v1.45.1"
+	CYCLONEDX_CLI_VERSION="v0.27.2"
 	sbom_toolbin="${TOP}/live-build/build/.sbom-tools"
 	mkdir -p "${sbom_toolbin}"
+	export PATH="${sbom_toolbin}:${PATH}"
 	if ! command -v syft >/dev/null 2>&1; then
 		echo "[sbom] Installing syft ${SYFT_VERSION} ..."
 		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh |
 			sh -s -- -b "${sbom_toolbin}" "${SYFT_VERSION}"
-		export PATH="${sbom_toolbin}:${PATH}"
+	fi
+	if ! command -v cyclonedx >/dev/null 2>&1; then
+		echo "[sbom] Installing cyclonedx-cli ${CYCLONEDX_CLI_VERSION} ..."
+		curl -sSfL \
+			"https://github.com/CycloneDX/cyclonedx-cli/releases/download/${CYCLONEDX_CLI_VERSION}/cyclonedx-linux-x64" \
+			-o "${sbom_toolbin}/cyclonedx"
+		chmod +x "${sbom_toolbin}/cyclonedx"
 	fi
 	echo "[sbom] Scanning ${ARTIFACT_NAME} chroot rootfs (dpkg cataloger only) ..."
 	syft scan "dir:${build_dir}/chroot" \
@@ -239,4 +248,10 @@ done
 		--source-version "${DELPHIX_APPLIANCE_VERSION:-unknown}" \
 		-o "cyclonedx-json=${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
 	echo "[sbom] Wrote ${ARTIFACT_NAME}.cdx.json"
+	echo "[sbom] Validating ${ARTIFACT_NAME}.cdx.json against CycloneDX 1.6 schema ..."
+	cyclonedx validate \
+		--input-file "${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json" \
+		--input-format json \
+		--input-version v1_6
+	echo "[sbom] Validation passed."
 ) || echo "[sbom] WARNING: CycloneDX SBOM generation failed for ${ARTIFACT_NAME}; the build continues without a SBOM." >&2
