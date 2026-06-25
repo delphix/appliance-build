@@ -126,15 +126,18 @@ for (variant in allVariants) {
                     case upgradeArtifactsRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.packages.list"
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.cdx.json"
                         break
                     case vmArtifactsRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.packages.list"
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.cdx.json"
                         break
                     case allRunType:
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.debs.tar.gz"
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.${artifactTypes[platform]}"
                         outputs.file "${buildDir}/artifacts/${variant}-${platform}.packages.list"
+                        outputs.file "${buildDir}/artifacts/${variant}-${platform}.cdx.json"
                         break
                 }
 
