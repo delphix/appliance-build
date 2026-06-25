@@ -235,6 +235,8 @@ done
 		-o "cyclonedx-json=${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
 	echo "[sbom] Wrote ${ARTIFACT_NAME}.cdx.json"
 	echo "[sbom] Validating ${ARTIFACT_NAME}.cdx.json structure ..."
+	jq -r '"[sbom]   bomFormat=\(.bomFormat) specVersion=\(.specVersion) components=\(.components | length)"' \
+		"${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
 	jq -e '.bomFormat == "CycloneDX" and (.components | length) > 0' \
 		"${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json" > /dev/null
 	echo "[sbom] Validation passed."
