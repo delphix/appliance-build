@@ -221,26 +221,12 @@ done
 # from /var/lib/dpkg/status rather than a heuristic filesystem scan.
 # cyclonedx-cli validates the emitted document against the CycloneDX 1.6 schema.
 #
+# Both syft and cyclonedx-cli are provisioned on the build host by
+# bootstrap/roles/appliance-build.bootstrap/tasks/main.yml.
+#
 # DELPHIX_APPLIANCE_VERSION is provided by the Gradle task environment.
 #
 (
-	SYFT_VERSION="v1.45.1"
-	CYCLONEDX_CLI_VERSION="v0.27.2"
-	sbom_toolbin="${TOP}/live-build/build/.sbom-tools"
-	mkdir -p "${sbom_toolbin}"
-	export PATH="${sbom_toolbin}:${PATH}"
-	if ! command -v syft >/dev/null 2>&1; then
-		echo "[sbom] Installing syft ${SYFT_VERSION} ..."
-		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh |
-			sh -s -- -b "${sbom_toolbin}" "${SYFT_VERSION}"
-	fi
-	if ! command -v cyclonedx >/dev/null 2>&1; then
-		echo "[sbom] Installing cyclonedx-cli ${CYCLONEDX_CLI_VERSION} ..."
-		curl -sSfL \
-			"https://github.com/CycloneDX/cyclonedx-cli/releases/download/${CYCLONEDX_CLI_VERSION}/cyclonedx-linux-x64" \
-			-o "${sbom_toolbin}/cyclonedx"
-		chmod +x "${sbom_toolbin}/cyclonedx"
-	fi
 	echo "[sbom] Scanning ${ARTIFACT_NAME} chroot rootfs (dpkg cataloger only) ..."
 	syft scan "dir:${build_dir}/chroot" \
 		--override-default-catalogers "dpkg-db-cataloger" \

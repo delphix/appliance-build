@@ -99,3 +99,17 @@
     name: delphix
     groups: docker
     append: true
+
+- name: Install syft (CycloneDX SBOM generator)
+  ansible.builtin.shell:
+    cmd: >
+      curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh |
+      sh -s -- -b /usr/local/bin {{ syft_version }}
+    creates: /usr/local/bin/syft
+
+- name: Install cyclonedx-cli (CycloneDX schema validator)
+  ansible.builtin.get_url:
+    url: "https://github.com/CycloneDX/cyclonedx-cli/releases/download/{{ cyclonedx_cli_version }}/cyclonedx-linux-x64"
+    dest: /usr/local/bin/cyclonedx
+    mode: "0755"
+    force: false
