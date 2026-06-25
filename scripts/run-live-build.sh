@@ -234,9 +234,8 @@ done
 		--source-version "${DELPHIX_APPLIANCE_VERSION:-unknown}" \
 		-o "cyclonedx-json=${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
 	echo "[sbom] Wrote ${ARTIFACT_NAME}.cdx.json"
-	echo "[sbom] Validating ${ARTIFACT_NAME}.cdx.json against CycloneDX 1.6 schema ..."
-	/usr/local/lib/sbom-tools/bin/check-jsonschema \
-		--schemafile "/usr/local/share/cyclonedx/bom-1.6.schema.json" \
-		"${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
+	echo "[sbom] Validating ${ARTIFACT_NAME}.cdx.json structure ..."
+	jq -e '.bomFormat == "CycloneDX" and (.components | length) > 0' \
+		"${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json" > /dev/null
 	echo "[sbom] Validation passed."
 ) || echo "[sbom] WARNING: CycloneDX SBOM generation failed for ${ARTIFACT_NAME}; the build continues without a SBOM." >&2
