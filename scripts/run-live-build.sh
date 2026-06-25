@@ -235,7 +235,7 @@ done
 		-o "cyclonedx-json=${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
 	echo "[sbom] Wrote ${ARTIFACT_NAME}.cdx.json"
 	echo "[sbom] Validating ${ARTIFACT_NAME}.cdx.json against CycloneDX 1.6 schema ..."
-	check-jsonschema \
+	/usr/local/lib/sbom-tools/bin/check-jsonschema \
 		--schemafile "/usr/local/share/cyclonedx/bom-1.6.schema.json" \
 		"${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
 	echo "[sbom] Validation passed."

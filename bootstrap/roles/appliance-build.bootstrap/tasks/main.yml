@@ -107,10 +107,11 @@
       sh -s -- -b /usr/local/bin {{ syft_version }}
     creates: /usr/local/bin/syft
 
-- name: Install check-jsonschema (offline CycloneDX schema validator)
+- name: Install check-jsonschema into isolated virtualenv (avoids conflict with system jsonschema)
   ansible.builtin.pip:
     name: check-jsonschema
-    break_system_packages: true
+    virtualenv: "{{ sbom_tools_venv }}"
+    virtualenv_command: python3 -m venv
 
 - name: Create CycloneDX schema directory
   ansible.builtin.file:
