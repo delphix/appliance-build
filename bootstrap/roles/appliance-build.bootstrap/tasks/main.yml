@@ -107,9 +107,20 @@
       sh -s -- -b /usr/local/bin {{ syft_version }}
     creates: /usr/local/bin/syft
 
-- name: Install cyclonedx-cli (CycloneDX schema validator)
-  ansible.builtin.get_url:
-    url: "https://github.com/CycloneDX/cyclonedx-cli/releases/download/{{ cyclonedx_cli_version }}/cyclonedx-linux-x64"
-    dest: /usr/local/bin/cyclonedx
+- name: Install check-jsonschema (offline CycloneDX schema validator)
+  ansible.builtin.pip:
+    name: check-jsonschema
+    break_system_packages: true
+
+- name: Create CycloneDX schema directory
+  ansible.builtin.file:
+    path: "{{ cyclonedx_schema_dir }}"
+    state: directory
     mode: "0755"
+
+- name: Download CycloneDX {{ cyclonedx_schema_version }} JSON schema
+  ansible.builtin.get_url:
+    url: "https://cyclonedx.org/schema/bom-{{ cyclonedx_schema_version }}.schema.json"
+    dest: "{{ cyclonedx_schema_dir }}/bom-{{ cyclonedx_schema_version }}.schema.json"
+    mode: "0644"
     force: false

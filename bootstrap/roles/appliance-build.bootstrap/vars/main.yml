@@ -1,3 +1,4 @@
 ---
 syft_version: "v1.45.1"
-cyclonedx_cli_version: "v0.27.2"
+cyclonedx_schema_version: "1.6"
+cyclonedx_schema_dir: "/usr/local/share/cyclonedx"
