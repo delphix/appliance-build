@@ -229,7 +229,7 @@ done
 (
 	echo "[sbom] Scanning ${ARTIFACT_NAME} chroot rootfs (dpkg cataloger only) ..."
 	syft scan "dir:${build_dir}/chroot" \
-		--select-catalogers "dpkg-db-cataloger,-file" \
+		--select-catalogers "dpkg" \
 		--source-name "${ARTIFACT_NAME}" \
 		--source-version "${DELPHIX_APPLIANCE_VERSION:-unknown}" \
 		-o "cyclonedx-json=${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
