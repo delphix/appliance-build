@@ -16,6 +16,37 @@
 
 ---
 #
+# UCF gets its own login user, separate from delphix, so that day-to-day
+# UCF administration (docker ps/logs, UCF service status, etc.) doesn't
+# require operators to su/sudo to root. It shares APPLIANCE_PASSWORD with
+# delphix/root (set by appliance-build.minimal-common), and mirrors the
+# same group membership delphix gets there: secondary membership in the
+# root group (appliance-build.minimal-common's mechanism for giving
+# delphix broad access to root-owned appliance files/services without
+# being uid 0), plus docker, for the same reason delphix has it on other
+# variants (see appliance-build.buildserver-internal,
+# appliance-build.unittest-internal).
+#
+# Note: both root-group and docker-group membership are root-equivalent
+# (root-group members can read/write many root-owned files; a docker-group
+# member can bind-mount the host filesystem via `docker run -v /:/host ...`
+# and get a root shell). This is an accepted tradeoff here, matching the
+# level of access delphix already has via the same mechanism.
+#
+- user:
+    name: ucf
+    uid: 65434
+    group: staff
+    groups: root,docker
+    append: true
+    shell: /bin/bash
+    create_home: true
+    comment: UCF User
+    home: /home/ucf
+    password:
+      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
+
+#
 # Installs the UCF (CDS) application packages from the ancillary apt
 # repository. The packages themselves are uploaded by the CDS team via
 # GitHub Actions to AWS_S3_URI_UCF_PACKAGES and pulled into the apt
