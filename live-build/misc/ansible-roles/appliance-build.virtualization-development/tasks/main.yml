@@ -77,6 +77,16 @@
     version: "develop"
     accept_hostkey: yes
     update: no
+  environment:
+    # Abort a clone that stalls mid-transfer (throughput < 100 B/s for 60s)
+    # rather than hanging until the egress-path session timeout (~60 min)
+    # severs it, so the retry below can recover quickly.
+    GIT_HTTP_LOW_SPEED_LIMIT: "100"
+    GIT_HTTP_LOW_SPEED_TIME: "60"
+  register: dlpx_app_gate_clone
+  until: dlpx_app_gate_clone is not failed
+  retries: 3
+  delay: 30
   when: lookup('env', 'GITHUB_TOKEN') != ''
 
 - file:
