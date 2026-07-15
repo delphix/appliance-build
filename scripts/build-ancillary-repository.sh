@@ -85,7 +85,21 @@ mkdir -p "$WORK_DIRECTORY/artifacts"
 download_combined_packages_artifacts "$AWS_S3_URI_COMBINED_PACKAGES" \
 	"$WORK_DIRECTORY/artifacts"
 
-download_dct_artifacts "$AWS_S3_URI_DCT_PACKAGES" "$WORK_DIRECTORY/artifacts"
+#
+# The DCT packages are only installed by the DCT appliance variants, so only
+# download them when a DCT variant is being built (signalled by the
+# ancillaryRepository gradle task via DELPHIX_BUILD_DCT_VARIANT) or when a DCT
+# artifacts URI is provided explicitly. Otherwise download_dct_artifacts would
+# fall back to fetching the latest DCT build, wastefully pulling packages into
+# the ancillary repo for the many builds (external-standard, internal-dev,
+# internal-qa, hyperscale, etc.) that never install them.
+#
+if [[ "$DELPHIX_BUILD_DCT_VARIANT" == "true" ||
+	-n "$AWS_S3_URI_DCT_PACKAGES" ]]; then
+	download_dct_artifacts "$AWS_S3_URI_DCT_PACKAGES" "$WORK_DIRECTORY/artifacts"
+else
+	echo "Skipping DCT artifact download: no DCT variant is being built."
+fi
 
 download_hyperscale_artifacts "$AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES" "$WORK_DIRECTORY/artifacts"
 

@@ -36,6 +36,36 @@ task ancillaryRepository(type: Exec) {
     commandLine "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
 }
 
+/*
+ * The ancillary repository is built once and shared by whichever variant is
+ * being built in this gradle invocation (every build<Variant><Platform> task
+ * dependsOn ancillaryRepository). The DCT packages are only installed by the
+ * DCT variants, so we only download them into the ancillary repository when a
+ * DCT variant is actually part of the build. We inspect the resolved task
+ * graph rather than the requested task names so that DCT variants requested via
+ * aggregate tasks are also detected.
+ *
+ * All DCT variant build tasks are named build<...Dct...>, so a real DCT build
+ * is always detected here. Failure modes:
+ *   - False positive (flag set for a non-DCT build): only wastes a download;
+ *     the packages are simply never installed.
+ *   - False negative (a DCT build not detected): the packages would not be
+ *     downloaded and the build would fail later when installing the DCT
+ *     packages. Setting AWS_S3_URI_DCT_PACKAGES forces the download in
+ *     build-ancillary-repository.sh regardless of this flag, so it remains an
+ *     escape hatch.
+ *
+ * The decision is registered as a task input (not just an environment
+ * variable) so gradle's up-to-date checking rebuilds the ancillary repository
+ * when switching between DCT and non-DCT builds in the same workspace. The
+ * environment variable is set in both cases so its value is explicit.
+ */
+gradle.taskGraph.whenReady { graph ->
+    def buildDct = graph.allTasks.any { it.name.contains("Dct") }
+    ancillaryRepository.inputs.property("buildDctVariant", buildDct)
+    ancillaryRepository.environment "DELPHIX_BUILD_DCT_VARIANT", buildDct.toString()
+}
+
 createArtifactsDirTask(this)
 
 def artifactTypes = ["aws": "vmdk",
