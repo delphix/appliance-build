@@ -16,6 +16,25 @@
 
 ---
 #
+# Dedicated UCF login user, so operators don't need to su/sudo to root
+# for UCF administration (docker ps/logs, service status). Mirrors
+# delphix's access model from appliance-build.minimal-common: staff +
+# root groups, plus docker — both root-equivalent, same tradeoff delphix
+# already has.
+#
+- user:
+    name: ucf
+    group: staff
+    groups: root,docker
+    append: true
+    shell: /bin/bash
+    create_home: true
+    comment: UCF User
+    home: /home/ucf
+    password:
+      "{{ lookup('env', 'APPLIANCE_PASSWORD') | password_hash('sha512') }}"
+
+#
 # Installs the UCF (CDS) application packages from the ancillary apt
 # repository. The packages themselves are uploaded by the CDS team via
 # GitHub Actions to AWS_S3_URI_UCF_PACKAGES and pulled into the apt
