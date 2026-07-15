@@ -44,15 +44,28 @@ task ancillaryRepository(type: Exec) {
  * ancillary repository when a hyperscale variant is actually part of the build.
  * We inspect the resolved task graph rather than the requested task names so
  * that hyperscale variants requested via aggregate tasks are also detected.
- * build-ancillary-repository.sh still downloads the packages unconditionally
- * when AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES is set explicitly, so the
- * detection failing "closed" only ever results in a skipped (never a broken)
- * hyperscale build.
+ *
+ * All hyperscale variant build tasks are named build<...Hyperscale...>, so a
+ * real hyperscale build is always detected here. Failure modes:
+ *   - False positive (flag set for a non-hyperscale build): only wastes a
+ *     download; the packages are simply never installed.
+ *   - False negative (a hyperscale build not detected): the packages would not
+ *     be downloaded and the build would fail later when installing
+ *     delphix-hyperscale. Setting AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES
+ *     forces the download in build-ancillary-repository.sh regardless of this
+ *     flag, so it remains an escape hatch.
+ *
+ * The decision is registered as a task input (not just an environment
+ * variable) so gradle's up-to-date checking rebuilds the ancillary repository
+ * when switching between hyperscale and non-hyperscale builds in the same
+ * workspace. The environment variable is set in both cases so its value is
+ * explicit.
  */
 gradle.taskGraph.whenReady { graph ->
-    if (graph.allTasks.any { it.name.contains("Hyperscale") }) {
-        ancillaryRepository.environment "DELPHIX_BUILD_HYPERSCALE_VARIANT", "true"
-    }
+    def buildHyperscale = graph.allTasks.any { it.name.contains("Hyperscale") }
+    ancillaryRepository.inputs.property("buildHyperscaleVariant", buildHyperscale)
+    ancillaryRepository.environment "DELPHIX_BUILD_HYPERSCALE_VARIANT",
+        buildHyperscale.toString()
 }
 
 createArtifactsDirTask(this)
