@@ -36,6 +36,21 @@ task ancillaryRepository(type: Exec) {
     commandLine "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
 }
 
+/*
+ * The ancillary repository is built once and shared by every variant built in
+ * this gradle invocation, so only download the DCT packages when a DCT variant
+ * is actually part of the build. We check the resolved task graph (which also
+ * catches DCT variants pulled in via aggregate tasks) and register the result
+ * as a task input so up-to-date checking rebuilds the repo when switching
+ * DCT<->non-DCT. Every DCT variant build task is named build<...Dct...>, so
+ * detection can only over-download (harmless), never miss a real DCT build.
+ */
+gradle.taskGraph.whenReady { graph ->
+    def buildDct = graph.allTasks.any { it.name.contains("Dct") }
+    ancillaryRepository.inputs.property("buildDctVariant", buildDct)
+    ancillaryRepository.environment "DELPHIX_BUILD_DCT_VARIANT", buildDct.toString()
+}
+
 createArtifactsDirTask(this)
 
 def artifactTypes = ["aws": "vmdk",
