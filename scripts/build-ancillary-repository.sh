@@ -100,7 +100,22 @@ else
 	echo "Skipping DCT artifact download: no DCT variant is being built."
 fi
 
-download_hyperscale_artifacts "$AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES" "$WORK_DIRECTORY/artifacts"
+#
+# The hyperscale compliance packages are only installed by the hyperscale
+# appliance variants, so only download them when a hyperscale variant is being
+# built (signalled by the ancillaryRepository gradle task via
+# DELPHIX_BUILD_HYPERSCALE_VARIANT). This avoids wastefully downloading them for
+# the many builds (external-standard, internal-dev, internal-qa, etc.) that
+# never install them. When a hyperscale variant is built,
+# AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES (if set) still selects a specific
+# build; otherwise download_hyperscale_artifacts fetches the latest.
+#
+if [[ "$DELPHIX_BUILD_HYPERSCALE_VARIANT" == "true" ]]; then
+	download_hyperscale_artifacts "$AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES" \
+		"$WORK_DIRECTORY/artifacts"
+else
+	echo "Skipping hyperscale artifact download: no hyperscale variant is being built."
+fi
 
 #
 # AWS_S3_URI_UCF_PACKAGES is an optional external variable set by the
