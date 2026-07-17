@@ -87,7 +87,22 @@ download_combined_packages_artifacts "$AWS_S3_URI_COMBINED_PACKAGES" \
 
 download_dct_artifacts "$AWS_S3_URI_DCT_PACKAGES" "$WORK_DIRECTORY/artifacts"
 
-download_hyperscale_artifacts "$AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES" "$WORK_DIRECTORY/artifacts"
+#
+# The hyperscale compliance packages are only installed by the hyperscale
+# appliance variants, so only download them when a hyperscale variant is being
+# built (signalled by the ancillaryRepository gradle task via
+# DELPHIX_BUILD_HYPERSCALE_VARIANT) or when a hyperscale artifacts URI is
+# provided explicitly. This avoids wastefully downloading them for the many
+# builds (external-standard, internal-dev, internal-qa, etc.) that never use
+# them.
+#
+if [[ "$DELPHIX_BUILD_HYPERSCALE_VARIANT" == "true" ||
+	-n "$AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES" ]]; then
+	download_hyperscale_artifacts "$AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES" \
+		"$WORK_DIRECTORY/artifacts"
+else
+	echo "Skipping hyperscale artifact download: no hyperscale variant is being built."
+fi
 
 download_ucf_artifacts "$AWS_S3_URI_UCF_PACKAGES" "$WORK_DIRECTORY/artifacts"
 

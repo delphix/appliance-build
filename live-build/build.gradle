@@ -36,6 +36,23 @@ task ancillaryRepository(type: Exec) {
     commandLine "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
 }
 
+/*
+ * The ancillary repository is built once and shared by every variant built in
+ * this gradle invocation, so only download the hyperscale packages when a
+ * hyperscale variant is actually part of the build. We check the resolved task
+ * graph (which also catches hyperscale variants pulled in via aggregate tasks)
+ * and register the result as a task input so up-to-date checking rebuilds the
+ * repo when switching hyperscale<->non-hyperscale. Detection can only
+ * over-download (harmless); setting AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES
+ * forces the download as an escape hatch.
+ */
+gradle.taskGraph.whenReady { graph ->
+    def buildHyperscale = graph.allTasks.any { it.name.contains("Hyperscale") }
+    ancillaryRepository.inputs.property("buildHyperscaleVariant", buildHyperscale)
+    ancillaryRepository.environment "DELPHIX_BUILD_HYPERSCALE_VARIANT",
+        buildHyperscale.toString()
+}
+
 createArtifactsDirTask(this)
 
 def artifactTypes = ["aws": "vmdk",
