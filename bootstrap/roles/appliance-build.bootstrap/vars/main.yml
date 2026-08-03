@@ -1,0 +1,5 @@
+---
+syft_version: "v1.45.1"
+cyclonedx_schema_version: "1.6"
+cyclonedx_schema_dir: "/usr/local/share/cyclonedx"
+sbom_tools_venv: "/usr/local/lib/sbom-tools"

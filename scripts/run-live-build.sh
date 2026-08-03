@@ -213,3 +213,30 @@ for ext in debs.tar.gz $vm_artifact_ext packages.list; do
 		mv "$ARTIFACT_NAME.$ext" "$TOP/live-build/build/artifacts/"
 	fi
 done
+
+#
+# Generate a per-image CycloneDX SBOM (best-effort — a failure must not block
+# the build). Syft is run with the dpkg-db cataloger only against the chroot
+# rootfs so the document is grounded in the authoritative installed-package set
+# from /var/lib/dpkg/status rather than a heuristic filesystem scan.
+#
+# syft and check-jsonschema are provisioned on the build host by
+# bootstrap/roles/appliance-build.bootstrap/tasks/main.yml. The CycloneDX
+# schema file is pre-downloaded there to avoid a runtime network dependency.
+#
+# DELPHIX_APPLIANCE_VERSION is provided by the Gradle task environment.
+#
+(
+	echo "[sbom] Scanning ${ARTIFACT_NAME} chroot rootfs (dpkg cataloger only) ..."
+	syft scan "dir:${build_dir}/chroot" \
+		--select-catalogers "dpkg-db-cataloger,-file" \
+		--source-name "${ARTIFACT_NAME}" \
+		--source-version "${DELPHIX_APPLIANCE_VERSION:-unknown}" \
+		-o "cyclonedx-json=${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
+	echo "[sbom] Wrote ${ARTIFACT_NAME}.cdx.json"
+	echo "[sbom] Validating ${ARTIFACT_NAME}.cdx.json against CycloneDX 1.6 schema ..."
+	/usr/local/lib/sbom-tools/bin/check-jsonschema \
+		--schemafile "/usr/local/share/cyclonedx/bom-1.6.schema.json" \
+		"${TOP}/live-build/build/artifacts/${ARTIFACT_NAME}.cdx.json"
+	echo "[sbom] Validation passed."
+) || echo "[sbom] WARNING: CycloneDX SBOM generation failed for ${ARTIFACT_NAME}; the build continues without a SBOM." >&2
