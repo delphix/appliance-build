@@ -684,3 +684,73 @@ function harden_home_mount_options() {
 		die "failed to add nodev,nosuid to /home entry in /etc/fstab"
 	fi
 }
+
+#
+# Retire any legacy autofs management of /home before the home-dataset
+# migration and the package phase. Engines that automount home directories
+# via autofs (e.g. LDAP-integrated ones) carry a "/home auto_home" entry in
+# /etc/auto.master and run autofs.service. Inside the upgrade container that
+# service starts and takes over /home, deactivating the home-dataset mount
+# established from the container's fstab. The upgrade container has no
+# network, so the autofs map never resolves and /home is left empty; package
+# maintainer scripts that write under /home (e.g. the delphix-virtualization
+# postinst creating /home/cli/.ssh) then fail.
+#
+# Remove only the /home autofs mapping -- other maps (e.g. /net) are left
+# intact -- and ensure /home is the home dataset. This is a no-op on engines
+# that do not automount /home (fresh installs, non-LDAP engines), so it is
+# safe to call unconditionally.
+#
+function disable_autofs_home() {
+	local removed=false
+	local f
+
+	if grep -qE '^[[:space:]]*/home[[:space:]]' /etc/auto.master 2>/dev/null; then
+		sed -i -E '/^[[:space:]]*\/home[[:space:]]/d' /etc/auto.master ||
+			die "failed to remove /home entry from /etc/auto.master"
+		removed=true
+	fi
+
+	if [[ -d /etc/auto.master.d ]]; then
+		while IFS= read -r f; do
+			[[ -n "$f" ]] || continue
+			sed -i -E '/^[[:space:]]*\/home[[:space:]]/d' "$f" ||
+				die "failed to remove /home entry from '$f'"
+			removed=true
+		done < <(grep -rlE '^[[:space:]]*/home[[:space:]]' /etc/auto.master.d/ 2>/dev/null)
+	fi
+
+	#
+	# Nothing referenced /home via autofs; leave the system untouched.
+	#
+	$removed || return 0
+
+	#
+	# Fully stop autofs rather than reloading it: a running daemon
+	# asynchronously expires and unmounts /home shortly after we remount the
+	# dataset, so a reload races its cleanup thread. Stopping releases /home
+	# synchronously. Other maps (e.g. /net) are unused inside the upgrade
+	# container, and on the upgraded root autofs starts fresh from the edited
+	# maps -- without /home -- at boot. The map edit above is the durable
+	# protection: autofs will not reclaim /home even if it is later restarted.
+	#
+	timeout 30 systemctl stop autofs 2>/dev/null || true
+
+	#
+	# Ensure /home is the home dataset, not an autofs mount or an empty
+	# directory, before the package phase. Mount it via its systemd unit so
+	# systemd owns and tracks it; a bare "mount /home" leaves home.mount
+	# inactive and a later daemon-reload can unmount it. Only act when fstab
+	# maps a dataset to /home (the upgrade container and post-migration
+	# engines); on a pre-migration engine migrate_export_home_to_home mounts
+	# it after rewriting fstab.
+	#
+	if grep -qE '^[^#][^[:space:]]*[[:space:]]+/home[[:space:]]' /etc/fstab &&
+		[[ "$(findmnt -no FSTYPE /home 2>/dev/null)" != "zfs" ]]; then
+		umount /home 2>/dev/null || true
+		systemctl start home.mount 2>/dev/null || mount /home ||
+			die "failed to mount /home dataset after disabling autofs"
+		[[ "$(findmnt -no FSTYPE /home 2>/dev/null)" == "zfs" ]] ||
+			die "/home is not the home dataset after disabling autofs"
+	fi
+}

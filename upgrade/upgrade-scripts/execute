@@ -313,11 +313,18 @@ disarm_mgmt_restart
 # run; otherwise they would create/modify content under a /home directory on
 # the root filesystem that the dataset mount later shadows.
 #
-# Both functions (in common.sh) self-guard and are no-ops once the engine
-# already uses /home -- i.e. on fresh installs and inside upgrade
+# disable_autofs_home must run first: on engines that automount /home via
+# autofs (e.g. LDAP-integrated), the cloned root starts autofs.service in the
+# container, which takes over /home and unmounts the home dataset. Retiring
+# the autofs /home mapping and remounting the dataset keeps /home populated
+# for the migration and the package phase.
+#
+# The remaining functions (in common.sh) self-guard and are no-ops once the
+# engine already uses /home -- i.e. on fresh installs and inside upgrade
 # containers, whose fstab maps the dataset to /home. migrate must run before
 # harden, which hardens the /home fstab entry the migration creates.
 #
+disable_autofs_home
 migrate_export_home_to_home
 harden_home_mount_options
 
