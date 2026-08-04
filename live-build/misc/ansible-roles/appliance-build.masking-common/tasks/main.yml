@@ -16,5 +16,8 @@
 
 ---
 - apt:
-    name: delphix-masking
+    name:
+      - delphix-masking
+      - libharfbuzz0b
+      - libgraphite2-3
     state: present
