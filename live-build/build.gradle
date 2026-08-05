@@ -21,7 +21,10 @@ apply from: "${rootProject.projectDir}/gradle-lib/util.gradle"
 task ancillaryRepository(type: Exec) {
     inputs.file "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
 
-    for (envVar in ["AWS_S3_URI_COMBINED_PACKAGES"]) {
+    for (envVar in ["AWS_S3_URI_COMBINED_PACKAGES",
+                    "AWS_S3_URI_DCT_PACKAGES",
+                    "AWS_S3_URI_HYPERSCALE_COMPLIANCE_PACKAGES",
+                    "AWS_S3_URI_UCF_PACKAGES"]) {
         inputs.property(envVar, System.getenv(envVar)).optional(true)
     }
 
@@ -31,6 +34,27 @@ task ancillaryRepository(type: Exec) {
     }
 
     commandLine "${rootProject.projectDir}/scripts/build-ancillary-repository.sh"
+}
+
+/*
+ * The ancillary repository is built once and shared by every variant built in
+ * this gradle invocation, so only download an optional package group when a
+ * variant that installs it is actually part of the build. We check the resolved
+ * task graph (which also catches variants pulled in via aggregate tasks) and
+ * register each decision as a task input so up-to-date checking rebuilds the
+ * repo when switching between builds. Every hyperscale/DCT variant build task is
+ * named build<...Hyperscale...> / build<...Dct...>, so detection can only
+ * over-download (harmless), never miss a real build that needs the packages.
+ */
+gradle.taskGraph.whenReady { graph ->
+    def buildHyperscale = graph.allTasks.any { it.name.contains("Hyperscale") }
+    ancillaryRepository.inputs.property("buildHyperscaleVariant", buildHyperscale)
+    ancillaryRepository.environment "DELPHIX_BUILD_HYPERSCALE_VARIANT",
+        buildHyperscale.toString()
+
+    def buildDct = graph.allTasks.any { it.name.contains("Dct") }
+    ancillaryRepository.inputs.property("buildDctVariant", buildDct)
+    ancillaryRepository.environment "DELPHIX_BUILD_DCT_VARIANT", buildDct.toString()
 }
 
 createArtifactsDirTask(this)

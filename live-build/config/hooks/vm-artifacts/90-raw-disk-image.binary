@@ -313,8 +313,21 @@ rsync --info=stats3 -WaAX binary/* "$DIRECTORY/"
 # exist in /etc/fstab since that will ensure that it gets mounted
 # automatically whenever we boot into the crash kernel.
 #
+# The /home dataset is normally mounted with nodev and nosuid to satisfy
+# the CIS requirement for a hardened /home filesystem. The internal
+# buildserver variant is an exception: appliance-build runs its image and
+# upgrade builds out of a working tree under /home, and those builds create
+# device nodes and run setuid binaries there -- which the nodev and nosuid
+# options would block. So we mount its /home with the default (unhardened)
+# options. This variant is internal only and is never shipped to customers,
+# so relaxing CIS hardening here is acceptable.
+#
+HOME_MOUNT_OPTS="defaults,nodev,nosuid"
+if [[ "$APPLIANCE_VARIANT" == "internal-buildserver" ]]; then
+	HOME_MOUNT_OPTS="defaults"
+fi
 cat <<-EOF >"$DIRECTORY/etc/fstab"
-	rpool/ROOT/$FSNAME/home /home zfs defaults,nodev,nosuid,x-systemd.before=zfs-import-cache.service 0 0
+	rpool/ROOT/$FSNAME/home /home zfs ${HOME_MOUNT_OPTS},x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/data /var/delphix zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/log  /var/log     zfs defaults,x-systemd.before=zfs-import-cache.service 0 0
 	rpool/ROOT/$FSNAME/tmp  /tmp     zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
