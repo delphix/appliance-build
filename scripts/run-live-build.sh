@@ -187,6 +187,30 @@ if [[ ! -f binary/SHA256SUMS ]]; then
 	exit 1
 fi
 
+#
+# Generate a CycloneDX SBOM for this image by scanning the populated
+# "binary" directory (see comment above: this is the appliance rootfs,
+# not a separate chroot). Only the dpkg cataloger is enabled: dpkg is
+# the sole source that can authoritatively attribute a file on disk to
+# the package that placed it there. Vendored/extracted third-party
+# content bundled inside a larger installed package (jars, npm modules,
+# Rust crates, etc.) isn't attributable this way, so language-level
+# catalogers are left off here to avoid misattributing it; that content
+# is covered separately by per-package sidecar SBOMs produced upstream
+# in linux-pkg, merged in at a later stage.
+#
+syft scan dir:binary \
+	--select-catalogers dpkg \
+	--source-name "$ARTIFACT_NAME" \
+	--source-version "$DELPHIX_APPLIANCE_VERSION" \
+	-o "cyclonedx-json@1.6=$ARTIFACT_NAME.cdx.json"
+
+cyclonedx-cli validate \
+	--input-file "$ARTIFACT_NAME.cdx.json" \
+	--input-format json \
+	--input-version v1_6 \
+	--fail-on-errors
+
 case $APPLIANCE_PLATFORM in
 aws) vm_artifact_ext=vmdk ;;
 azure) vm_artifact_ext=vhdx ;;
@@ -208,7 +232,7 @@ esac
 # user (e.g. other software); this is most useful when multiple variants
 # are built via a single call to "make" (e.g. using the "all" target).
 #
-for ext in debs.tar.gz $vm_artifact_ext packages.list; do
+for ext in debs.tar.gz $vm_artifact_ext packages.list cdx.json; do
 	if [[ -f "$ARTIFACT_NAME.$ext" ]]; then
 		mv "$ARTIFACT_NAME.$ext" "$TOP/live-build/build/artifacts/"
 	fi
