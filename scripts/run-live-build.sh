@@ -199,7 +199,16 @@ fi
 # is covered separately by per-package sidecar SBOMs produced upstream
 # in linux-pkg, merged in at a later stage.
 #
-syft scan dir:binary \
+# SYFT_FILE_METADATA_SELECTION=none suppresses Syft's default behavior of
+# emitting a separate CycloneDX "file" component (with SHA-1/SHA-256
+# hashes) for every individual file owned by every cataloged package.
+# That's unrelated to --select-catalogers (which only scopes *package*
+# catalogers) and, left at its default, balloons the output to one
+# "file" entry per file on the appliance -- tens of thousands of them --
+# instead of the flat, per-package pkg:deb document this step is meant
+# to produce.
+#
+SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 	--select-catalogers dpkg \
 	--source-name "$ARTIFACT_NAME" \
 	--source-version "$DELPHIX_APPLIANCE_VERSION" \
