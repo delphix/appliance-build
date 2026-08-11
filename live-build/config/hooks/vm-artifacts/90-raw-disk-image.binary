@@ -401,7 +401,7 @@ chroot "$DIRECTORY" bootctl --esp-path=$EFI_DIR install --no-variables
 # For OCI, use GRUB as the primary boot loader. OCI has issue booting
 # with systemd-boot when VM is created with >=8 vCPUs.
 #
-if [[ "$APPLIANCE_PLATFORM" == "oci" ]]; then
+if [[ "$APPLIANCE_PLATFORM" == "oci" || "$APPLIANCE_PLATFORM" == "kvm" ]]; then
   chroot "$DIRECTORY" mount -t zfs "$FSNAME/grub" /mnt
   chroot "$DIRECTORY" grub-install --target=x86_64-efi --efi-directory="$EFI_DIR" \
     --root-directory=/mnt --bootloader-id=GRUB --no-nvram
