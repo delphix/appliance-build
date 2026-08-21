@@ -17,7 +17,7 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
-check_env DELPHIX_PACKAGE_MIRROR_MAIN DELPHIX_PACKAGE_MIRROR_SECONDARY
+check_env DELPHIX_PACKAGE_MIRROR_MAIN DELPHIX_PACKAGE_MIRROR_SECONDARY DELPHIX_APPLIANCE_VERSION
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null)
 
@@ -170,6 +170,30 @@ lb config \
 	--mirror-binary-backports "$DELPHIX_PACKAGE_MIRROR_MAIN"
 
 lb build
+
+#
+# Syft and cyclonedx-cli are consumed exactly the same way as every other
+# first-party Delphix package: as .deb's in the ancillary repository (see
+# build-ancillary-repository.sh), already being served locally above. The
+# one difference is that these are build-host-only tooling for the SBOM
+# step below, never installed into the appliance chroot -- so, unlike
+# "lb config"'s --mirror-chroot/--mirror-binary (which points the chroot's
+# own bootstrap at config/archives/localhost.list), these are installed
+# directly onto the build host itself via apt, pointed at that same
+# ancillary repository, before the still-running local Aptly server
+# serving it is killed just below.
+#
+# Reuse config/archives/localhost.list itself (rather than re-typing the
+# same "deb [trusted=yes] http://localhost:8080 noble main" line here) so
+# this can never silently drift out of sync with what the chroot uses.
+#
+cp config/archives/localhost.list /etc/apt/sources.list.d/ancillary-repository.list
+apt-get update \
+	-o Dir::Etc::sourcelist="sources.list.d/ancillary-repository.list" \
+	-o Dir::Etc::sourceparts="-" \
+	-o APT::Get::List-Cleanup="0"
+apt-get install -y --no-install-recommends delphix-syft delphix-cyclonedx-cli
+rm -f /etc/apt/sources.list.d/ancillary-repository.list
 
 kill -9 $APTLY_SERVE_PID
 
