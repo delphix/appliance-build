@@ -81,33 +81,6 @@
     state: present
     update_cache: true
 
-# Syft and cyclonedx-cli are used by scripts/run-live-build.sh to generate and validate a
-# CycloneDX SBOM for each built image. Neither is available through the Delphix package
-# mirror -- they're upstream GitHub-release binaries, not Ubuntu packages -- so each is
-# pinned to an explicit version and checksum-verified here instead of installed via apt.
-- name: Download pinned Syft .deb
-  ansible.builtin.get_url:
-    url: https://github.com/anchore/syft/releases/download/v1.46.0/syft_1.46.0_linux_amd64.deb
-    dest: /tmp/syft_1.46.0_linux_amd64.deb
-    checksum: sha256:003f82f0d70350a2e7795ecc43f86b50e2c883055ffaf82b309a0a274c62915d
-    mode: "0644"
-
-- name: Install Syft
-  ansible.builtin.apt:
-    deb: /tmp/syft_1.46.0_linux_amd64.deb
-
-# cyclonedx-cli ships only a bare per-platform binary upstream (no .deb, and no official
-# checksums file); the checksum below was computed locally from the downloaded binary at
-# the time this version was pinned. The destination filename must be exactly
-# "cyclonedx-cli" -- that's the command name run-live-build.sh invokes, not upstream's own
-# convention of renaming the asset to "cyclonedx".
-- name: Download pinned cyclonedx-cli binary
-  ansible.builtin.get_url:
-    url: https://github.com/CycloneDX/cyclonedx-cli/releases/download/v0.32.0/cyclonedx-linux-x64
-    dest: /usr/local/bin/cyclonedx-cli
-    checksum: sha256:454879e6a4a405c8a13bff49b8982adcb0596f3019b26b0811c66e4d7f0783e1
-    mode: "0755"
-
 # awscli is distributed via pip or snap on 24.04. While the package is not required by the product,
 # it is required by appliance-build itself.
 - name: Install awscli python package
