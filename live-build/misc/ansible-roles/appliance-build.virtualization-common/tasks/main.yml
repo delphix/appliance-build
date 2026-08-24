@@ -74,9 +74,15 @@
 # The services in this section should be disabled & masked initially, but
 # can be later dynamically enabled by the appliance.
 #
+# delphix-fluentd.service and delphix-masking.service are owned by the
+# delphix-masking package, which isn't installed on variants (DCT, UCF)
+# that don't include the masking-common role; "disable" on a unit that
+# doesn't exist fails, so it's allowed to fail here. "mask" always
+# succeeds regardless of whether the unit exists.
+#
 - name: Disable and mask services that should not be running by default
   shell: |
-    systemctl disable {{ item }}
+    systemctl disable {{ item }} || true
     systemctl mask {{ item }}
   with_items:
     - delphix-fluentd.service
