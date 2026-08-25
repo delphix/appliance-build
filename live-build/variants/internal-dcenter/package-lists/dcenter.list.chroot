@@ -21,12 +21,10 @@ git
 gnupg
 isc-dhcp-server
 libldap2-dev
-libsasl2-dev
 nfs-kernel-server
 openjdk-11-jdk-headless
 openjdk-17-jdk-headless
 python3.12
-python3.12-dev
 python3-venv
 python3.12-venv
 targetcli-fb
