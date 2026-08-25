@@ -19,13 +19,7 @@
   gather_facts: no
   vars:
     ansible_python_interpreter: /usr/bin/python3
-  #
-  # masking-common is required even though UCF doesn't use the masking
-  # workflow — the Delphix mgmt JVM hard-requires /opt/delphix/masking
-  # and setup_masking.sh on startup.
-  #
   roles:
     - appliance-build.minimal-common
-    - appliance-build.masking-common
     - appliance-build.virtualization-common
     - appliance-build.ucf-common
