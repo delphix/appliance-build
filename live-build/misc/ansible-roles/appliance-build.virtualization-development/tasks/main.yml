@@ -71,6 +71,19 @@
       [Service]
       Environment=DLPX_PG_DEBUG=true
 
+#
+# git is required to clone dlpx-app-gate below. Install it explicitly here
+# rather than relying on another role in the playbook to have installed it
+# first (see TOOL-30934).
+#
+- apt:
+    name: git
+    state: present
+  register: result
+  until: result is not failed
+  retries: 3
+  delay: 60
+
 - git:
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dlpx-app-gate.git"
     dest: "/home/delphix/dlpx-app-gate"
