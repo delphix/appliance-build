@@ -21,7 +21,10 @@
     ansible_python_interpreter: /usr/bin/python3
   #
   # UCF ships with Delphix's locked-down appliance + admin console
-  # (virtualization-common) plus the UCF/CDS app. We skip
+  # (virtualization-common + masking-common) plus the UCF/CDS app.
+  # APIGW-25850 removed masking-common from the DCT and UCF variants;
+  # APIGW-26202 re-introduces it for UCF only (DCT remains without
+  # it). We skip
   # virtualization-development and qa-internal which target the full
   # Delphix dev workflow (clones dlpx-app-gate, etc.) and are not
   # applicable to UCF.
@@ -29,5 +32,6 @@
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
+    - appliance-build.masking-common
     - appliance-build.virtualization-common
     - appliance-build.ucf-common

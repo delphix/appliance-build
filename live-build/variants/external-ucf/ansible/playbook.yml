@@ -19,7 +19,15 @@
   gather_facts: no
   vars:
     ansible_python_interpreter: /usr/bin/python3
+  #
+  # UCF requires appliance-build.masking-common: it installs
+  # delphix-masking, which owns /opt/delphix/masking and the
+  # delphix-masking.service / delphix-fluentd.service units.
+  # APIGW-25850 removed this role from the DCT and UCF variants;
+  # APIGW-26202 re-introduces it for UCF only. DCT remains without it.
+  #
   roles:
     - appliance-build.minimal-common
+    - appliance-build.masking-common
     - appliance-build.virtualization-common
     - appliance-build.ucf-common
