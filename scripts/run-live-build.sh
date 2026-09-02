@@ -17,7 +17,7 @@
 
 . "${BASH_SOURCE%/*}/common.sh"
 
-check_env DELPHIX_PACKAGE_MIRROR_MAIN DELPHIX_PACKAGE_MIRROR_SECONDARY DELPHIX_APPLIANCE_VERSION
+check_env DELPHIX_PACKAGE_MIRROR_MAIN DELPHIX_PACKAGE_MIRROR_SECONDARY
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null)
 
@@ -171,30 +171,6 @@ lb config \
 
 lb build
 
-#
-# Syft and cyclonedx-cli are consumed exactly the same way as every other
-# first-party Delphix package: as .deb's in the ancillary repository (see
-# build-ancillary-repository.sh), already being served locally above. The
-# one difference is that these are build-host-only tooling for the SBOM
-# step below, never installed into the appliance chroot -- so, unlike
-# "lb config"'s --mirror-chroot/--mirror-binary (which points the chroot's
-# own bootstrap at config/archives/localhost.list), these are installed
-# directly onto the build host itself via apt, pointed at that same
-# ancillary repository, before the still-running local Aptly server
-# serving it is killed just below.
-#
-# Reuse config/archives/localhost.list itself (rather than re-typing the
-# same "deb [trusted=yes] http://localhost:8080 noble main" line here) so
-# this can never silently drift out of sync with what the chroot uses.
-#
-cp config/archives/localhost.list /etc/apt/sources.list.d/ancillary-repository.list
-apt-get update \
-	-o Dir::Etc::sourcelist="sources.list.d/ancillary-repository.list" \
-	-o Dir::Etc::sourceparts="-" \
-	-o APT::Get::List-Cleanup="0"
-apt-get install -y --no-install-recommends delphix-syft delphix-cyclonedx-cli
-rm -f /etc/apt/sources.list.d/ancillary-repository.list
-
 kill -9 $APTLY_SERVE_PID
 
 #
@@ -210,39 +186,6 @@ kill -9 $APTLY_SERVE_PID
 if [[ ! -f binary/SHA256SUMS ]]; then
 	exit 1
 fi
-
-#
-# Generate a CycloneDX SBOM for this image by scanning the populated
-# "binary" directory (see comment above: this is the appliance rootfs,
-# not a separate chroot). Only the dpkg cataloger is enabled: dpkg is
-# the sole source that can authoritatively attribute a file on disk to
-# the package that placed it there. Vendored/extracted third-party
-# content bundled inside a larger installed package (jars, npm modules,
-# Rust crates, etc.) isn't attributable this way, so language-level
-# catalogers are left off here to avoid misattributing it; that content
-# is covered separately by per-package sidecar SBOMs produced upstream
-# in linux-pkg, merged in at a later stage.
-#
-# SYFT_FILE_METADATA_SELECTION=none suppresses Syft's default behavior of
-# emitting a separate CycloneDX "file" component (with SHA-1/SHA-256
-# hashes) for every individual file owned by every cataloged package.
-# That's unrelated to --select-catalogers (which only scopes *package*
-# catalogers) and, left at its default, balloons the output to one
-# "file" entry per file on the appliance -- tens of thousands of them --
-# instead of the flat, per-package pkg:deb document this step is meant
-# to produce.
-#
-SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
-	--select-catalogers dpkg \
-	--source-name "$ARTIFACT_NAME" \
-	--source-version "$DELPHIX_APPLIANCE_VERSION" \
-	-o "cyclonedx-json@1.6=$ARTIFACT_NAME.cdx.json"
-
-cyclonedx-cli validate \
-	--input-file "$ARTIFACT_NAME.cdx.json" \
-	--input-format json \
-	--input-version v1_6 \
-	--fail-on-errors
 
 case $APPLIANCE_PLATFORM in
 aws) vm_artifact_ext=vmdk ;;
