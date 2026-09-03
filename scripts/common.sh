@@ -23,6 +23,47 @@ function die() {
 	exit 2
 }
 
+#
+# The number of times a command is attempted by retry() before giving up, and
+# the delay in seconds before the first retry. The delay doubles after every
+# failed attempt.
+#
+RETRY_ATTEMPTS=3
+RETRY_DELAY=5
+
+#
+# Run the given command, retrying it if it fails.
+#
+# This exists because the AWS CLI does not retry every transient failure on its
+# own. A connection that is dropped mid-transfer surfaces as "An HTTP Client
+# raised an unhandled exception: I/O operation on closed file.", which the CLI
+# treats as fatal rather than retryable, so a single dropped connection fails
+# the whole transfer even though every other object was copied successfully.
+# Raising max_attempts or setting retry_mode in the AWS config does not help,
+# as that exception bypasses botocore's retry handling entirely.
+#
+# Only use this for commands that are safe to run more than once. Every current
+# caller wraps "aws s3 sync", which is idempotent: it skips objects that are
+# already present in the destination, so a retry only re-fetches whatever is
+# still missing.
+#
+# The final attempt is run outside the loop so that its exit status propagates
+# to the caller, which is running under "set -o errexit".
+#
+function retry() {
+	local attempt delay=$RETRY_DELAY
+
+	for ((attempt = 1; attempt < RETRY_ATTEMPTS; attempt++)); do
+		"$@" && return 0
+		echo "'$*' failed (attempt $attempt of $RETRY_ATTEMPTS);" \
+			"retrying in ${delay}s." 1>&2
+		sleep "$delay"
+		delay=$((delay * 2))
+	done
+
+	"$@"
+}
+
 function resolve_s3_uri() {
 	local pkg_uri="$1"
 
@@ -93,10 +134,11 @@ function download_combined_packages_artifacts() {
 	pushd "$target_dir" &>/dev/null
 
 	if [[ -n "$pkg" ]]; then
-		aws s3 sync --exclude 'packages/*' --include "packages/$pkg/*" \
-			--only-show-errors "$combined_pkgs_uri" .
+		retry aws s3 sync --exclude 'packages/*' \
+			--include "packages/$pkg/*" --only-show-errors \
+			"$combined_pkgs_uri" .
 	else
-		aws s3 sync --only-show-errors "$combined_pkgs_uri" .
+		retry aws s3 sync --only-show-errors "$combined_pkgs_uri" .
 	fi
 
 	if [[ -d packages ]]; then
@@ -115,7 +157,7 @@ function download_combined_packages_artifacts() {
 		[[ -n "$pkg" ]] && [[ "$pkg" != "$pkgname" ]] && continue
 		mkdir "$pkgname"
 		pushd "$pkgname" &>/dev/null
-		aws s3 sync --only-show-errors "$s3uri" .
+		retry aws s3 sync --only-show-errors "$s3uri" .
 		sha256sum -c --strict SHA256SUMS
 		popd &>/dev/null
 	done <../COMPONENTS
@@ -143,7 +185,7 @@ function download_dct_artifacts() {
 	mkdir "$target_dir/dct"
 	pushd "$target_dir/dct" &>/dev/null || exit 1
 
-	aws s3 sync "$dct_artifacts_uri" .
+	retry aws s3 sync "$dct_artifacts_uri" .
 	sha256sum -c SHA256SUMS
 
 	popd &>/dev/null || exit 1
@@ -175,11 +217,13 @@ function download_ucf_artifacts() {
 	# sets to linux-build-publish credentials).
 	#
 	if [[ -n "${AWS_UCF_ACCESS_KEY_ID:-}" && -n "${AWS_UCF_SECRET_ACCESS_KEY:-}" ]]; then
-		AWS_ACCESS_KEY_ID="$AWS_UCF_ACCESS_KEY_ID" \
-		AWS_SECRET_ACCESS_KEY="$AWS_UCF_SECRET_ACCESS_KEY" \
-			aws s3 sync "$ucf_artifacts_uri" .
+		(
+			export AWS_ACCESS_KEY_ID="$AWS_UCF_ACCESS_KEY_ID"
+			export AWS_SECRET_ACCESS_KEY="$AWS_UCF_SECRET_ACCESS_KEY"
+			retry aws s3 sync "$ucf_artifacts_uri" .
+		)
 	else
-		aws s3 sync "$ucf_artifacts_uri" .
+		retry aws s3 sync "$ucf_artifacts_uri" .
 	fi
 
 	#
@@ -213,7 +257,7 @@ function download_hyperscale_artifacts() {
 	mkdir "$target_dir/hyperscale"
 	pushd "$target_dir/hyperscale" &>/dev/null || exit 1
 
-	aws s3 sync "$hyperscale_artifacts_uri" .
+	retry aws s3 sync "$hyperscale_artifacts_uri" .
 	sha256sum -c SHA256SUMS
 
 	popd &>/dev/null || exit 1
