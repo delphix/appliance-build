@@ -129,8 +129,12 @@ echo "$APPLIANCE_VARIANT" >variant
 
 test -n "$DELPHIX_APPLIANCE_VERSION"
 
+#
+# The platform substitution must be global: the "Links" field in the control
+# template names the platform twice.
+#
 sed -i "s/@@VERSION@@/$DELPHIX_APPLIANCE_VERSION/" delphix-entire.ctl
-sed -i "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/" delphix-entire.ctl
+sed -i "s/@@PLATFORM@@/$APPLIANCE_PLATFORM/g" delphix-entire.ctl
 
 equivs-build delphix-entire.ctl
 
