@@ -1,5 +1,5 @@
 #
-# Copyright 2025 Delphix
+# Copyright 2025, 2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,13 +22,5 @@
     ansible_python_interpreter: /usr/bin/python3
   roles:
     - appliance-build.minimal-common
-    - appliance-build.masking-common
     - appliance-build.virtualization-common
-    #
-    # The hyperscale-common role requires the appliance configuration,
-    # essentially the 'masking' user creation, done by the masking-common
-    # role to be in place before the hyperscale-common role is applied.
-    # Thus, we need to ensure the hyperscale-common role is applied after
-    # the masking-common role.
-    #
     - appliance-build.hyperscale-common
