@@ -365,6 +365,63 @@ function xargs_apt_get() {
 		"$@"
 }
 
+#
+# List installed packages whose name contains "$1" (typically the
+# running kernel release, "$(uname -r)").
+#
+function get_installed_packages_matching() {
+	[[ -n "$1" ]] || die "pattern not specified"
+	local PACKAGES
+	PACKAGES="$(dpkg-query -Wf '${Package}\n')" || die "dpkg-query failed"
+	grep -F "$1" <<<"$PACKAGES" || true
+}
+
+#
+# Print "$@" plus everything those packages "Depends:"/"PreDepends:" on,
+# recursively, restricted to what's actually installed.
+#
+# This exists to compute the set of packages that must be protected
+# from a purge (DLPX-98670): "apt-get purge" also removes a package's
+# reverse dependents, so protecting a package by name is not enough --
+# if something it depends on is purged (because that dependency's own
+# name doesn't match the protection pattern), apt cascades the purge
+# back up and removes the protected package too. Protecting the full
+# forward dependency closure prevents that cascade.
+#
+function get_transitive_install_deps() {
+	[[ $# -gt 0 ]] || return 0
+	#
+	# The "grep -E '^[^ |]'" strips apt-cache's indented "Depends:"/
+	# " |Depends:" lines, keeping only the un-indented package name
+	# lines. This relies on apt-cache's human-oriented text formatting
+	# rather than a documented stable interface; verified against apt
+	# 2.8.3.
+	#
+	apt-cache depends --recurse \
+		--no-recommends --no-suggests --no-conflicts \
+		--no-breaks --no-replaces --no-enhances \
+		--installed "$@" | grep -E '^[^ |]'
+}
+
+#
+# Defense in depth for DLPX-98670: verify every package named in "$1" (a
+# newline-separated list, typically captured before a purge) is still
+# installed, and fail loudly if not.
+#
+# Without this, a gap in the purge protection above (or a future change
+# to the purge logic) would only surface as some unrelated service
+# silently failing to modprobe a deleted module at an arbitrary later
+# boot, with no diagnostic trail pointing back at the upgrade.
+#
+function verify_packages_installed() {
+	local PKG
+	while read -r PKG; do
+		[[ -n "$PKG" ]] || continue
+		dpkg-query -W "$PKG" &>/dev/null ||
+			die "package '$PKG' is missing after the upgrade purge"
+	done <<<"$1"
+}
+
 function verify_upgrade_not_in_progress() {
 	#
 	# This function only works properly if the UPGRADE_TYPE variable

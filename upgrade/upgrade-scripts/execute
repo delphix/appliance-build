@@ -561,9 +561,41 @@ fi
 # work properly, we'll still have the currently running kernel available
 # to use as a fallback.
 #
-# shellcheck disable=SC2046
-apt_get purge -y $(apt-mark showauto | grep -v "$(uname -r)") ||
-	die "failed to remove no-longer-needed packages"
+# It's not enough to protect only packages whose *name* carries the
+# running kernel release: "apt-get purge" also removes a package's
+# reverse dependents, so a dropped dependency of a kernel package (e.g.
+# "wireless-regdb", which "linux-modules-extra-$(uname -r)" depends on
+# but doesn't itself name the kernel) drags the kernel package down with
+# it (DLPX-98670). So instead we protect every installed kernel-named
+# package plus their full installed dependency closure.
+#
+RUNNING_KERNEL_PACKAGES="$(get_installed_packages_matching "$(uname -r)")"
+
+#
+# Note: a failure inside either process substitution below (e.g.
+# "apt-mark" or "apt-cache") isn't propagated to "comm" or this
+# assignment; "comm" would just see a truncated stream. We don't
+# guard against that explicitly here because the "verify_packages_installed"
+# check after the purge below still catches the resulting damage and
+# fails the upgrade loudly.
+#
+# shellcheck disable=SC2046,SC2086
+PURGE_PACKAGES="$(comm -23 \
+	<(apt-mark showauto | sort -u) \
+	<(get_transitive_install_deps $RUNNING_KERNEL_PACKAGES | sort -u))"
+
+if [[ -n "$PURGE_PACKAGES" ]]; then
+	# shellcheck disable=SC2086
+	apt_get purge -y $PURGE_PACKAGES ||
+		die "failed to remove no-longer-needed packages"
+fi
+
+#
+# Assert the purge above didn't take out any running-kernel package,
+# rather than deferring a silent failure to an arbitrary later boot
+# (DLPX-98670).
+#
+verify_packages_installed "$RUNNING_KERNEL_PACKAGES"
 
 #
 # Additionally, we've seen packages get removed but remain in the "rc"
