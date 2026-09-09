@@ -172,7 +172,7 @@ build_ancillary_repository "$WORK_DIRECTORY/debs"
 # while letting the build host's existing APT sources satisfy the
 # dependencies.
 #
-for pkg in delphix-syft delphix-cyclonedx-cli; do
+for pkg in syft cyclonedx-cli; do
 	deb=$(find "$WORK_DIRECTORY/debs" -maxdepth 1 -name "${pkg}_*.deb" |
 		head -n 1)
 	[[ -n "$deb" ]] ||
