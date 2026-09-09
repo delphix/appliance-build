@@ -1,0 +1,61 @@
+#!/bin/bash -ex
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Generate a CycloneDX SBOM for this image by scanning the populated
+# "binary" directory (i.e. the appliance's root filesystem). The syft and
+# cyclonedx-cli tools used here are build-host-only tooling, installed
+# onto the build host by build-ancillary-repository.sh; they are never
+# installed into the appliance itself.
+#
+# This hook lives in "configuration" (rather than "vm-artifacts") and is
+# numbered above every other hook, so that it always runs, for every run
+# type, and runs last. Both matter: build.gradle declares "*.cdx.json" as
+# an output of the "upgrade-artifacts" run type, which never copies the
+# "vm-artifacts" hooks; and running last means the SBOM reflects whatever
+# every earlier hook (the apt cache cleanup, the hostname clearing, etc.)
+# left behind in the "binary" directory.
+#
+# Only the dpkg cataloger is enabled: dpkg is the sole source that can
+# authoritatively attribute a file on disk to the package that placed it
+# there. Vendored/extracted third-party content bundled inside a larger
+# installed package (jars, npm modules, Rust crates, etc.) isn't
+# attributable this way, so language-level catalogers are left off here
+# to avoid misattributing it; that content is covered separately by
+# per-package sidecar SBOMs produced upstream in linux-pkg, merged in at
+# a later stage.
+#
+# SYFT_FILE_METADATA_SELECTION=none suppresses Syft's default behavior of
+# emitting a separate CycloneDX "file" component (with SHA-1/SHA-256
+# hashes) for every individual file owned by every cataloged package.
+# That's unrelated to --select-catalogers (which only scopes *package*
+# catalogers) and, left at its default, balloons the output to one
+# "file" entry per file on the appliance -- tens of thousands of them --
+# instead of the flat, per-package pkg:deb document this hook is meant to
+# produce.
+#
+SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
+	--select-catalogers dpkg \
+	--source-name "$ARTIFACT_NAME" \
+	--source-version "$DELPHIX_APPLIANCE_VERSION" \
+	-o "cyclonedx-json@1.6=$ARTIFACT_NAME.cdx.json"
+
+cyclonedx-cli validate \
+	--input-file "$ARTIFACT_NAME.cdx.json" \
+	--input-format json \
+	--input-version v1_6 \
+	--fail-on-errors

@@ -147,4 +147,37 @@ extract_debs_into_dir "$WORK_DIRECTORY/artifacts" "$WORK_DIRECTORY/debs"
 #
 build_ancillary_repository "$WORK_DIRECTORY/debs"
 
+#
+# Syft and cyclonedx-cli are used to generate and validate the CycloneDX
+# SBOM for each image (see the "95-generate-sbom.binary" live-build
+# hook). They're consumed as .deb's from the ancillary repository, like
+# every other first-party Delphix package, but unlike those they're
+# build-host-only tooling: they're installed onto the build host here,
+# and are never listed in any of live-build's chroot package lists, so
+# they never end up inside the appliance image itself.
+#
+# They're installed here, rather than from run-live-build.sh, because
+# the ancillary repository is built once and shared by every
+# variant/platform combination in the build, whereas run-live-build.sh
+# runs once per combination; there's no reason to reinstall this tooling
+# for each of them. Installing directly from the .deb's that were just
+# fed into Aptly also means this needs neither a running "aptly serve",
+# nor any modification of the build host's APT sources configuration.
+#
+# Note that these are installed via "apt-get install <path>" rather than
+# "dpkg -i <path>": delphix-cyclonedx-cli declares real dependencies
+# (libicu, plus the usual shared library ones), and dpkg, unlike apt,
+# won't resolve those. Passing apt a path rather than a package name
+# still installs exactly the .deb we just built the repository from,
+# while letting the build host's existing APT sources satisfy the
+# dependencies.
+#
+for pkg in delphix-syft delphix-cyclonedx-cli; do
+	deb=$(find "$WORK_DIRECTORY/debs" -maxdepth 1 -name "${pkg}_*.deb" |
+		head -n 1)
+	[[ -n "$deb" ]] ||
+		die "Could not find a '$pkg' package in the ancillary repository."
+	apt-get install -y --no-install-recommends "$deb"
+done
+
 rm -rf "$WORK_DIRECTORY"
