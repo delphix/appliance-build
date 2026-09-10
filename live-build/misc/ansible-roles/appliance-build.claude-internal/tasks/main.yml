@@ -83,6 +83,52 @@
     creates: /usr/local/bin/claude
   changed_when: true
 
+# The DCenter CLI, so skills can run `dc` on the image itself rather than over ssh to
+# dlpxdc.co -- a clone carries authorized_keys but no private key to make that hop with. It
+# gets its own virtualenv because dlpxdccommand pins boto3/botocore, which would fight the
+# awscli install in minimal-internal.
+- name: Install python3-venv for the DCenter client
+  ansible.builtin.apt:
+    name: python3-venv
+    state: present
+
+# The index is delphix-virtual-pypi, not the delphix-local one dcoa's README documents:
+# delphix-local carries dlpxdccommand but no setuptools, so pip cannot resolve its build
+# dependencies there and fails on "No matching distribution found for setuptools>=40.8.0".
+- name: Install the DCenter client into /opt/dcenter-client
+  ansible.builtin.pip:
+    name: dlpxdccommand
+    virtualenv: /opt/dcenter-client
+    virtualenv_command: /usr/bin/python3 -m venv
+    extra_args: >-
+      --no-cache-dir
+      --index-url
+      https://artifactory.delphix.com/artifactory/api/pypi/delphix-virtual-pypi/simple/
+
+# A wrapper rather than a symlink into the venv's bin, which also holds python3 and pip:
+# that directory on PATH would send every bare `python3` on the image into this virtualenv.
+- name: Install the dc wrapper into /usr/local/bin
+  ansible.builtin.copy:
+    dest: /usr/local/bin/dc
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      #
+      # Installed by appliance-build.claude-internal -- edit that role, not this file.
+      #
+      # DLPX_DC_API_HOST is pinned because the dlpxdccommand build on Artifactory defaults
+      # to a decommissioned API gateway (2.0.3 defaults to r46rgdk3u4..., which NXDOMAINs)
+      # while reporting the same --version as a working client, so the bad default cannot
+      # be spotted from the version. This value is DEFAULT_API_HOST in dcoa's
+      # components/dc-command/src/main/python/dlpxdccommand/command/dc_cmds.py.
+      #
+      # Credentials are left to the caller: interactively, run `dc login` once; in
+      # automation, export DLPX_DEFAULT_CREDENTIALS=true to authenticate off the standard
+      # AWS credential chain instead of a dcoa profile.
+      #
+      export DLPX_DC_API_HOST="${DLPX_DC_API_HOST:-sknncxtzxf.execute-api.us-west-2.amazonaws.com}"
+      exec /opt/dcenter-client/bin/dc "$@"
+
 - name: Create /export/home/delphix/src directory
   ansible.builtin.file:
     path: /export/home/delphix/src
