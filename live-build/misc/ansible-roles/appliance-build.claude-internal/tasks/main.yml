@@ -137,34 +137,45 @@
     group: staff
     mode: "g+w"
 
+# The repository list lives in this role's defaults/main.yml -- see the comments there for
+# what is in it and why. Retries are worth it here because the list is long enough, and
+# the gates large enough, that a single transient GitHub failure would otherwise discard
+# an entire image build.
 - name: Clone product repositories
   ansible.builtin.git:
-    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/{{ item.org }}/{{ item.name }}.git"
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/{{ item.org | default('delphix') }}/{{ item.name }}.git"
     dest: "/export/home/delphix/src/{{ item.name }}"
     version: "{{ item.version }}"
+    depth: "{{ item.depth | default(omit) }}"
     update: false
-  loop:
-    - { org: delphix, name: dlpx-app-gate, version: develop }
-    - { org: delphix, name: dlpx-qa-gate, version: develop }
-    - { org: delphix, name: dms-core-gate, version: develop }
-    - { org: delphix, name: zfs, version: develop }
-    - { org: delphix, name: cd-aidlc, version: main }
-    - { org: delphix, name: git-utils, version: main }
+  loop: "{{ claude_internal_repos }}"
+  register: clone_result
+  until: clone_result is succeeded
+  retries: 3
+  delay: 5
   no_log: true
 
+# No no_log here, unlike the clone above: these commands carry no token, and suppressing
+# their output only makes a failure among this many repositories harder to place.
 - name: Reset clone URLs to SSH (strips the build-time bot token)
   ansible.builtin.command:
     cmd: >
       git -C /export/home/delphix/src/{{ item.name }}
-      remote set-url origin git@github.com:{{ item.org }}/{{ item.name }}.git
-  loop:
-    - { org: delphix, name: dlpx-app-gate }
-    - { org: delphix, name: dlpx-qa-gate }
-    - { org: delphix, name: dms-core-gate }
-    - { org: delphix, name: zfs }
-    - { org: delphix, name: cd-aidlc }
-    - { org: delphix, name: git-utils }
-  no_log: true
+      remote set-url origin
+      git@github.com:{{ item.org | default('delphix') }}/{{ item.name }}.git
+  loop: "{{ claude_internal_repos }}"
+  changed_when: false
+
+# A shallow clone is also a single-branch clone: git narrows remote.origin.fetch to just
+# the one branch that was cloned, so on the image neither "git fetch --unshallow" nor a
+# checkout of any other branch would see anything else. Restoring the wildcard refspec
+# makes both work. This is a no-op for the full clones, which already have this value.
+- name: Restore the wildcard fetch refspec (shallow clones are single-branch)
+  ansible.builtin.command:
+    cmd: >
+      git -C /export/home/delphix/src/{{ item.name }}
+      config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
+  loop: "{{ claude_internal_repos }}"
   changed_when: false
 
 - name: Ensure ~delphix/src is owned by delphix:staff with group-write
