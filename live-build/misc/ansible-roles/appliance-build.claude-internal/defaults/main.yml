@@ -1,0 +1,140 @@
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+#
+# The repositories cloned into ~delphix/src on the internal-claude image, so that an agent
+# on the image can read and modify the sources the Delphix Engine is built from without
+# first having to discover and clone them.
+#
+# The engine-input half of this list is not hand-curated: it is every repository that
+# linux-pkg names in a package's DEFAULT_PACKAGE_GIT_URL, plus the two build frameworks
+# (appliance-build, linux-pkg) that drive it. When a package is added to or removed from
+# linux-pkg, this list should follow. Two linux-pkg packages are deliberately absent
+# because they have no git source to clone -- grub2 fetches a prebuilt from the
+# release-de-images S3 bucket and misc-debs fetches prebuilt .debs from Artifactory; both
+# set DEFAULT_PACKAGE_GIT_URL=none.
+#
+# Fields:
+#   name     repository name; also the directory under ~delphix/src
+#   version  the branch to check out -- these are NOT uniformly "develop", so each entry
+#            carries the repository's actual default branch
+#   org      GitHub organization, defaulting to "delphix"
+#   depth    when set, clone shallow to this many commits (see the kernels below)
+#
+claude_internal_repos:
+  #
+  # The build frameworks, and the platform/kernel metapackages they assemble.
+  #
+  - { name: appliance-build, version: develop }
+  - { name: linux-pkg, version: develop }
+  - { name: delphix-platform, version: develop }
+  - { name: delphix-kernel, version: develop }
+
+  #
+  # The product gates. These three and the API gateway below are the bulk of the total,
+  # at roughly 1.9GB between them.
+  #
+  - { name: dlpx-app-gate, version: develop }
+  - { name: dms-core-gate, version: develop }
+  - { name: zfs, version: develop }
+
+  #
+  # The API gateway: the services, their Angular UI, and the support tooling. None of
+  # these are linux-pkg packages, so unlike most of the list above they don't come from
+  # a DEFAULT_PACKAGE_GIT_URL. All three are on main.
+  #
+  - { name: apigw-services, version: main }
+  - { name: apigw-ui, version: main }
+  - { name: apigw-support, version: main }
+
+  #
+  # Upgrade verification, and the SSO app (built as the delphix-sso-app package).
+  #
+  - { name: delphix-upgrade-verification, version: main }
+  - { name: saml-app, version: develop }
+
+  #
+  # First-party packages and Delphix forks of upstream packages. All small; the whole
+  # group is well under 100MB.
+  #
+  - { name: bcc, version: develop }
+  - { name: challenge-response, version: develop }
+  - { name: cloud-init, version: develop }
+  - { name: connstat, version: develop }
+  - { name: crypt-blowfish, version: develop }
+  - { name: delphix-go, version: master }
+  - { name: delphix-rust, version: develop }
+  - { name: docker-python-image, version: develop }
+  - { name: drgn, version: develop }
+  - { name: dwarves, version: master }
+  - { name: fluentd-gems, version: develop }
+  - { name: host-jdks, version: develop }
+  - { name: libkdumpfile, version: develop }
+  - { name: makedumpfile, version: develop }
+  - { name: nfs-utils, version: develop }
+  - { name: performance-diagnostics, version: develop }
+  - { name: ptools, version: develop }
+  - { name: python-rtslib-fb, version: develop }
+  - { name: savedump, version: develop }
+  - { name: sdb, version: develop }
+  - { name: targetcli-fb, version: develop }
+
+  #
+  # SBOM tooling. Installed on the linux-pkg and appliance-build hosts rather than into
+  # the shipped image, but still an input to how images are produced (DLPX-98618).
+  #
+  - { name: syft, version: develop }
+  - { name: cyclonedx-cli, version: develop }
+
+  #
+  # The per-platform kernels, cloned shallow. At full depth these five are ~20GB packed --
+  # by themselves an order of magnitude more than everything else here combined, on a
+  # variant whose rpool is 70GB, and ~20GB pulled from GitHub on every image build.
+  #
+  # The cost of depth=1 is that history is absent, so blame and bisect do not work until
+  # someone runs "git fetch --unshallow" on the image. The tasks file rewrites the fetch
+  # refspec after cloning so that unshallowing, and checking out any other branch, works.
+  #
+  - { name: linux-kernel-generic, version: develop, depth: 1 }
+  - { name: linux-kernel-aws, version: develop, depth: 1 }
+  - { name: linux-kernel-azure, version: develop, depth: 1 }
+  - { name: linux-kernel-gcp, version: develop, depth: 1 }
+  - { name: linux-kernel-oracle, version: develop, depth: 1 }
+
+  #
+  # Build, CI, and agent-tooling repositories. Not engine inputs, but the skills already
+  # shipped on this image drive them -- git-utils provides git-ab-pre-push, dcoa provides
+  # the dc CLI's source of truth, and devops-gate/pipeline-shared hold the Jenkins jobs
+  # those triggers land in.
+  #
+  - { name: devops-gate, version: main }
+  - { name: git-utils, version: main }
+  - { name: pipeline-shared, version: main }
+  - { name: dcoa, version: stage }
+  - { name: qa-infra, version: master }
+  - { name: github-infra, version: main }
+  - { name: dlpx-claude-plugins, version: main }
+  - { name: platform-team-claude-plugins, version: main }
+  - { name: cd-aidlc, version: main }
+
+  #
+  # QA: the test gate itself, the VSDK test plugins it provisions, and the golden images
+  # the environments under test are built from.
+  #
+  - { name: dlpx-qa-gate, version: develop }
+  - { name: qa-appdata-toolkits, version: main }
+  - { name: golden-images, version: master }
