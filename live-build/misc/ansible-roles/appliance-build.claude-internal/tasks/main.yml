@@ -129,9 +129,9 @@
       export DLPX_DC_API_HOST="${DLPX_DC_API_HOST:-sknncxtzxf.execute-api.us-west-2.amazonaws.com}"
       exec /opt/dcenter-client/bin/dc "$@"
 
-- name: Create /export/home/delphix/src directory
+- name: Create ~delphix/src directory
   ansible.builtin.file:
-    path: /export/home/delphix/src
+    path: "{{ claude_internal_src_dir }}"
     state: directory
     owner: delphix
     group: staff
@@ -144,7 +144,7 @@
 - name: Clone product repositories
   ansible.builtin.git:
     repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/{{ item.org | default('delphix') }}/{{ item.name }}.git"
-    dest: "/export/home/delphix/src/{{ item.name }}"
+    dest: "{{ claude_internal_src_dir }}/{{ item.name }}"
     version: "{{ item.version }}"
     depth: "{{ item.depth | default(omit) }}"
     update: false
@@ -160,7 +160,7 @@
 - name: Reset clone URLs to SSH (strips the build-time bot token)
   ansible.builtin.command:
     cmd: >
-      git -C /export/home/delphix/src/{{ item.name }}
+      git -C {{ claude_internal_src_dir }}/{{ item.name }}
       remote set-url origin
       git@github.com:{{ item.org | default('delphix') }}/{{ item.name }}.git
   loop: "{{ claude_internal_repos }}"
@@ -173,14 +173,14 @@
 - name: Restore the wildcard fetch refspec (shallow clones are single-branch)
   ansible.builtin.command:
     cmd: >
-      git -C /export/home/delphix/src/{{ item.name }}
+      git -C {{ claude_internal_src_dir }}/{{ item.name }}
       config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
   loop: "{{ claude_internal_repos }}"
   changed_when: false
 
 - name: Ensure ~delphix/src is owned by delphix:staff with group-write
   ansible.builtin.file:
-    path: /export/home/delphix/src
+    path: "{{ claude_internal_src_dir }}"
     state: directory
     owner: delphix
     group: staff
@@ -199,4 +199,4 @@
   ansible.builtin.copy:
     dest: /etc/profile.d/git-utils-path.sh
     mode: "0644"
-    content: 'export PATH="$PATH:/export/home/delphix/src/git-utils/bin"'
+    content: 'export PATH="$PATH:{{ claude_internal_src_dir }}/git-utils/bin"'
