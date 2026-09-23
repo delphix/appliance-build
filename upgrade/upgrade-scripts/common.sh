@@ -593,6 +593,24 @@ function fix_and_migrate_services() {
 	fi
 
 	#
+	# DLPX-99011: influxdb2 is built with the same debhelper packaging as
+	# telegraf and ships its own default influxdb.service unit, enabled by
+	# the package's postinst. delphix-influxdb.service is Delphix's own
+	# wrapper around the same influxd binary; if the stock unit is left
+	# enabled it races delphix-influxdb.service for port 8086 on the next
+	# boot after influxdb2 is (re)installed, and the loser is either
+	# permanently parked FAILED (port already bound) or left answering
+	# requests against an auth store Telegraf's stored token doesn't match
+	# (persistent 401 Unauthorized). Re-mask it after packages are upgraded
+	# for the same reason telegraf needs it above -- a package
+	# upgrade/reinstall of influxdb2 can restore its shipped unit file and
+	# reverse a mask applied before the upgrade.
+	#
+	if [[ "$(systemctl is-enabled influxdb)" == enabled ]]; then
+		mask_service influxdb "$container"
+	fi
+
+	#
 	# The services listed below are either permanently disabled or can be
 	# dynamically modified by the application(s) running on the appliance,
 	# so we need to ensure we migrate the state of these services when
@@ -634,6 +652,7 @@ function fix_and_migrate_services() {
 		delphix-fluentd.service
 		delphix-masking.service
 		fluentd.service
+		influxdb.service
 		nfs-mountd.service
 		nginx.service
 		postgresql.service
