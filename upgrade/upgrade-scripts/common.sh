@@ -593,7 +593,7 @@ function fix_and_migrate_services() {
 	fi
 
 	#
-	# DLPX-99011: influxdb2 is built with the same debhelper packaging as
+	# influxdb2 is built with the same debhelper packaging as
 	# telegraf and ships its own default influxdb.service unit, enabled by
 	# the package's postinst. delphix-influxdb.service is Delphix's own
 	# wrapper around the same influxd binary; if the stock unit is left
