@@ -81,7 +81,12 @@ cd /packages
 
 apt-get update
 
-dpkg-query -Wf '${Package}=${Version}\n' | xargs apt-get download
+# mount-s3 and blobfuse2 are installed from external sources and not yet
+# available in the internal apt mirror (DLPXECO-13872). Exclude them until
+# they are vendored into the mirror.
+MIRROR_EXCLUDED_PACKAGES="mount-s3 blobfuse2"
+EXCLUDE_PATTERN=$(echo "$MIRROR_EXCLUDED_PACKAGES" | tr ' ' '|')
+dpkg-query -Wf '${Package}=${Version}\n' | grep -Ev "^($EXCLUDE_PATTERN)=" | xargs apt-get download
 EOF
 
 #
