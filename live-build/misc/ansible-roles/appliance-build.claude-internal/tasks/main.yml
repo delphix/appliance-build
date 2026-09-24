@@ -200,3 +200,15 @@
     dest: /etc/profile.d/git-utils-path.sh
     mode: "0644"
     content: 'export PATH="$PATH:{{ claude_internal_src_dir }}/git-utils/bin"'
+
+# The kg plugin's skills look at $KG_DIR first and otherwise clone the corpus into
+# ~/.cache/delphix-kg themselves, so without this an agentic run on a fresh image pays for
+# a second copy of a repository the image already carries. profile.d rather than the role's
+# other config sites because that is where this role already puts shell environment (see
+# git-utils-path.sh above), and it is what an interactive shell and Claude Code's own bash
+# tool both read.
+- name: Point the kg skills at the pre-installed knowledge-graph clone
+  ansible.builtin.copy:
+    dest: /etc/profile.d/knowledge-graph.sh
+    mode: "0644"
+    content: 'export KG_DIR="{{ claude_internal_src_dir }}/knowledge-graph"'
