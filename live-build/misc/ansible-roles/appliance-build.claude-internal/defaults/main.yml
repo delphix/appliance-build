@@ -142,6 +142,16 @@ claude_internal_repos:
   - { name: cd-aidlc, version: main }
 
   #
+  # The team knowledge graph. Not tooling but the corpus the tooling reads: the kg plugin's
+  # skills (shipped from platform-team-claude-plugins above) resolve it from $KG_DIR, which
+  # the tasks file points at this clone. Without it their fallback is to clone into
+  # ~/.cache/delphix-kg on first use, which an agentic run on a fresh image would pay for
+  # every time. The tradeoff is that this copy is only as current as the image, where that
+  # cache is hard-reset to origin/main on every use -- pull it before trusting it.
+  #
+  - { name: knowledge-graph, version: main }
+
+  #
   # QA: the test gate itself, the VSDK test plugins it provisions, and the golden images
   # the environments under test are built from.
   #
