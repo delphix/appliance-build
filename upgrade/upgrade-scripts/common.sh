@@ -439,6 +439,43 @@ function is_bootmode_uefi() {
 	[ -d /sys/firmware/efi/efivars ] && return 0 || return 1
 }
 
+#
+# Reload a service, starting it first so that systemd will accept the
+# reload.
+#
+# Systemd refuses to reload a unit that isn't active, so a unit that's
+# been left inactive can't be reloaded at all. Starting it first is what
+# makes the reload possible again. Starting a unit that's already active
+# skips its "ExecStart", so the reload is the only thing that runs in
+# that case.
+#
+# "--job-mode=ignore-dependencies" is what keeps this to the named unit.
+# Without it, "systemctl start" enqueues a job for the unit's "Wants"
+# and "Requires" too, and those aren't necessarily idempotent the way
+# starting an already-active unit is; e.g. "delphix-platform.service"
+# wants "delphix-sb-enroll.service", which sets "RemainAfterExit=no" and
+# can reboot the appliance. A plain "systemctl reload" pulls in none of
+# that, and neither should this.
+#
+# The flag drops the unit's ordering along with its dependencies, which
+# is inert for the callers here: everything "delphix-platform" requires
+# or is ordered after (e.g. "sysinit.target", "local-fs.target",
+# "delphix-rpool-upgrade.service") is already active by the point in the
+# upgrade where we reload it. A caller whose unit has ordering that
+# still matters would need to account for that itself.
+#
+# Note that when the unit is inactive, its "ExecStart" does run here,
+# which for our "oneshot" units is their real work rather than a cheap
+# no-op. A unit that genuinely can't start still fails, as it should.
+#
+function start_and_reload_service() {
+	local svc="$1"
+
+	systemctl start --job-mode=ignore-dependencies "$svc" ||
+		die "failed to start '$svc'"
+	systemctl reload "$svc" || die "failed to reload '$svc'"
+}
+
 function mask_service() {
 	local svc="$1"
 	local container="$2"

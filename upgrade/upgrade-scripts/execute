@@ -848,8 +848,21 @@ if ! systemd-detect-virt -qc; then
 		die "failed to set-bootfs '$ROOTFS_CONTAINER'"
 fi
 
-systemctl reload delphix-platform.service ||
-	die "failed to reload delphix-platform.service"
+#
+# Reloading "delphix-platform" removes the marker that records its
+# ansible configuration as already applied, so that the configuration
+# shipped by the packages installed above is applied the next time the
+# service starts; i.e. by the reboot or the "delphix.target" restart
+# below.
+#
+# We can't reload the service directly, because this script is meant to
+# be re-run to resume an interrupted upgrade, and the service is not
+# necessarily active when it is. The package's "prerm" disables it when
+# the package is upgraded, so an engine that's interrupted after that
+# point and reboots comes back with the service disabled and inactive,
+# and the reload would fail. See DLPX-99309.
+#
+start_and_reload_service delphix-platform.service
 
 #
 # Before we exit, we want to ensure all of the changes made to the root
