@@ -24,6 +24,7 @@
     - appliance-build.minimal-internal
     - appliance-build.minimal-development
     - appliance-build.dct-common
+    - appliance-build.ucf-common
     - appliance-build.virtualization-common
     - appliance-build.virtualization-development
     - appliance-build.qa-internal
