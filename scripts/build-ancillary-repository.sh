@@ -62,6 +62,49 @@ function build_ancillary_repository() {
 }
 
 #
+# Replace each linux-image-KVERS-dbgsym package with an empty package of the
+# same name. delphix-kernel depends on these, so they can't simply be dropped,
+# but the real ones are large and are otherwise shipped once per platform in
+# the upgrade image. The stub's version sorts after the real one's, and the
+# live-build chroot installs and re-downloads packages from this repository, so
+# the stub is also what ends up in the upgrade image.
+#
+function replace_kernel_dbgsym_with_stubs() {
+	local debs_dir="$1"
+	local deb pkg version arch stub_dir
+
+	for deb in "$debs_dir"/linux-image-*-dbgsym_*.deb \
+		"$debs_dir"/linux-image-*-dbgsym_*.ddeb; do
+		[[ -e "$deb" ]] || continue
+
+		pkg=$(dpkg-deb -f "$deb" Package)
+		version=$(dpkg-deb -f "$deb" Version)
+		arch=$(dpkg-deb -f "$deb" Architecture)
+
+		stub_dir=$(mktemp -d -p "$WORK_DIRECTORY" dbgsym-stub.XXXXXXXXXX)
+		cat >"$stub_dir/stub.ctl" <<-EOF
+			Section: debug
+			Priority: optional
+			Maintainer: Delphix Engineering <eng@delphix.com>
+			Standards-Version: 3.9.2
+			Package: $pkg
+			Version: $version+nodbgsym
+			Architecture: $arch
+			Description: Empty stand-in for $pkg
+			 Satisfies the delphix-kernel dependency on $pkg without shipping
+			 the kernel debug symbols.
+		EOF
+		(cd "$stub_dir" && equivs-build stub.ctl) ||
+			die "failed to build stub package for '$pkg'"
+
+		rm "$deb"
+		mv "$stub_dir"/*.deb "$debs_dir/"
+		rm -rf "$stub_dir"
+		echo "Replaced '$pkg' with an empty stub package."
+	done
+}
+
+#
 # The packages produced by Delphix are stored in Amazon S3.
 # Thus, in order to populate the ancillary repository with these
 # packages, they must be downloaded from S3, so they can be then
@@ -138,6 +181,14 @@ download_ucf_artifacts "$AWS_S3_URI_UCF_PACKAGES" "$WORK_DIRECTORY/artifacts"
 #
 mkdir -p "$WORK_DIRECTORY/debs"
 extract_debs_into_dir "$WORK_DIRECTORY/artifacts" "$WORK_DIRECTORY/debs"
+
+#
+# The gradle build guarantees a DCT build doesn't also build other variants,
+# which still need the real debug symbols.
+#
+if [[ "$DELPHIX_BUILD_DCT_VARIANT" == "true" ]]; then
+	replace_kernel_dbgsym_with_stubs "$WORK_DIRECTORY/debs"
+fi
 
 #
 # Build up our Aptly/APT ancillary repository. After this function
