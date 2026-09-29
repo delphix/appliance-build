@@ -19,6 +19,7 @@
   gather_facts: no
   vars:
     ansible_python_interpreter: /usr/bin/python3
+    install_kernel_dbgsym: false
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
