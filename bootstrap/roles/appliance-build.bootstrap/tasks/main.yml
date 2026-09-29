@@ -23,17 +23,31 @@
   vars:
     mirror_url: "{{ lookup('env', 'DELPHIX_PACKAGE_MIRROR_MAIN') }}"
   block:
-    - name: Configure noble apt source
+    # Different branches mirror different Ubuntu releases (e.g. os-upgrade mirrors the next
+    # release under test, not the current one), so the suite name can't be hardcoded. The
+    # mirror's own directory listing is the source of truth for which suite a given branch
+    # actually publishes.
+    - name: Determine the Ubuntu suite this branch's mirror publishes
+      ansible.builtin.uri:
+        url: "{{ mirror_url }}/dists/"
+        return_content: true
+      register: mirror_dists_index
+
+    - name: Resolve the base suite name (the one entry without a -backports/-security/-updates suffix)
+      ansible.builtin.set_fact:
+        ubuntu_suite: "{{ (mirror_dists_index.content | regex_findall('href=\"([a-z]+)/\"')) | first }}"
+
+    - name: Configure base apt source
       ansible.builtin.apt_repository:
-        repo: "deb {{ mirror_url }} noble main restricted multiverse universe"
+        repo: "deb {{ mirror_url }} {{ ubuntu_suite }} main restricted multiverse universe"
         state: present
-    - name: Configure noble-updates apt source
+    - name: Configure updates apt source
       ansible.builtin.apt_repository:
-        repo: "deb {{ mirror_url }} noble-updates main restricted multiverse universe"
+        repo: "deb {{ mirror_url }} {{ ubuntu_suite }}-updates main restricted multiverse universe"
         state: present
-    - name: Configure noble-security apt source
+    - name: Configure security apt source
       ansible.builtin.apt_repository:
-        repo: "deb {{ mirror_url }} noble-security main"
+        repo: "deb {{ mirror_url }} {{ ubuntu_suite }}-security main"
         state: present
 
 - name: Stop unattended-upgrades systemd service in preparation for package removal
