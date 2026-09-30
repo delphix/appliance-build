@@ -19,6 +19,11 @@
     name: delphix-virtualization
     state: present
 
+- apt:
+    name: host-jdks
+    state: present
+  when: install_host_jdks | bool
+
 - file:
     path: /var/opt/delphix
     state: directory
