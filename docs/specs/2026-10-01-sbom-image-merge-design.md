@@ -168,6 +168,15 @@ different build than the SBOM, the versions differ, and attributing the wrong bu
 components would be worse than leaving the entry flat. A name match with a version
 mismatch is a *warning*, not a match (§6).
 
+**The version may come from the filename or from the SBOM.** A `.deb`'s filename can
+disagree with the `Version:` in its own control file, and dpkg — so the image BOM — reports
+the control file. The first real build exposed this: `windows-connector_2.4.dev.1_all.deb`
+installs as `windows-connector 1.0.0`, and its SBOM's `metadata.component.version` is also
+`1.0.0`. A filename-only rule rejected it as a mismatch. The matcher therefore accepts the
+installed version if it equals *either* the filename's version or
+`metadata.component.version`; name and arch still come from the filename. For every other
+package seen so far the two versions are identical, so this changes nothing for them.
+
 Note `COMPONENTS` is not needed for this. The earlier draft used it to map a `.deb` to its
 owning package; the filename makes that indirection unnecessary.
 
@@ -175,8 +184,12 @@ owning package; the filename makes that indirection unnecessary.
 
 For each file in `live-build/build/sboms/`:
 
-1. Parse the filename to `(name, version, arch)`. Unparseable → warn, skip.
-2. Find the image BOM component with that `name`, `version` and purl `arch`. No match →
+1. Parse the filename to `(name, version, arch)`. Unparseable → warn, skip. An SBOM with no
+   components → skip, counted separately: most of a multi-`.deb` package's `.deb`s carry
+   none of its bundled content (16 of the 27 zfs SBOMs in the first real build), and
+   nesting an empty list under them adds nothing.
+2. Find the image BOM component with that `name`, purl `arch`, and a `version` equal to the
+   filename's or the SBOM's own (§5). No match →
    skip silently: the package simply is not installed in this variant, which is normal
    (e.g. `containerized-masking` is in no appliance variant; DCT/Hyperscale only in their
    own variants).
@@ -216,6 +229,7 @@ standalone match count.
 |---|---|
 | `live-build/build/sboms/` missing or empty | Proceed with the Phase 1 document unchanged. Covers a build whose packages all predate Phase 2. Not an error. |
 | SBOM present, matching `.deb` not installed | Skip silently. Expected for variant-specific packages. |
+| SBOM present but has no components | Skip, counted in the summary. Nothing to attribute. |
 | `.deb` installed, no SBOM present | Leave it flat, silently. Expected for third-party packages and for flagged packages built before Phase 2 (§3). appliance-build cannot see linux-pkg's `SBOM_DEEP_SCAN` flag, so it has no reliable way to tell an expected absence from an unexpected one; warning on every flat `.deb` would mean ~676 warnings per image and none of them actionable. |
 | name matches but version does not | **Warn**, do not attach. Indicates the image and the SBOM came from different builds. |
 | SBOM present but unparseable JSON | **Fail the build.** A corrupt artifact is a data-integrity problem, not a coverage gap. |
