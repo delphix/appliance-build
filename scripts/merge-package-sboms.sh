@@ -36,11 +36,18 @@
 # with a different version means the SBOM describes a different build of that
 # .deb, and attributing its contents would be worse than leaving it flat.
 #
+# The version is accepted from either the filename or the SBOM's own
+# metadata.component.version, because a .deb's filename can disagree with the
+# Version: in its control file, which is what dpkg (and so the image SBOM)
+# reports. windows-connector does this: windows-connector_2.4.dev.1_all.deb
+# installs as version 1.0.0, and its SBOM records 1.0.0.
+#
 # Missing data degrades gracefully; corrupt data fails. An SBOM whose .deb is
 # not installed (normal for variant-specific packages) is skipped, an
-# installed .deb with no SBOM stays flat, and a version mismatch is reported
-# but not merged. An SBOM that is not valid JSON fails the script, since the
-# result would ship to customers. See
+# installed .deb with no SBOM stays flat, an SBOM with no components is
+# skipped rather than nesting an empty list, and a version mismatch is
+# reported but not merged. An SBOM that is not valid JSON fails the script,
+# since the result would ship to customers. See
 # docs/specs/2026-10-01-sbom-image-merge-design.md.
 #
 
@@ -81,6 +88,7 @@ tmp=""
 trap '[[ -n "$tmp" ]] && rm -f "$tmp"' EXIT
 
 merged=0
+empty=0
 mismatched=0
 absent=0
 
@@ -100,33 +108,60 @@ for package_sbom in "${package_sboms[@]}"; do
 	jq -e . "$package_sbom" >/dev/null 2>&1 ||
 		die "Package SBOM '$package_sbom' is not valid JSON."
 
-	match=$(jq -r --arg n "$name" --arg v "$version" --arg a "$arch" "
+	# Many .debs of a package carry none of its bundled content (most zfs
+	# .debs, for instance); nesting an empty list under them adds nothing.
+	count=$(jq '.components // [] | length' "$package_sbom")
+	if [[ "$count" -eq 0 ]]; then
+		empty=$((empty + 1))
+		continue
+	fi
+
+	sbom_version=$(jq -r '.metadata.component.version // ""' "$package_sbom")
+
+	#
+	# Prints the installed version that matched (the filename's or the
+	# SBOM's own), or "version-mismatch", or "absent".
+	#
+	match=$(jq -r --arg n "$name" --arg v "$version" --arg sv "$sbom_version" \
+		--arg a "$arch" "
 		[.components[] | select(.name == \$n)] as \$byname
-		| if any(\$byname[]; .version == \$v and $jq_arch == \$a)
-		  then \"match\"
+		| [\$byname[]
+		   | select($jq_arch == \$a and
+		            (.version == \$v or (\$sv != \"\" and .version == \$sv)))
+		   | .version] as \$hits
+		| if (\$hits | length) > 0
+		  then \"match:\" + \$hits[0]
 		  elif (\$byname | length) > 0
 		  then \"version-mismatch\"
 		  else \"absent\"
 		  end" "$image_sbom")
 
 	case "$match" in
-	match)
+	match:*)
+		installed="${match#match:}"
 		tmp=$(mktemp "$image_sbom.XXXXXXXXXX")
-		jq --arg n "$name" --arg v "$version" --arg a "$arch" \
+		jq --arg n "$name" --arg v "$installed" --arg a "$arch" \
 			--slurpfile pkg "$package_sbom" "
 			(.components[]
 			 | select(.name == \$n and .version == \$v and $jq_arch == \$a)
-			 | .components) = (\$pkg[0].components // [])" \
+			 | .components) = \$pkg[0].components" \
 			"$image_sbom" >"$tmp"
 		mv "$tmp" "$image_sbom"
 		tmp=""
-		echo "Merged $(jq '.components // [] | length' "$package_sbom")" \
-			"component(s) under $name $version ($arch)."
+		note=""
+		if [[ "$installed" != "$version" ]]; then
+			note=" (its filename says $version; matched on the SBOM's version)"
+		fi
+		echo "Merged $count component(s) under $name $installed ($arch)$note."
 		merged=$((merged + 1))
 		;;
 	version-mismatch)
+		wanted="$version"
+		if [[ -n "$sbom_version" && "$sbom_version" != "$version" ]]; then
+			wanted="$version or $sbom_version"
+		fi
 		echo "WARNING: not merging '$package_sbom': $name is installed," \
-			"but not at version $version ($arch); the SBOM describes a" \
+			"but not at version $wanted ($arch); the SBOM describes a" \
 			"different build of it."
 		mismatched=$((mismatched + 1))
 		;;
@@ -136,5 +171,6 @@ for package_sbom in "${package_sboms[@]}"; do
 	esac
 done
 
-echo "Package SBOMs: $merged merged, $mismatched version mismatch(es)," \
-	"$absent for .debs not installed in this image."
+echo "Package SBOMs: $merged merged, $empty with no components," \
+	"$mismatched version mismatch(es), $absent for .debs not installed" \
+	"in this image."
