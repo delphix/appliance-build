@@ -45,6 +45,11 @@ The top-level count is unchanged. Nothing is appended; components are *attribute
 **Non-goals:** changing Phase 2's output; the `devops-gate` publishing switch; closing the
 npm gap (CP-13467); DCT/Hyperscale producer-side SBOM generation.
 
+**Also in scope: the image SBOM's root type.** Phase 1's hook emits
+`metadata.component.type: "file"`, because Syft types the root by what it scanned and the
+hook scans a directory. This change sets it to `application` — see §6a for where, and why
+it has to be done on the image side rather than relying on the package SBOMs.
+
 ## 2. Why `cyclonedx-cli merge` is not the mechanism
 
 The earlier draft specified `cyclonedx-cli merge`. That was never verified, and testing
@@ -85,8 +90,11 @@ downloads into a `mktemp -d` and ends with `rm -rf "$WORK_DIRECTORY"`. That scri
 are gone by the time the merge would run. §4 addresses this.
 
 **Packages built before Phase 2 landed have no SBOM at all.** Their S3 directories contain
-a `.deb` and nothing else. This is a transitional state that resolves as packages are
-rebuilt, and is handled by the "no SBOM → stay flat" rule (§6), not treated as an error.
+a `.deb` and nothing else. Phase 2 merged on 2026-10-01, so this window opens then: until
+every `SBOM_DEEP_SCAN="true"` package has been rebuilt at least once, some flagged `.deb`s
+in a given image will carry no SBOM. The window closes on its own as packages are rebuilt
+for unrelated reasons, and is handled by the "no SBOM → stay flat" rule (§6), not treated as
+an error.
 
 ## 4. Persisting the SBOMs
 
@@ -183,13 +191,32 @@ with its bundled third-party components as **nested `components[]`**"), it is
 self-describing without a second structure to consult, and it leaves the image BOM's own
 dependency graph untouched (§8).
 
+The merge does **not** sanitize the components it nests. They come from Phase 2's output,
+which is already de-duplicated, stripped of path-bearing properties, and reduced to
+`syft:cpe23` and `syft:package:type`. The merge only matches and nests.
+
+**`bom-ref` uniqueness holds across packages.** CycloneDX requires every `bom-ref` in a
+document to be unique, and nesting several packages' components into one document could in
+principle break that. It does not: Syft appends a content- and location-derived
+`package-id` to each ref, so the same jar bundled in two packages gets two different refs.
+Verified on three real package SBOMs — `virtualization` (421), `delphix-sso-app` (86) and
+`windows-connector` (34) — giving 541 distinct refs and zero collisions.
+
+**Nested components are not referenced from `dependencies`, deliberately.** The image
+graph describes `.deb`-to-`.deb` relationships; nesting adds refs it knows nothing about,
+and in a test merge 0 of 421 nested components appeared in it. That is the intended shape —
+ownership is carried by the nesting — but whether a given consumer honours nesting has to be
+measured per consumer (§9, §10). Grype does: the unmerged `internal-qa-aws` image SBOM gives
+36,170 matches, the merged one 36,212, and the 42 extra are exactly the package SBOM's own
+standalone match count.
+
 ### Error handling
 
 | condition | behaviour |
 |---|---|
 | `live-build/build/sboms/` missing or empty | Proceed with the Phase 1 document unchanged. Covers a build whose packages all predate Phase 2. Not an error. |
 | SBOM present, matching `.deb` not installed | Skip silently. Expected for variant-specific packages. |
-| `.deb` installed, no SBOM present | Leave it flat. Expected for third-party packages and for packages built before Phase 2. **Warn** only when the package is one we expect an SBOM for, if that list is available; otherwise silent. |
+| `.deb` installed, no SBOM present | Leave it flat, silently. Expected for third-party packages and for flagged packages built before Phase 2 (§3). appliance-build cannot see linux-pkg's `SBOM_DEEP_SCAN` flag, so it has no reliable way to tell an expected absence from an unexpected one; warning on every flat `.deb` would mean ~676 warnings per image and none of them actionable. |
 | name matches but version does not | **Warn**, do not attach. Indicates the image and the SBOM came from different builds. |
 | SBOM present but unparseable JSON | **Fail the build.** A corrupt artifact is a data-integrity problem, not a coverage gap. |
 | final `cyclonedx-cli validate` fails | **Fail the build.** Consistent with Phase 1 and Phase 2. |
@@ -197,6 +224,31 @@ dependency graph untouched (§8).
 The asymmetry is deliberate: *missing* data degrades gracefully, *corrupt* data fails
 loudly. A producer-side hiccup in linux-pkg should not break every appliance build; a
 malformed document that would ship to customers should.
+
+### 6a. The root component type
+
+Set `metadata.component.type` to `application` in the Phase 1 hook,
+`live-build/config/hooks/configuration/95-generate-sbom.binary`, immediately after the Syft
+scan and before its `cyclonedx-cli validate`.
+
+**Why on the image side.** The merged document inherits the *image* SBOM's root: a test
+merge of the two kept `type: file / internal-qa-aws`. The package SBOMs' own
+`application`-typed roots do not carry across, because the merge nests only their
+`components` and never their `metadata`. So if the root type matters to a consumer at all,
+it has to be set on the image SBOM.
+
+**Why in the hook and not in the merge.** Doing it in the merge would leave the document
+correct only when a merge actually runs — a variant with no package SBOMs to merge, or a
+build before any flagged package has been rebuilt (§3), would still publish a `file`-rooted
+document. Setting it where the document is produced makes it correct regardless, and the
+merge inherits it.
+
+**What this is based on.** Mend support stated that their importer only treats
+`metadata.component` as the project root when its type is `application`. We have not
+observed a failure attributable to `file`: scans of a `file`-rooted and an
+`application`-rooted document produced identical logs and identical component counts. This
+change follows Mend's stated requirement for consistency with Phase 2, and is pending their
+confirmation of what the type actually affects (§9).
 
 ## 7. Where it runs
 
@@ -237,6 +289,21 @@ so the graph stays valid untouched.
 **The 685 top-level entries.** Components are nested, not appended. A consumer that ignores
 nesting sees exactly the document it sees today.
 
+**Anything else Phase 2's sanitizer does.** `resources/sanitize-sbom.jq` in linux-pkg does
+five things, and only the root-typing (§6a) applies here. The image SBOM was measured
+against each of the others before deciding:
+
+- *De-duplication* — 685 components, 685 unique. A dpkg scan emits one entry per installed
+  package; the duplication that motivated Phase 2's merge-dedupe (one jar found at up to 17
+  paths inside a single `.deb`) does not occur.
+- *Stripping path-bearing properties* — all 3,336 `syft:location:*:path` entries resolve to
+  `/var/lib/dpkg` (2,659) or `/usr/share/doc` (677), and none to `/opt/delphix` or any other
+  product-internal path. Phase 2's leak was product internals such as
+  `resources.war:WEB-INF/lib/ST4-4.3.4.jar`; this is standard Debian metadata.
+- *Rebuilding `dependencies`* — covered above; doing it here would destroy 2,488 real edges.
+
+Porting the Phase 2 filter wholesale would look consistent and make this document worse.
+
 **Phase 2's output.** Phase 3 is a pure consumer.
 
 ## 9. Open items
@@ -245,11 +312,17 @@ nesting sees exactly the document it sees today.
   "incomplete"}]`. Nesting their components does not import that element, but the merged
   document arguably *is* now partly incomplete. Whether to declare that at image level
   needs deciding — it should be deliberate, not inherited by accident.
-- **Root component type.** The image BOM's `metadata.component.type` is `file`; Mend
-  support flagged this, but neither a `file`-rooted nor an `application`-rooted scan showed
-  an observable difference in testing. Tracked as DLPX-99414 and currently **on hold**
-  pending Mend's answer. Whatever is decided applies to the merged document, since it
-  inherits the image BOM's root.
+- **Whether the root type actually matters.** Now in scope and implemented per §6a, but
+  pending Mend's answer to what `metadata.component.type` concretely affects — our scans of
+  `file`- and `application`-rooted documents were indistinguishable. If Mend confirms it has
+  no effect, the rewrite can be dropped from both this hook and Phase 2's filter, so that
+  both publish Syft's output unmodified. Originally filed separately as DLPX-99414, now
+  delivered here.
+- **How Mend treats nested components.** Grype ingests them (§6). Mend has not been tested,
+  and its support team described its rule for components with no declared relationship as
+  "treated as a direct dependency of the root". If that applies to nested components, Mend
+  would flatten every nested jar to the root and lose the attribution this phase exists to
+  create. Needs a Mend scan of a merged document before this phase is called done.
 - **Package SBOMs for `.deb`s not in `COMPONENTS`.** DCT and Hyperscale are downloaded by
   `download_dct_artifacts()` / `download_hyperscale_artifacts()` into the same work
   directory, so their SBOMs would be persisted and matched by the same filename rule *if
@@ -264,9 +337,16 @@ nesting sees exactly the document it sees today.
   Phase 1 document.
 - `dependencies` still reports 606 entries / 2,488 edges / 0 dangling / 100% coverage —
   i.e. demonstrably untouched.
-- Grype and Mend scans of the merged document, compared against the unmerged one, to
-  establish whether the nested components are actually ingested by each. This is worth
-  measuring rather than assuming: Grype and Mend were shown during Phase 2 to find
-  disjoint vulnerability sets, and Mend skips `type: application` components entirely.
+- **Each scanner ingests the nested components** — measured, not inferred from the document
+  validating. Validation passing is not evidence of content: Phase 2 shipped schema-valid
+  SBOMs that contained one component for a 1.2 GB application before anyone read the
+  output. For each scanner, compare matches on the merged document against the unmerged
+  image SBOM; the difference should equal the nested packages' own standalone match counts.
+  - Grype: done in testing — 36,170 → 36,212 matches, a delta of 42 equal to the package
+    SBOM's standalone count.
+  - Mend: not yet done (§9). Worth noting Mend and Grype were shown during Phase 2 to find
+    disjoint vulnerability sets, and Mend skips `type: application` components entirely, so
+    Grype's result says nothing about Mend's.
+- The image SBOM's root is `application`, including on a variant where nothing is merged.
 - The merge script run standalone against two files on disk, as a fast feedback loop that
   does not require a build.
