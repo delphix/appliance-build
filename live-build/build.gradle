@@ -45,7 +45,14 @@ task ancillaryRepository(type: Exec) {
  * repo when switching between builds. Every hyperscale/DCT variant build task is
  * named build<...Hyperscale...> / build<...Dct...>, so detection can only
  * over-download (harmless), never miss a real build that needs the packages.
+ *
+ * For DCT builds the ancillary repository also swaps the kernel debug symbol
+ * packages for empty stubs, which isn't harmless for other variants, so a DCT
+ * build must not share a gradle invocation with any other variant.
  */
+def dctVariants = ["internal-dct", "external-dct"]
+def liveBuildTaskVariants = [:]
+
 gradle.taskGraph.whenReady { graph ->
     def buildHyperscale = graph.allTasks.any { it.name.contains("Hyperscale") }
     ancillaryRepository.inputs.property("buildHyperscaleVariant", buildHyperscale)
@@ -53,6 +60,18 @@ gradle.taskGraph.whenReady { graph ->
         buildHyperscale.toString()
 
     def buildDct = graph.allTasks.any { it.name.contains("Dct") }
+    if (buildDct) {
+        def variantsInGraph = graph.allTasks
+            .findAll { it.project == project && liveBuildTaskVariants.containsKey(it.name) }
+            .collect { liveBuildTaskVariants[it.name] }
+            .unique()
+        def nonDctVariants = variantsInGraph - dctVariants
+        if (nonDctVariants) {
+            throw new GradleException(
+                "DCT variants can't be built in the same invocation as other variants " +
+                "(${nonDctVariants.join(', ')}); build them separately.")
+        }
+    }
     ancillaryRepository.inputs.property("buildDctVariant", buildDct)
     ancillaryRepository.environment "DELPHIX_BUILD_DCT_VARIANT", buildDct.toString()
 }
@@ -167,6 +186,7 @@ for (variant in allVariants) {
 
                 commandLine "${rootProject.projectDir}/scripts/run-live-build.sh", variant, platform, runType
             }
+            liveBuildTaskVariants[t.name] = variant
 
             tasks.create("clean${taskSuffix}${runSuffix}", Exec) {
                 commandLine "rm", "-rf", "${buildDir}/${variant}-${platform}"

@@ -69,6 +69,7 @@
   delay: 30
   register: result
   until: result is succeeded
+  when: install_kernel_dbgsym | default(true)
 
 - shell: ls /lib/modules
   register: kernel_versions
@@ -84,3 +85,4 @@
     dest: '/usr/src/linux-headers-{{ item }}/vmlinux'
     state: link
   loop: '{{ kernel_versions.stdout_lines }}'
+  when: install_kernel_dbgsym | default(true)
