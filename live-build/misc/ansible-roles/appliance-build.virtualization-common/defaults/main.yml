@@ -1,5 +1,5 @@
 #
-# Copyright 2024, 2026 Delphix
+# Copyright 2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,17 +15,11 @@
 #
 
 ---
-- hosts: all
-  gather_facts: no
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-    install_kernel_dbgsym: false
-    install_host_jdks: false
-  roles:
-    - appliance-build.minimal-common
-    - appliance-build.minimal-internal
-    - appliance-build.minimal-development
-    - appliance-build.dct-common
-    - appliance-build.virtualization-common
-    - appliance-build.virtualization-development
-    - appliance-build.qa-internal
+#
+# Whether to install the host-jdks package, which provides the JDKs that the
+# virtualization engine pushes to host environments. It isn't a dependency of
+# delphix-virtualization, so variants that don't manage host environments
+# (i.e. DCT) can set this to false to leave it out of both the image and the
+# upgrade image.
+#
+install_host_jdks: true
