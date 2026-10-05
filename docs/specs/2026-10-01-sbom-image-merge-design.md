@@ -268,11 +268,26 @@ At that point `$ARTIFACT_NAME.cdx.json` exists (written by the
 place and the existing loop carries the enriched document onward unchanged. This is also
 the integration point the top-level design named.
 
-The merge logic itself lives in a new `scripts/merge-package-sboms.py` — Python rather than
-`jq`, because the matcher needs filename parsing, purl field extraction and per-file error
-handling, which are awkward in `jq` and readable in Python. It takes the image BOM path and
-the SBOM directory as arguments, making it independently runnable against artifacts on disk
-for testing, without a build.
+The merge logic itself lives in a new `scripts/merge-package-sboms.sh`, in shell and `jq`.
+An earlier draft of this design specified Python, for the readability of the filename
+parsing and per-file error handling; that was reversed during implementation because:
+
+- `appliance-build` contains no Python today. Every script is shell, and it would be the
+  first file in a new language.
+- CI lints only shell (ShellCheck) and Ansible. A Python file would get no lint coverage at
+  all.
+- `jq` is an explicitly declared build-host dependency (in
+  `bootstrap/roles/appliance-build.bootstrap/tasks/main.yml`) and is already used by build
+  hooks. Python is present only incidentally, as Ansible's interpreter.
+- Phase 2's equivalent, `resources/sanitize-sbom.jq` in linux-pkg, is `jq`.
+
+The parsing turns out simple in shell: `IFS=_ read -r name version arch extra` splits the
+filename, and a non-empty `extra` rejects a malformed one. `jq --slurpfile` does the nesting.
+
+The script takes the image BOM path and the SBOM directory as arguments, so it runs
+standalone against artifacts on disk without a build. It is also idempotent: a second run
+over an already-merged document produces byte-identical output, since nesting replaces a
+component's `components` rather than appending to it.
 
 No `devops-gate` change is required: Phase 3 produces the same filename at the same path,
 and `appliance_build_stage0.groovy` already fetches and archives `*.cdx.json`.

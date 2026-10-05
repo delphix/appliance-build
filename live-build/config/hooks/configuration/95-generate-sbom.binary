@@ -36,8 +36,8 @@
 # installed package (jars, npm modules, Rust crates, etc.) isn't
 # attributable this way, so language-level catalogers are left off here
 # to avoid misattributing it; that content is covered separately by
-# per-package sidecar SBOMs produced upstream in linux-pkg, merged in at
-# a later stage.
+# per-package SBOMs produced upstream in linux-pkg, which
+# run-live-build.sh merges into this document once the image is built.
 #
 # SYFT_FILE_METADATA_SELECTION=none suppresses Syft's default behavior of
 # emitting a separate CycloneDX "file" component (with SHA-1/SHA-256
@@ -53,6 +53,20 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 	--source-name "$ARTIFACT_NAME" \
 	--source-version "$DELPHIX_APPLIANCE_VERSION" \
 	-o "cyclonedx-json@1.6=$ARTIFACT_NAME.cdx.json"
+
+#
+# Syft types the document's root component by what it scanned, and scanning
+# a directory makes it "file". Mend's support team stated that their importer
+# only treats metadata.component as the project root when it is typed
+# "application", so retype it here. This is done where the document is
+# produced, rather than when per-package SBOMs are merged into it later
+# (scripts/merge-package-sboms.sh), so that it holds for every image --
+# including one with nothing to merge -- and the merged document simply
+# inherits it.
+#
+jq '.metadata.component.type = "application"' "$ARTIFACT_NAME.cdx.json" \
+	>"$ARTIFACT_NAME.cdx.json.tmp"
+mv "$ARTIFACT_NAME.cdx.json.tmp" "$ARTIFACT_NAME.cdx.json"
 
 cyclonedx-cli validate \
 	--input-file "$ARTIFACT_NAME.cdx.json" \
