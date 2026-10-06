@@ -24,7 +24,14 @@
     - appliance-build.minimal-internal
     - appliance-build.minimal-development
     - appliance-build.dct-common
-    - appliance-build.ucf-common
+    # internal-dct is also built nightly, outside any DCT release, where UCF
+    # should keep installing as it always has -- default to install unless
+    # the caller explicitly opts out. The DCT release pipeline sets
+    # INCLUDE_UCF=false for releases before UCF is bundled, since no matching
+    # UCF package will ever exist for those; anything else (unset, true)
+    # installs normally.
+    - role: appliance-build.ucf-common
+      when: (lookup('env', 'INCLUDE_UCF') | default('true', true)) != 'false'
     - appliance-build.virtualization-common
     - appliance-build.virtualization-development
     - appliance-build.qa-internal
