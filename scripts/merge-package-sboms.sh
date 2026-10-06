@@ -84,6 +84,12 @@ jq_arch='(try (.purl | capture("[?&]arch=(?<a>[^&]+)").a) catch null)'
 # once jq has succeeded, so a failure part-way leaves the previous, valid
 # document in place. Remove that temporary file on any exit.
 #
+# mktemp creates the file 0600, and the build runs as root, so moving it over
+# the image SBOM as-is would leave the published artifact readable only by
+# root; Jenkins, which checksums and uploads it as an unprivileged user, then
+# fails with "Permission denied". "cp -p" first gives the temporary file the
+# image SBOM's own mode and ownership, which jq's output then keeps.
+#
 tmp=""
 trap '[[ -n "$tmp" ]] && rm -f "$tmp"' EXIT
 
@@ -140,6 +146,7 @@ for package_sbom in "${package_sboms[@]}"; do
 	match:*)
 		installed="${match#match:}"
 		tmp=$(mktemp "$image_sbom.XXXXXXXXXX")
+		cp -p "$image_sbom" "$tmp"
 		jq --arg n "$name" --arg v "$installed" --arg a "$arch" \
 			--slurpfile pkg "$package_sbom" "
 			(.components[]
