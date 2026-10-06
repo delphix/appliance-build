@@ -22,11 +22,5 @@
   roles:
     - appliance-build.minimal-common
     - appliance-build.dct-common
-    # external-dct never installed UCF before this role was added, so default
-    # to skipping it unless the caller explicitly opts in. The DCT release
-    # pipeline sets INCLUDE_UCF=true only once a matching UCF package is
-    # expected to exist; anything else (unset, false) skips the whole role
-    # (including the ucf login user) rather than fail the apt install below.
-    - role: appliance-build.ucf-common
-      when: (lookup('env', 'INCLUDE_UCF') | default('false', true)) == 'true'
+    - appliance-build.ucf-common
     - appliance-build.virtualization-common
