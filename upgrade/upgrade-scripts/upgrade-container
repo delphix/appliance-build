@@ -593,9 +593,23 @@ function run() {
 	#
 	systemctl restart systemd-reexec.service 2>/dev/null
 
+	#
+	# Callers that are at risk of the command hanging indefinitely
+	# (e.g. if the container reboots internally mid-command, which
+	# can leave "--wait" blocked forever) can set RUN_TIMEOUT_SEC to
+	# bound how long we'll wait before systemd kills the command and
+	# we fail loudly, rather than hanging forever with no diagnostic
+	# trail.
+	#
+	local timeout_property=()
+	if [[ -n "$RUN_TIMEOUT_SEC" ]]; then
+		timeout_property=(--property="RuntimeMaxSec=$RUN_TIMEOUT_SEC")
+	fi
+
 	systemd-run \
 		--machine="$CONTAINER" \
 		--setenv=CONTAINER="$CONTAINER" \
+		"${timeout_property[@]}" \
 		--quiet --wait --pipe -- "$@"
 }
 
@@ -706,8 +720,8 @@ function do_upgrade_container() {
 	type=$(get_type)
 	case $type in
 	in-place | not-in-place)
-		run "$IMAGE_PATH/execute" ||
-			die "'$IMAGE_PATH/execute' failed in '$CONTAINER'"
+		RUN_TIMEOUT_SEC=3600 run "$IMAGE_PATH/execute" ||
+			die "'$IMAGE_PATH/execute' failed or timed out in '$CONTAINER'"
 		;;
 	*)
 		die "unsupported upgrade container type specified: '$type'"
