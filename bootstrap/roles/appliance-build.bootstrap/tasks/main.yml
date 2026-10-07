@@ -73,6 +73,7 @@
       - pigz
       - python3-passlib
       - python3-pip
+      - python3-venv
       - qemu-system
       - rename
       - shellcheck
@@ -99,3 +100,29 @@
     name: delphix
     groups: docker
     append: true
+
+- name: Install syft (CycloneDX SBOM generator)
+  ansible.builtin.shell:
+    cmd: >
+      curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh |
+      sh -s -- -b /usr/local/bin {{ syft_version }}
+    creates: /usr/local/bin/syft
+
+- name: Install check-jsonschema into isolated virtualenv (avoids conflict with system jsonschema)
+  ansible.builtin.pip:
+    name: check-jsonschema
+    virtualenv: "{{ sbom_tools_venv }}"
+    virtualenv_command: python3 -m venv
+
+- name: Create CycloneDX schema directory
+  ansible.builtin.file:
+    path: "{{ cyclonedx_schema_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Download CycloneDX {{ cyclonedx_schema_version }} JSON schema
+  ansible.builtin.get_url:
+    url: "https://cyclonedx.org/schema/bom-{{ cyclonedx_schema_version }}.schema.json"
+    dest: "{{ cyclonedx_schema_dir }}/bom-{{ cyclonedx_schema_version }}.schema.json"
+    mode: "0644"
+    force: false
