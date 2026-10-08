@@ -64,8 +64,24 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 # including one with nothing to merge -- and the merged document simply
 # inherits it.
 #
-jq '.metadata.component.type = "application"' "$ARTIFACT_NAME.cdx.json" \
-	>"$ARTIFACT_NAME.cdx.json.tmp"
+#
+# Mend also rejects the whole document if a license "id" isn't on its own list
+# of SPDX identifiers, which is shorter than the real SPDX list. These two are
+# valid SPDX ids that Debian's copyright files use (SMAIL-GPL on debianutils,
+# Artistic-dist on perl), so carry them as free-text license names instead,
+# which CycloneDX allows. Add to this list if Mend reports another.
+#
+jq '
+	["SMAIL-GPL", "Artistic-dist"] as $unknown_to_mend
+	| .metadata.component.type = "application"
+	| .components |= map(
+		if .licenses then
+			.licenses |= map(
+				if .license.id and (.license.id | IN($unknown_to_mend[]))
+				then .license = {name: .license.id}
+				else . end)
+		else . end)
+' "$ARTIFACT_NAME.cdx.json" >"$ARTIFACT_NAME.cdx.json.tmp"
 mv "$ARTIFACT_NAME.cdx.json.tmp" "$ARTIFACT_NAME.cdx.json"
 
 cyclonedx-cli validate \
