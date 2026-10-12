@@ -23,29 +23,13 @@ IMAGE_PATH=$(get_image_path)
 CONTAINER=
 
 #
-# Default bound (seconds) for run()'s "systemd-run --wait" call. Chosen to sit
-# comfortably between the one measured real-world worst case for
-# do_upgrade_container's "execute" run (~41 minutes under resource contention,
-# blackbox-chained #9752) and dlpx-app-gate's own apply-job backstop
-# (UpgradeManagerImpl.doApplyVersion() sleeps 60 minutes before declaring
-# itself fatally wedged) -- so a genuine hang here fails loudly as an
-# appliance-build-level error with margin to spare, rather than racing
-# app-gate's independent clock to the same deadline.
+# Bound (seconds) for do_upgrade_container()'s "execute" run (DLPX-99539).
+# Chosen with margin above the one measured real-world worst case under
+# resource contention (~41 minutes, blackbox-chained #9752). Can be removed
+# once the appliance's systemd is upgraded past v257 (systemd/systemd#34884),
+# which fixes the underlying bug this works around.
 #
-# Root cause (DLPX-99539): installing/reconfiguring the "systemd" package
-# inside the upgrade container unconditionally triggers a dpkg-postinst-driven
-# daemon-reexec (stock Debian/Ubuntu systemd packaging behavior), which happens
-# at least twice early in "execute" (once via postinst, once via our own
-# explicit call). systemd-run's D-Bus-based --wait job tracking cannot survive
-# the watched instance reexec'ing mid-job on the systemd version shipped here
-# (v255) -- a maintainer-acknowledged upstream bug (systemd/systemd#27204),
-# only fixed in v257 (systemd/systemd#34884). Until the appliance's systemd is
-# upgraded past that fix, "--wait" can block indefinitely with no diagnostic
-# trail.
-#
-# Callers can override via RUN_TIMEOUT_SEC if a different bound is needed.
-#
-DEFAULT_RUN_TIMEOUT_SEC=3000
+EXECUTE_TIMEOUT_SEC=3600
 
 TMP_DATASETS_EXIST=false
 
@@ -606,6 +590,12 @@ function destroy() {
 }
 
 function run() {
+	local timeout_sec=""
+	if [[ "$1" == --timeout=* ]]; then
+		timeout_sec="${1#--timeout=}"
+		shift
+	fi
+
 	#
 	# We've seen cases where systemd-run fails to exit, even after
 	# it's run the comamnds/script specified. We've "fixed" this in
@@ -618,19 +608,59 @@ function run() {
 	#
 	systemctl restart systemd-reexec.service 2>/dev/null
 
-	#
-	# Always bound how long we'll wait before systemd kills the command and
-	# we fail loudly, rather than risking an indefinite hang with no
-	# diagnostic trail (see DEFAULT_RUN_TIMEOUT_SEC above). Set
-	# RUN_TIMEOUT_SEC to override the default for a specific call.
-	#
-	local timeout_property=(--property="RuntimeMaxSec=${RUN_TIMEOUT_SEC:-$DEFAULT_RUN_TIMEOUT_SEC}")
+	if [[ -z "$timeout_sec" ]]; then
+		systemd-run \
+			--machine="$CONTAINER" \
+			--setenv=CONTAINER="$CONTAINER" \
+			--quiet --wait --pipe -- "$@"
+		return
+	fi
 
-	systemd-run \
+	#
+	# DLPX-99539: "systemd-run --wait" tracks job completion over D-Bus,
+	# which doesn't reliably survive the watched systemd instance
+	# re-executing mid-job -- so "--wait" can hang even after "$@" itself
+	# has already finished. A "RuntimeMaxSec=" unit property doesn't help
+	# here, since it only bounds the unit while it's still running, not the
+	# client's wait. So we bound the client call itself with timeout(1), and
+	# have "$@" record its own exit status to a file under LOG_DIRECTORY
+	# (bind-mounted into the container), so a hung wait after "$@" actually
+	# succeeded isn't reported as a failure.
+	#
+	local status_file
+	status_file=$(mktemp -p "$LOG_DIRECTORY" -t run-status.XXXXXX) ||
+		die "failed to create run status file"
+
+	timeout --kill-after=60 "$timeout_sec" \
+		systemd-run \
 		--machine="$CONTAINER" \
 		--setenv=CONTAINER="$CONTAINER" \
-		"${timeout_property[@]}" \
-		--quiet --wait --pipe -- "$@"
+		--quiet --wait --pipe -- \
+		bash -c '
+			status_file="$1"
+			shift
+			"$@"
+			echo "$?" >"$status_file"
+		' _ "$status_file" "$@"
+	local run_rc=$?
+
+	if [[ -s "$status_file" ]]; then
+		local real_rc
+		real_rc=$(<"$status_file")
+		rm -f "$status_file"
+		if [[ $run_rc -eq 124 || $run_rc -eq 137 ]]; then
+			warn "'$*' finished (exit $real_rc), but 'systemd-run --wait'" \
+				"itself hung afterwards (DLPX-99539); continuing"
+		fi
+		return "$real_rc"
+	fi
+
+	rm -f "$status_file"
+	if [[ $run_rc -eq 124 || $run_rc -eq 137 ]]; then
+		warn "'$*' gave up after ${timeout_sec}s with no response from" \
+			"'systemd-run --wait' (DLPX-99539)"
+	fi
+	return "$run_rc"
 }
 
 function shell() {
@@ -740,7 +770,7 @@ function do_upgrade_container() {
 	type=$(get_type)
 	case $type in
 	in-place | not-in-place)
-		run "$IMAGE_PATH/execute" ||
+		run --timeout="$EXECUTE_TIMEOUT_SEC" "$IMAGE_PATH/execute" ||
 			die "'$IMAGE_PATH/execute' failed or timed out in '$CONTAINER'"
 		;;
 	*)
@@ -766,7 +796,7 @@ function usage() {
 	echo "$PREFIX_SPACES start <container>"
 	echo "$PREFIX_SPACES stop <container>"
 	echo "$PREFIX_SPACES destroy <container>"
-	echo "$PREFIX_SPACES run <container> <command>"
+	echo "$PREFIX_SPACES run <container> [--timeout=SEC] <command>"
 	echo "$PREFIX_SPACES shell <container>"
 	echo "$PREFIX_SPACES list-started"
 	echo "$PREFIX_SPACES list-all"
