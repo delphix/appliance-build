@@ -112,8 +112,8 @@ claude_internal_repos:
 
   #
   # The per-platform kernels, cloned shallow. At full depth these five are ~20GB packed --
-  # by themselves an order of magnitude more than everything else here combined, on a
-  # variant whose rpool is 70GB, and ~20GB pulled from GitHub on every image build.
+  # by themselves an order of magnitude more than everything else here combined, and
+  # ~20GB pulled from GitHub on every image build.
   #
   # The cost of depth=1 is that history is absent, so blame and bisect do not work until
   # someone runs "git fetch --unshallow" on the image. The tasks file rewrites the fetch

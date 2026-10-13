@@ -20,8 +20,22 @@
   gather_facts: false
   vars:
     ansible_python_interpreter: /usr/bin/python3
+  #
+  # This variant is the internal-dev variant plus the Claude Code tooling in
+  # claude-internal, so every role up to that one should match the internal-dev
+  # playbook, in the same order. When a role is added to or removed from that
+  # playbook, this one should follow. The one deliberate difference is that
+  # delphix-ldap (and the passwordless_ldap_sudo it reads) is left out: this
+  # image is driven as the local delphix user, not by LDAP logins.
+  #
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
     - appliance-build.minimal-development
+    - appliance-build.masking-common
+    - appliance-build.masking-development
+    - appliance-build.qa-internal
+    - appliance-build.virtualization-common
+    - appliance-build.virtualization-development
+    - appliance-build.zfsonlinux-development
     - appliance-build.claude-internal
