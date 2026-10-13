@@ -631,6 +631,11 @@ function run() {
 	status_file=$(mktemp -p "$LOG_DIRECTORY" -t run-status.XXXXXX) ||
 		die "failed to create run status file"
 
+	#
+	# The single-quoted script below is intentionally unexpanded on the
+	# host; it's meant to run as-is inside the container.
+	#
+	# shellcheck disable=SC2016
 	timeout --kill-after=60 "$timeout_sec" \
 		systemd-run \
 		--machine="$CONTAINER" \
