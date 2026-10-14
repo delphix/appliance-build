@@ -215,3 +215,143 @@
     dest: /etc/profile.d/knowledge-graph.sh
     mode: "0644"
     content: 'export KG_DIR="{{ claude_internal_src_dir }}/knowledge-graph"'
+
+- name: Create the Claude Code system configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/claude-code
+    - /etc/claude-code/managed-settings.d
+
+# Claude Code loads /etc/claude-code/CLAUDE.md into every session on the machine --
+# interactive, `claude -p`, and the Agent SDK -- ahead of any user or project CLAUDE.md.
+# It holds facts about this image that every session would otherwise re-derive; workflow
+# guidance belongs in the plugins' skills instead.
+- name: Install the system-wide CLAUDE.md
+  ansible.builtin.copy:
+    dest: /etc/claude-code/CLAUDE.md
+    mode: "0644"
+    content: |
+      <!-- Installed by appliance-build.claude-internal -- edit that role, not this file. -->
+      # This machine: the Delphix internal-claude image
+
+      ## Filesystem
+      - /nas is an NFS mount of the support-tools NAS: every customer's support bundles,
+        far too large to walk. Never search from / (find /, grep -r /, du /), and add -xdev
+        when a whole-disk search is unavoidable.
+      - To find source, search the one repo it belongs to: git -C ~delphix/src/<repo>
+        ls-files or rg there. Even ~delphix/src as a whole is over 600,000 files, slow to
+        walk on a cold cache.
+      - ~delphix/src holds a clone of every repo the engine is built from, plus the build,
+        CI, and agent-tooling repos; the list is claude_internal_repos in
+        ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.claude-internal/defaults/main.yml.
+        Clones are only as current as the image build: git fetch before trusting them.
+        The linux-kernel-* clones are shallow; git fetch --unshallow before blame or bisect.
+
+      ## Team knowledge graph
+      - delphix/knowledge-graph is cloned at $KG_DIR (~delphix/src/knowledge-graph):
+        escalation postmortems, CI known failures, investigations, subsystem notes.
+      - Before investigating or root-causing a Delphix problem, git -C $KG_DIR pull and
+        read $KG_DIR/INDEX.md for prior art.
+      - Record anything a teammate could reuse with the kg skills: /kg:ingest, or
+        kg:ingest-escl-postmortem / kg:ingest-known-failure for those cases. Never
+        hand-edit INDEX.md; it is generated. The kg skills push to main directly, no PR.
+
+      ## Tools
+      - dc (DCenter CLI) runs locally. Interactively, run dc login once; in automation,
+        export DLPX_DEFAULT_CREDENTIALS=true to use the AWS credential chain.
+      - gh is installed; git-utils/bin is on PATH for login shells.
+
+      ## Git and PRs
+      - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push. Do
+        not use git review, even where a repo's docs say to.
+      - Name development branches projects/<slug>. Delphix branch protection permits
+        creating, force-pushing, and deleting branches only under projects/; other
+        namespaces are rejected.
+
+      ## Claude Code configuration
+      - This file and the plugins in /etc/claude-code/managed-settings.d/ are installed by
+        the appliance-build.claude-internal role; change them there, not on the VM.
+
+# Managed settings take precedence over every user and project scope, so these plugins
+# load for every session and a user cannot switch them off without root. A drop-in in
+# managed-settings.d rather than managed-settings.json, so a policy file someone else
+# owns can sit beside it. The platform marketplace is read in place from its clone in
+# ~delphix/src -- no GitHub credentials are needed at session start, and automation that
+# checks out a PLUGINS_BRANCH there gets that branch's plugins. Only plugins the platform
+# team has vetted are enabled; zfs and hotfix depend on dev-hygiene and blackbox, which
+# are listed so the whole enabled set is visible here.
+- name: Install the managed Claude Code plugin settings
+  ansible.builtin.copy:
+    dest: /etc/claude-code/managed-settings.d/internal-claude.json
+    mode: "0644"
+    content: |
+      {
+        "extraKnownMarketplaces": {
+          "delphix-platform-team-claude-plugins": {
+            "source": {
+              "source": "directory",
+              "path": "{{ claude_internal_src_dir }}/platform-team-claude-plugins"
+            }
+          },
+          "claude-plugins-official": {
+            "source": {
+              "source": "github",
+              "repo": "anthropics/claude-plugins-official"
+            }
+          }
+        },
+        "enabledPlugins": {
+          "kg@delphix-platform-team-claude-plugins": true,
+          "jira@delphix-platform-team-claude-plugins": true,
+          "dcenter@delphix-platform-team-claude-plugins": true,
+          "secrets@delphix-platform-team-claude-plugins": true,
+          "git-utils@delphix-platform-team-claude-plugins": true,
+          "code-standards@delphix-platform-team-claude-plugins": true,
+          "app@delphix-platform-team-claude-plugins": true,
+          "zfs@delphix-platform-team-claude-plugins": true,
+          "hotfix@delphix-platform-team-claude-plugins": true,
+          "jenkins@delphix-platform-team-claude-plugins": true,
+          "dev-hygiene@delphix-platform-team-claude-plugins": true,
+          "blackbox@delphix-platform-team-claude-plugins": true,
+          "superpowers@claude-plugins-official": true
+        }
+      }
+
+# superpowers is fetched from GitHub rather than read from a clone on the image, and a
+# headless session never fetches a plugin hosted that way: on a fresh home, `claude -p`
+# starts before the managed marketplace above is registered and skips the plugin as an
+# orphan. Installing it for delphix here leaves the marketplace registered and the plugin
+# cached, so the first session -- the only one an automation VM ever runs -- loads it.
+- name: Pre-install the superpowers plugin for the delphix user
+  ansible.builtin.shell: |
+    set -e
+    claude plugin marketplace add anthropics/claude-plugins-official
+    claude plugin install superpowers@claude-plugins-official
+  environment:
+    HOME: "{{ claude_internal_home_dir }}"
+  args:
+    creates: "{{ claude_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/superpowers"
+
+# The install above also writes CLI state that should not ship in an image: .claude.json
+# carries a machineID and userID every clone would share, and settings.json would enable
+# superpowers a second time at user scope, where it would outlive a change to the managed
+# settings. Only ~delphix/.claude/plugins is kept.
+- name: Remove the CLI state left by the superpowers install
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ claude_internal_home_dir }}/.claude.json"
+    - "{{ claude_internal_home_dir }}/.claude/settings.json"
+    - "{{ claude_internal_home_dir }}/.claude/backups"
+
+- name: Ensure ~delphix/.claude is owned by delphix:staff
+  ansible.builtin.file:
+    path: "{{ claude_internal_home_dir }}/.claude"
+    state: directory
+    owner: delphix
+    group: staff
+    recurse: true

@@ -16,14 +16,15 @@
 
 ---
 #
-# The directory the repositories below are cloned into. This is the delphix user's home
-# (see the "delphix" user in the appliance-build.minimal-common role), which moved from
+# The delphix user's home (see the "delphix" user in the appliance-build.minimal-common
+# role), and the directory the repositories below are cloned into. The home moved from
 # /export/home to /home; there is deliberately no /export/home compatibility symlink, so
 # the old path would resolve to a stray directory tree on the root dataset rather than to
-# anything reachable as ~delphix. It is defined once here because six tasks consume it,
-# and repeating it inline is what let that move miss this role.
+# anything reachable as ~delphix. Both are defined once here because many tasks consume
+# them, and repeating the path inline is what let that move miss this role.
 #
-claude_internal_src_dir: /home/delphix/src
+claude_internal_home_dir: /home/delphix
+claude_internal_src_dir: "{{ claude_internal_home_dir }}/src"
 
 #
 # The repositories cloned into ~delphix/src on the internal-claude image, so that an agent
