@@ -68,11 +68,12 @@
     name: nas.mount
     enabled: true
 
-- name: Install curl, git, and Node.js
+- name: Install curl, git, jq, and Node.js
   ansible.builtin.apt:
     name:
       - curl
       - git
+      - jq
       - nodejs
       - npm
     state: present
@@ -270,6 +271,8 @@
       - Name development branches projects/<slug>. Delphix branch protection permits
         creating, force-pushing, and deleting branches only under projects/; other
         namespaces are rejected.
+      - Commit, branch, PR and linking conventions come from the git, github and writing
+        plugins; their skills load as needed.
 
       ## Claude Code configuration
       - This file and the plugins in /etc/claude-code/managed-settings.d/ are installed by
@@ -281,8 +284,9 @@
 # owns can sit beside it. The platform marketplace is read in place from its clone in
 # ~delphix/src -- no GitHub credentials are needed at session start, and automation that
 # checks out a PLUGINS_BRANCH there gets that branch's plugins. Only plugins the platform
-# team has vetted are enabled; zfs and hotfix depend on dev-hygiene and blackbox, which
-# are listed so the whole enabled set is visible here.
+# team has vetted are enabled; zfs and hotfix depend on git and blackbox, which are
+# listed so the whole enabled set is visible here. attribution is pinned true here too,
+# so no user or project setting can turn Claude co-authorship off.
 - name: Install the managed Claude Code plugin settings
   ansible.builtin.copy:
     dest: /etc/claude-code/managed-settings.d/internal-claude.json
@@ -314,10 +318,13 @@
           "zfs@delphix-platform-team-claude-plugins": true,
           "hotfix@delphix-platform-team-claude-plugins": true,
           "jenkins@delphix-platform-team-claude-plugins": true,
-          "dev-hygiene@delphix-platform-team-claude-plugins": true,
+          "git@delphix-platform-team-claude-plugins": true,
+          "github@delphix-platform-team-claude-plugins": true,
+          "writing@delphix-platform-team-claude-plugins": true,
           "blackbox@delphix-platform-team-claude-plugins": true,
           "superpowers@claude-plugins-official": true
-        }
+        },
+        "attribution": true
       }
 
 # superpowers is fetched from GitHub rather than read from a clone on the image, and a
