@@ -67,13 +67,16 @@ retry() {
 #
 # Another exception is our "buildserver" variant. We use those images to
 # generate our appliance images, and upgrade images, which consume a lot
-# of space during the build process; thus, we need a larger rpool.
+# of space during the build process; thus, we need a larger rpool. The
+# "claude" variant gets the same size, for the same reason: an agent on
+# that image runs those builds too, on top of the full internal-dev
+# stack and the product repositories it carries in ~delphix/src.
 #
 case "$APPLIANCE_VARIANT" in
 external-* | internal-dcenter)
 	RAW_DISK_SIZE_GB=127
 	;;
-internal-buildserver)
+internal-buildserver | internal-claude)
 	RAW_DISK_SIZE_GB=512
 	;;
 internal-*)
