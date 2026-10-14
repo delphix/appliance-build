@@ -92,18 +92,39 @@
     name: python3-venv
     state: present
 
+# The client is built from dcoa's python/command at the dcoa/live tag, the same source and
+# packaging dlpxdc.co installs from. The dlpxdccommand package on Artifactory is not
+# published from that tag, so it lags what dlpxdc.co runs.
+- name: Create a scratch directory for the dcoa checkout
+  ansible.builtin.tempfile:
+    state: directory
+  register: dcoa_checkout
+
+- name: Check out dcoa at the dcoa/live tag
+  ansible.builtin.git:
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dcoa.git"
+    dest: "{{ dcoa_checkout.path }}"
+    version: dcoa/live
+    depth: 1
+  no_log: true
+
 # The index is delphix-virtual-pypi, not the delphix-local one dcoa's README documents:
-# delphix-local carries dlpxdccommand but no setuptools, so pip cannot resolve its build
-# dependencies there and fails on "No matching distribution found for setuptools>=40.8.0".
+# delphix-local has no setuptools, so pip cannot resolve the build dependencies there and
+# fails on "No matching distribution found for setuptools>=40.8.0".
 - name: Install the DCenter client into /opt/dcenter-client
   ansible.builtin.pip:
-    name: dlpxdccommand
+    name: "{{ dcoa_checkout.path }}/python/command"
     virtualenv: /opt/dcenter-client
     virtualenv_command: /usr/bin/python3 -m venv
     extra_args: >-
       --no-cache-dir
       --index-url
       https://artifactory.delphix.com/artifactory/api/pypi/delphix-virtual-pypi/simple/
+
+- name: Remove the dcoa checkout
+  ansible.builtin.file:
+    path: "{{ dcoa_checkout.path }}"
+    state: absent
 
 # A wrapper rather than a symlink into the venv's bin, which also holds python3 and pip:
 # that directory on PATH would send every bare `python3` on the image into this virtualenv.
@@ -116,17 +137,10 @@
       #
       # Installed by appliance-build.claude-internal -- edit that role, not this file.
       #
-      # DLPX_DC_API_HOST is pinned because the dlpxdccommand build on Artifactory defaults
-      # to a decommissioned API gateway (2.0.3 defaults to r46rgdk3u4..., which NXDOMAINs)
-      # while reporting the same --version as a working client, so the bad default cannot
-      # be spotted from the version. This value is DEFAULT_API_HOST in dcoa's
-      # components/dc-command/src/main/python/dlpxdccommand/command/dc_cmds.py.
-      #
       # Credentials are left to the caller: interactively, run `dc login` once; in
       # automation, export DLPX_DEFAULT_CREDENTIALS=true to authenticate off the standard
       # AWS credential chain instead of a dcoa profile.
       #
-      export DLPX_DC_API_HOST="${DLPX_DC_API_HOST:-sknncxtzxf.execute-api.us-west-2.amazonaws.com}"
       exec /opt/dcenter-client/bin/dc "$@"
 
 - name: Create ~delphix/src directory
