@@ -287,6 +287,12 @@
 # team has vetted are enabled; zfs and hotfix depend on git and blackbox, which are
 # listed so the whole enabled set is visible here. attribution is pinned true here too,
 # so no user or project setting can turn Claude co-authorship off.
+#
+# clangd-lsp is pre-installed below but deliberately absent from enabledPlugins: without
+# a compile_commands.json clangd resolves nothing and pushes false errors into every
+# session's context. The key is omitted rather than set to false because a managed false
+# also makes "claude plugin enable" refuse outright, as blocked by organization policy,
+# which would leave no way to switch it on short of root.
 - name: Install the managed Claude Code plugin settings
   ansible.builtin.copy:
     dest: /etc/claude-code/managed-settings.d/internal-claude.json
@@ -322,31 +328,66 @@
           "github@delphix-platform-team-claude-plugins": true,
           "writing@delphix-platform-team-claude-plugins": true,
           "blackbox@delphix-platform-team-claude-plugins": true,
-          "superpowers@claude-plugins-official": true
+          "superpowers@claude-plugins-official": true,
+          "pyright-lsp@claude-plugins-official": true,
+          "rust-analyzer-lsp@claude-plugins-official": true
         },
         "attribution": true
       }
 
-# superpowers is fetched from GitHub rather than read from a clone on the image, and a
-# headless session never fetches a plugin hosted that way: on a fresh home, `claude -p`
-# starts before the managed marketplace above is registered and skips the plugin as an
-# orphan. Installing it for delphix here leaves the marketplace registered and the plugin
-# cached, so the first session -- the only one an automation VM ever runs -- loads it.
-- name: Pre-install the superpowers plugin for the delphix user
-  ansible.builtin.shell: |
-    set -e
-    claude plugin marketplace add anthropics/claude-plugins-official
-    claude plugin install superpowers@claude-plugins-official
+# The language servers the LSP plugins below drive. They go in /usr/local/bin and
+# /usr/bin so that every session finds them: a PATH entry in /etc/profile.d, the way
+# git-utils is added above, reaches login shells but not an automated `claude -p`.
+# rust-analyzer is already on the image, from the delphix-rust package. The pyright
+# version is pinned so that an image build is reproducible rather than taking whatever
+# npm published that day; clangd's is a function of the apt mirror the image builds
+# against, which pins the whole archive at once.
+- name: Install the pyright language server
+  ansible.builtin.command: npm install -g pyright@1.1.414
+  args:
+    creates: /usr/local/bin/pyright-langserver
+  changed_when: true
+
+- name: Install the clangd language server
+  ansible.builtin.apt:
+    name: clangd
+    state: present
+
+# Plugins from the official marketplace are fetched from GitHub rather than read from a
+# clone on the image, and a headless session never fetches a plugin hosted that way: on a
+# fresh home, `claude -p` starts before the managed marketplace above is registered and
+# skips the plugin as an orphan. Installing them for delphix here leaves the marketplace
+# registered and the plugins cached, so the first session -- the only one an automation VM
+# ever runs -- loads them. With the managed drop-in but an empty ~delphix/.claude/plugins
+# a session loads none of them, exposes no LSP tool at all, and reports no error.
+#
+# jdtls-lsp is not here. It needs a JVM newer than the one the image's javac is on, and on
+# dlpx-app-gate it answers from a stale checked-in Eclipse classpath, so the Java server is
+# separate work.
+- name: Register the official Claude Code plugin marketplace
+  ansible.builtin.command: claude plugin marketplace add anthropics/claude-plugins-official
   environment:
     HOME: "{{ claude_internal_home_dir }}"
   args:
-    creates: "{{ claude_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/superpowers"
+    creates: "{{ claude_internal_home_dir }}/.claude/plugins/marketplaces/claude-plugins-official"
 
-# The install above also writes CLI state that should not ship in an image: .claude.json
+- name: Pre-install the official plugins for the delphix user
+  ansible.builtin.command: claude plugin install {{ item }}@claude-plugins-official
+  environment:
+    HOME: "{{ claude_internal_home_dir }}"
+  args:
+    creates: "{{ claude_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/{{ item }}"
+  loop:
+    - superpowers
+    - pyright-lsp
+    - rust-analyzer-lsp
+    - clangd-lsp
+
+# The installs above also write CLI state that should not ship in an image: .claude.json
 # carries a machineID and userID every clone would share, and settings.json would enable
-# superpowers a second time at user scope, where it would outlive a change to the managed
+# the plugins a second time at user scope, where it would outlive a change to the managed
 # settings. Only ~delphix/.claude/plugins is kept.
-- name: Remove the CLI state left by the superpowers install
+- name: Remove the CLI state left by the plugin installs
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
