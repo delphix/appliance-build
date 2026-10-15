@@ -318,16 +318,26 @@
     HOME: "{{ claude_internal_home_dir }}"
   args:
     creates: "{{ claude_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/{{ item }}"
-  loop:
-    - superpowers
-    - pyright-lsp
-    - rust-analyzer-lsp
-    - clangd-lsp
+  loop: "{{ claude_internal_official_plugins }}"
+
+# The first session on a booted VM silently skips a plugin that is cached but has no
+# user-scope record in installed_plugins.json; see the ordering note on the managed
+# settings task below. The creates: guard above sees only the cache directory, which an
+# interrupted install also leaves, so check the record itself and fail the build without it.
+- name: Check that each official plugin was recorded at user scope
+  ansible.builtin.command: >-
+    jq -e --arg p "{{ item }}@claude-plugins-official"
+    '(.plugins[$p] // []) | any(.scope == "user")'
+    {{ claude_internal_home_dir }}/.claude/plugins/installed_plugins.json
+  changed_when: false
+  loop: "{{ claude_internal_official_plugins }}"
 
 # The installs above also write CLI state that should not ship in an image: .claude.json
 # carries a machineID and userID every clone would share, and settings.json would enable
 # the plugins a second time at user scope, where it would outlive a change to the managed
-# settings. Only ~delphix/.claude/plugins is kept.
+# settings. For clangd-lsp it would not be a second time: settings.json is the only place
+# it is enabled, so removing it is also what keeps clangd-lsp off. Only
+# ~delphix/.claude/plugins is kept.
 - name: Remove the CLI state left by the plugin installs
   ansible.builtin.file:
     path: "{{ item }}"
@@ -360,7 +370,9 @@
 # ~delphix/.claude/plugins/installed_plugins.json, because the plugin is enabled at
 # managed scope while the install records user scope. The image then ships it cached but
 # unrecorded, and the first session on a booted VM -- the only one an automation VM runs
-# -- installs it at managed scope too late to load it, and reports no error.
+# -- installs it at managed scope too late to load it, and reports no error. The role
+# therefore assumes this file is not yet in place when it runs, as on a fresh image
+# build; the record check above fails a run where it was.
 #
 # clangd-lsp is installed above but deliberately absent from enabledPlugins: without
 # a compile_commands.json clangd resolves nothing and pushes false errors into every

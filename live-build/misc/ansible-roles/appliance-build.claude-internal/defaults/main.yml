@@ -159,3 +159,15 @@ claude_internal_repos:
   - { name: dlpx-qa-gate, version: develop }
   - { name: qa-appdata-toolkits, version: main }
   - { name: golden-images, version: master }
+
+#
+# The official-marketplace plugins pre-installed for the delphix user. Installed is not
+# enabled: which of these load is up to enabledPlugins in the managed drop-in, and
+# clangd-lsp is deliberately left out of it. The tasks file both installs this list and
+# checks afterwards that every entry was recorded.
+#
+claude_internal_official_plugins:
+  - superpowers
+  - pyright-lsp
+  - rust-analyzer-lsp
+  - clangd-lsp
