@@ -147,11 +147,33 @@ for package_sbom in "${package_sboms[@]}"; do
 		installed="${match#match:}"
 		tmp=$(mktemp "$image_sbom.XXXXXXXXXX")
 		cp -p "$image_sbom" "$tmp"
+		#
+		# Nesting alone is invisible to Mend, which builds its tree only by
+		# walking "dependencies" from the root. So the owning .deb is also
+		# made to depend on each nested component, and each nested
+		# component gets an entry of its own (the package SBOM's own graph
+		# is a flat placeholder and is not carried over). Edges and entries
+		# left by an earlier merge into the same .deb are dropped first,
+		# so that merging again gives the same document.
+		#
 		jq --arg n "$name" --arg v "$installed" --arg a "$arch" \
 			--slurpfile pkg "$package_sbom" "
-			(.components[]
-			 | select(.name == \$n and .version == \$v and $jq_arch == \$a)
-			 | .components) = \$pkg[0].components" \
+			def owner: select(.name == \$n and .version == \$v
+			                  and $jq_arch == \$a);
+			([.components[] | owner | .\"bom-ref\"] | first) as \$ref
+			| ([.components[] | owner | .components // []
+			    | .[].\"bom-ref\"]) as \$old
+			| [\$pkg[0].components[].\"bom-ref\"] as \$new
+			| (.components[] | owner | .components) = \$pkg[0].components
+			| .dependencies //= []
+			| .dependencies |= (
+				map(select(.ref | IN(\$old[]) | not))
+				| if any(.[]; .ref == \$ref) then . else
+				  . + [{ref: \$ref, dependsOn: []}] end
+				| map(if .ref == \$ref then .dependsOn = (
+					[.dependsOn[] | select(IN(\$old[]) | not)]
+					+ \$new | unique) else . end)
+				| . + [\$new[] | {ref: ., dependsOn: []}])" \
 			"$image_sbom" >"$tmp"
 		mv "$tmp" "$image_sbom"
 		tmp=""

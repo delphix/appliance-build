@@ -71,9 +71,26 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 # Artistic-dist on perl), so carry them as free-text license names instead,
 # which CycloneDX allows. Add to this list if Mend reports another.
 #
+# Mend builds its dependency tree by walking the "dependencies" array from
+# the root, but Syft never gives the root an entry there: it records only the
+# Depends: edges between packages. Every package that nothing else depends on
+# (dash, host-jdks, delphix-entire-aws, ...) is therefore unreachable, and
+# Mend drops it. So make the root depend on each such top-level component,
+# and give any component Syft left out of the array an empty entry of its
+# own. The existing Depends: edges are kept exactly as Syft produced them.
+#
 jq '
 	["SMAIL-GPL", "Artistic-dist"] as $unknown_to_mend
 	| .metadata.component.type = "application"
+	| .dependencies //= []
+	| .metadata.component["bom-ref"] as $root
+	| ([.dependencies[].dependsOn[]?] | unique) as $children
+	| ([.dependencies[].ref] | unique) as $listed
+	| [.components[]["bom-ref"]] as $top
+	| .dependencies = [.dependencies[] | select(.ref != $root)]
+		+ [{ref: $root, dependsOn:
+			[$top[] | select(IN($children[]) | not)]}]
+		+ [$top[] | select(IN($listed[]) | not) | {ref: ., dependsOn: []}]
 	| .components |= map(
 		if .licenses then
 			.licenses |= map(
