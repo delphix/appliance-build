@@ -16,6 +16,14 @@
 #
 UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
 
+#
+# Records that the image's payload has been extracted into the unpack
+# directory, which is the one thing a later run cannot tell from the
+# directory's contents. It is written before payload.tar.gz is removed and
+# deleted once the image is in place.
+#
+EXTRACTED_MARKER=.payload-extracted
+
 function die() {
 	exit_code=$1
 	# Use first argument as exit code, if provided.
@@ -76,12 +84,20 @@ UNPACK_DIR="$1"
 trap cleanup EXIT
 pushd "$UNPACK_DIR" &>/dev/null || die "'pushd $UNPACK_DIR' failed"
 
-for file in payload.tar.gz version.info; do
-	[[ -f "$file" ]] || die 15 "image is corrupt; missing '$file' file"
-done
+[[ -f version.info ]] || die 15 "image is corrupt; missing 'version.info' file"
 
-tar -xzf payload.tar.gz || die 14 "failed to extract payload.tar.gz"
-rm payload.tar.gz || die "failed to remove payload.tar.gz"
+#
+# A run that is interrupted between the extraction and the move below
+# leaves an unpack directory with no payload in it. That directory is
+# resumable, not corrupt, so take it as it is and carry on from here.
+#
+if [[ -f payload.tar.gz ]]; then
+	tar -xzf payload.tar.gz || die 14 "failed to extract payload.tar.gz"
+	touch "$EXTRACTED_MARKER" || die "failed to create '$EXTRACTED_MARKER' file"
+	rm payload.tar.gz || die "failed to remove payload.tar.gz"
+elif [[ ! -f "$EXTRACTED_MARKER" ]]; then
+	die 15 "image is corrupt; missing 'payload.tar.gz' file"
+fi
 
 #
 # We need to be careful when sourcing this file, since it can conflict
@@ -120,6 +136,9 @@ $opt_f && rm -rf "${UPDATE_DIR:?}/$VERSION" >/dev/null 2>&1
 
 mv "$UNPACK_DIR" "$UPDATE_DIR/$VERSION" ||
 	die "failed to move unpacked upgrade image to $UPDATE_DIR/$VERSION"
+
+rm -f "$UPDATE_DIR/$VERSION/$EXTRACTED_MARKER" ||
+	die "failed to remove '$EXTRACTED_MARKER' file"
 
 rm -f "$UPDATE_DIR/latest" || die "failed to remove 'latest' symlink"
 ln -s "$VERSION" "$UPDATE_DIR/latest" || die "failed to create 'latest' symlink"
