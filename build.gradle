@@ -87,6 +87,7 @@ def shellScripts = fileTree("scripts").include({ details ->
                    }) +
                    fileTree("upgrade", {
                        include "prepare"
+                       include "tests/*.sh"
                    }) +
                    fileTree("upgrade/upgrade-scripts", {
                        exclude "README.md"
