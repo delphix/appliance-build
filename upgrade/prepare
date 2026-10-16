@@ -16,6 +16,14 @@
 #
 UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
 
+#
+# Records that the image's payload has been extracted into the unpack
+# directory, which is the one thing a later run cannot tell from the
+# directory's contents. It stays with the image so that a later run reads
+# it there too.
+#
+EXTRACTED_MARKER=.payload-extracted
+
 function die() {
 	exit_code=$1
 	# Use first argument as exit code, if provided.
@@ -40,6 +48,12 @@ function report_progress_inc() {
 
 # shellcheck disable=SC2317
 function cleanup() {
+	#
+	# An extracted payload makes this directory the only copy of the image:
+	# unpack-image deletes the uploaded one before calling this script.
+	# Leave it for a later run to finish rather than reclaiming its space.
+	#
+	[[ -f "$UNPACK_DIR/$EXTRACTED_MARKER" ]] && return
 	[[ -d "$UNPACK_DIR" ]] && rm -rf "$UNPACK_DIR"
 }
 
@@ -76,12 +90,20 @@ UNPACK_DIR="$1"
 trap cleanup EXIT
 pushd "$UNPACK_DIR" &>/dev/null || die "'pushd $UNPACK_DIR' failed"
 
-for file in payload.tar.gz version.info; do
-	[[ -f "$file" ]] || die 15 "image is corrupt; missing '$file' file"
-done
+[[ -f version.info ]] || die 15 "image is corrupt; missing 'version.info' file"
 
-tar -xzf payload.tar.gz || die 14 "failed to extract payload.tar.gz"
-rm payload.tar.gz || die "failed to remove payload.tar.gz"
+#
+# A run that is interrupted between the extraction and the move below
+# leaves an unpack directory with no payload in it. That directory is
+# resumable, not corrupt, so take it as it is and carry on from here.
+#
+if [[ -f payload.tar.gz ]]; then
+	tar -xzf payload.tar.gz || die 14 "failed to extract payload.tar.gz"
+	touch "$EXTRACTED_MARKER" || die "failed to create '$EXTRACTED_MARKER' file"
+	rm payload.tar.gz || die "failed to remove payload.tar.gz"
+elif [[ ! -f "$EXTRACTED_MARKER" ]]; then
+	die 15 "image is corrupt; missing 'payload.tar.gz' file"
+fi
 
 #
 # We need to be careful when sourcing this file, since it can conflict
