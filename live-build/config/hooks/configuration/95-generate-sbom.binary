@@ -79,18 +79,44 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 # and give any component Syft left out of the array an empty entry of its
 # own. The existing Depends: edges are kept exactly as Syft produced them.
 #
+# That still misses packages that depend on each other in a closed loop with
+# nothing outside depending on them: in internal-dev, ldap-auth-client,
+# libpam-ldap, ldap-auth-config and libnss-ldap each have a parent, but only
+# within that loop. So walk the graph from the root and, while some component
+# is still unreachable, make the root depend on the first such one; one edge
+# per loop is enough to bring the whole loop in.
+#
 jq '
+	def reachable($g; $from):
+		{seen: {($from): true}, todo: [$from]}
+		| until(.todo == [];
+			.seen as $s
+			| ([.todo[] | $g[.][]?] | unique
+			   | map(select($s[.] | not))) as $new
+			| .seen += (reduce $new[] as $n ({}; .[$n] = true))
+			| .todo = $new)
+		| .seen;
 	["SMAIL-GPL", "Artistic-dist"] as $unknown_to_mend
 	| .metadata.component.type = "application"
 	| .dependencies //= []
 	| .metadata.component["bom-ref"] as $root
-	| ([.dependencies[].dependsOn[]?] | unique) as $children
+	| ([.dependencies[] | select(.ref != $root) | .dependsOn[]?]
+	   | unique) as $children
 	| ([.dependencies[].ref] | unique) as $listed
 	| [.components[]["bom-ref"]] as $top
 	| .dependencies = [.dependencies[] | select(.ref != $root)]
 		+ [{ref: $root, dependsOn:
 			[$top[] | select(IN($children[]) | not)]}]
 		+ [$top[] | select(IN($listed[]) | not) | {ref: ., dependsOn: []}]
+	| def unreached:
+		(reduce .dependencies[] as $e ({}; .[$e.ref] = $e.dependsOn))
+			as $g
+		| reachable($g; $root) as $s
+		| [$top[] | select($s[.] | not)] | first;
+	  until(unreached == null;
+		unreached as $c
+		| .dependencies |= map(if .ref == $root
+			then .dependsOn += [$c] else . end))
 	| .components |= map(
 		if .licenses then
 			.licenses |= map(
