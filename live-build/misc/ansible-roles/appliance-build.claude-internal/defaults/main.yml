@@ -45,6 +45,8 @@ claude_internal_src_dir: "{{ claude_internal_home_dir }}/src"
 #            carries the repository's actual default branch
 #   org      GitHub organization, defaulting to "delphix"
 #   depth    when set, clone shallow to this many commits (see the kernels below)
+#   single_branch
+#            when true, clone only the branch in version (see the dashboard below)
 #
 claude_internal_repos:
   #
@@ -141,6 +143,14 @@ claude_internal_repos:
   - { name: dlpx-claude-plugins, version: main }
   - { name: platform-team-claude-plugins, version: main }
   - { name: cd-aidlc, version: main }
+
+  #
+  # The dashboard over the claude-automation Jenkins jobs, whose publisher job is in
+  # devops-gate above. Cloned single-branch because nearly all of its 176MB is the
+  # gh-pages branch the publisher commits to on every run; main, the source, is under
+  # 1MB.
+  #
+  - { name: dlpx-claude-automation-dashboard, version: main, single_branch: true }
 
   #
   # The team knowledge graph. Not tooling but the corpus the tooling reads: the kg plugin's
