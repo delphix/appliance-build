@@ -100,7 +100,9 @@
   until: dlpx_app_gate_clone is not failed
   retries: 3
   delay: 30
-  when: lookup('env', 'GITHUB_TOKEN') != ''
+  when:
+    - lookup('env', 'GITHUB_TOKEN') != ''
+    - not (skip_home_source_clones | default(false))
 
 - file:
     path: "/home/delphix/{{ item }}"
@@ -111,6 +113,7 @@
     recurse: yes
   with_items:
     - dlpx-app-gate
+  when: not (skip_home_source_clones | default(false))
 
 - authorized_key:
     user: delphix
