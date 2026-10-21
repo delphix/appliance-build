@@ -133,6 +133,28 @@
     dest: /usr/local/bin/dc
     state: link
 
+# The GitHub CLI, which the skills use for every PR and API call. It comes from GitHub's
+# own apt repository, not the Ubuntu mirror's older gh, and like the Claude CLI above it
+# takes the latest release at build time.
+- name: Install the GitHub CLI apt signing key
+  ansible.builtin.get_url:
+    url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    dest: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+    mode: "0644"
+
+- name: Add the GitHub CLI apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/github-cli.list
+    mode: "0644"
+    content: |
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main
+
+- name: Install the GitHub CLI
+  ansible.builtin.apt:
+    name: gh
+    update_cache: true
+    state: present
+
 - name: Create ~delphix/src directory
   ansible.builtin.file:
     path: "{{ claude_internal_src_dir }}"
@@ -263,7 +285,8 @@
       ## Tools
       - dc (DCenter CLI) runs locally. Interactively, run dc login once; in automation,
         export DLPX_DEFAULT_CREDENTIALS=true to use the AWS credential chain.
-      - gh is installed; git-utils/bin is on PATH for login shells.
+      - gh is installed; interactively, run gh auth login once. git-utils/bin is on PATH
+        for login shells.
 
       ## Git and PRs
       - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push. Do
