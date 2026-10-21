@@ -87,10 +87,13 @@ def shellScripts = fileTree("scripts").include({ details ->
                    }) +
                    fileTree("upgrade", {
                        include "prepare"
+                       include "tests/*.sh"
                    }) +
                    fileTree("upgrade/upgrade-scripts", {
                        exclude "README.md"
                        exclude "rootfs-cleanup"
+                       exclude "**/*.py"
+                       exclude "tests/rootfs-cleanup-stubs/**"
                    })
 
 task shfmt(type: Exec) {

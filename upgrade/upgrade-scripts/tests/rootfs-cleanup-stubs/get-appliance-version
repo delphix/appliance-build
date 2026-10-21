@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+#
+# A stand-in for get-appliance-version, used by test-rootfs-cleanup.py.
+#
+import json
+import os
+
+with open(os.environ["STUB_INVENTORY"]) as f:
+    print(json.load(f)["current"])
