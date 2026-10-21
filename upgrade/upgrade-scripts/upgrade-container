@@ -22,16 +22,6 @@ IMAGE_PATH=$(get_image_path)
 
 CONTAINER=
 
-TMP_DATASETS_EXIST=false
-
-# Verify whether both /tmp and /var/tmp ZFS datasets exist for the specified container.
-# If both datasets are present, the system is considered CIS compliant.
-# In such cases, handle the /tmp and /var/tmp mounts appropriately during the upgrade process.
-# To ensure this handling, set the TMP_DATASETS_EXIST variable to true.
-if zfs list "rpool/ROOT/$CONTAINER/tmp" >/dev/null 2>&1 && zfs list "rpool/ROOT/$CONTAINER/vartmp" >/dev/null 2>&1; then
-	TMP_DATASETS_EXIST=true
-fi
-
 function create_cleanup() {
 	#
 	# Upon successful creation of the container, don't perform any
@@ -191,7 +181,19 @@ function create_upgrade_container() {
 		"rpool/ROOT/$CONTAINER/log" ||
 		die "failed to create upgrade /var/log clone"
 
-	if $TMP_DATASETS_EXIST; then
+	#
+	# An engine that is CIS compliant keeps /tmp and /var/tmp as separate
+	# ZFS filesystems. The container's own are clones of the boot
+	# environment's, so this container gets them when the snapshot it is
+	# cloned from holds them.
+	#
+	local tmp_datasets_exist=false
+	if zfs list "$ROOTFS_DATASET/tmp@$SNAPSHOT_NAME" >/dev/null 2>&1 &&
+		zfs list "$ROOTFS_DATASET/vartmp@$SNAPSHOT_NAME" >/dev/null 2>&1; then
+		tmp_datasets_exist=true
+	fi
+
+	if $tmp_datasets_exist; then
 		zfs clone \
 			-o mountpoint=legacy \
 			"$ROOTFS_DATASET/tmp@$SNAPSHOT_NAME" \
@@ -219,7 +221,7 @@ function create_upgrade_container() {
 		rpool/crashdump            /var/crash   zfs defaults,x-systemd.before=zfs-import-cache.service,x-systemd.before=kdump-tools.service 0 0
 	EOF
 
-	if $TMP_DATASETS_EXIST; then
+	if $tmp_datasets_exist; then
 		cat <<-EOF >>"$DIRECTORY/etc/fstab"
 			         rpool/ROOT/$CONTAINER/tmp  /tmp         zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
 			         rpool/ROOT/$CONTAINER/vartmp  /var/tmp  zfs defaults,nosuid,nodev,exec,x-systemd.before=zfs-import-cache.service 0 0
@@ -424,6 +426,10 @@ function create_upgrade_container() {
 }
 
 function start() {
+	#
+	# The tmp and vartmp datasets are not required here: a container has
+	# them only when the boot environment it was cloned from does.
+	#
 	if [[ ! -d "/var/lib/machines/$CONTAINER" ]] ||
 		[[ ! -f "/etc/systemd/nspawn/$CONTAINER.nspawn" ]] ||
 		[[ ! -d "/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d" ]] ||
@@ -431,11 +437,7 @@ function start() {
 		! zfs list "rpool/ROOT/$CONTAINER/root" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/home" &>/dev/null ||
 		! zfs list "rpool/ROOT/$CONTAINER/data" &>/dev/null ||
-		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null ||
-		($TMP_DATASETS_EXIST && {
-			! zfs list "rpool/ROOT/$CONTAINER/tmp" &>/dev/null ||
-				! zfs list "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
-		}); then
+		! zfs list "rpool/ROOT/$CONTAINER/log" &>/dev/null; then
 		die "container '$CONTAINER' non-existent or mis-configured"
 	fi
 
@@ -555,10 +557,8 @@ function destroy() {
 		umount "rpool/ROOT/$CONTAINER/log" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/data" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/home" &>/dev/null
-		if $TMP_DATASETS_EXIST; then
-			umount "rpool/ROOT/$CONTAINER/tmp" &>/dev/null
-			umount "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
-		fi
+		umount "rpool/ROOT/$CONTAINER/tmp" &>/dev/null
+		umount "rpool/ROOT/$CONTAINER/vartmp" &>/dev/null
 		umount "rpool/ROOT/$CONTAINER/root" &>/dev/null
 
 		zfs destroy -r "rpool/ROOT/$CONTAINER" ||
