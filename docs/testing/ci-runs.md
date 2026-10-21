@@ -28,6 +28,15 @@ other repos, before a PR exists (or independent of one):
   [hotfix plugin](https://github.com/delphix/platform-team-claude-plugins/tree/main/plugins/hotfix)
   for how that works.
 
+## A check inside the build itself
+
+Every image build runs
+[`live-build/config/hooks/configuration/96-check-no-baked-credentials.binary`](../../live-build/config/hooks/configuration/96-check-no-baked-credentials.binary)
+last, for every variant and run type, and fails the build if the image's `/etc/environment`
+carries an AWS credential. A build that stops with `error: this image ships an AWS credential in
+/etc/environment` is this check: find what wrote the variable it names and stop it writing one,
+rather than relaxing the check.
+
 ## Pass/fail signal
 
 The automatic check reports as the `jenkinsci/appliance-build-orchestrator` GitHub status check
