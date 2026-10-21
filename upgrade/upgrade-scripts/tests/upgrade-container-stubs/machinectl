@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+#
+# A stand-in for machinectl(1), used by test-upgrade-container-teardown.py.
+#
+# Which containers are running, and whether terminating one works, come
+# from the JSON state named by $STUB_STATE. "terminate_succeeds: false"
+# models the failure the ticket is about: stop() exits non-zero, either
+# because the terminate itself failed or because its 600-second poll
+# expired, and the container is still up afterwards.
+#
+import json
+import os
+import sys
+
+
+def main():
+    argv = sys.argv[1:]
+
+    with open(os.environ["STUB_TRACE"], "a") as f:
+        f.write("machinectl " + " ".join(argv) + "\n")
+
+    with open(os.environ["STUB_STATE"]) as f:
+        state = json.load(f)
+
+    if argv[:1] == ["list"]:
+        for machine in state["running"]:
+            print("{} container systemd-nspawn ubuntu 24.04 -".format(machine))
+        return
+
+    verb, machine = argv[0], argv[1]
+
+    if verb == "status":
+        if machine not in state["running"]:
+            sys.exit("Could not get machine: No such file or directory")
+        print("{}\n\t   Since: now".format(machine))
+        return
+
+    if verb == "start":
+        if machine not in state["running"]:
+            state["running"].append(machine)
+    elif verb == "terminate":
+        if machine not in state["running"]:
+            sys.exit("Could not kill machine: No such file or directory")
+        if not state["terminate_succeeds"]:
+            sys.exit("Failed to terminate machine: Connection timed out")
+        state["running"].remove(machine)
+    else:
+        sys.exit("stub machinectl: unhandled verb: '{}'".format(verb))
+
+    with open(os.environ["STUB_STATE"], "w") as f:
+        json.dump(state, f)
+
+
+main()

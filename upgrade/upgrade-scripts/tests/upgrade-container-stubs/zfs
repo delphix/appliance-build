@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+#
+# A stand-in for zfs(8), used by test-upgrade-container-teardown.py.
+#
+# It answers the invocations "upgrade-container destroy" and
+# "upgrade-container cleanup" make, out of the JSON state named by
+# $STUB_STATE, and appends every invocation to $STUB_TRACE.
+#
+# The one behaviour the tests actually rest on is that a recursive destroy
+# of a running container's dataset fails, because its "root" child is
+# mounted under /var/lib/machines. That is what an engine does, and it is
+# the failure the ticket's teardown walks into. Nothing else here is a
+# claim about ZFS semantics.
+#
+import json
+import os
+import sys
+
+
+def load():
+    with open(os.environ["STUB_STATE"]) as f:
+        return json.load(f)
+
+
+def save(state):
+    with open(os.environ["STUB_STATE"], "w") as f:
+        json.dump(state, f)
+
+
+def subtree(state, dataset):
+    return [d for d in state["datasets"]
+            if d == dataset or d.startswith(dataset + "/")]
+
+
+def main():
+    argv = sys.argv[1:]
+
+    with open(os.environ["STUB_TRACE"], "a") as f:
+        f.write("zfs " + " ".join(argv) + "\n")
+
+    state = load()
+    target = argv[-1]
+
+    if argv[:1] == ["list"]:
+        #
+        # get_mounted_rootfs_container_dataset() takes the dirname of the
+        # dataset mounted at "/", which on an engine is the running boot
+        # environment's "root" child.
+        #
+        if target == "/":
+            print(state["rootfs_dataset"] + "/root")
+            return
+        if target in state["datasets"] or target in state["snapshots"]:
+            print(target)
+            return
+        sys.exit("cannot open '{}': dataset does not exist".format(target))
+
+    if argv[:1] == ["destroy"]:
+        if "@" in target:
+            dataset, snapshot = target.split("@", 1)
+            doomed = ["{}@{}".format(d, snapshot) for d in subtree(state, dataset)]
+            state["snapshots"] = [s for s in state["snapshots"] if s not in doomed]
+            save(state)
+            return
+
+        #
+        # The container's "root" dataset is mounted at
+        # /var/lib/machines/<container> while the container runs, so a
+        # recursive destroy of the container cannot complete.
+        #
+        if os.path.basename(target) in state["running"]:
+            sys.exit("cannot destroy '{}/root': dataset is busy".format(target))
+
+        doomed = subtree(state, target)
+        state["datasets"] = [d for d in state["datasets"] if d not in doomed]
+        state["snapshots"] = [s for s in state["snapshots"]
+                              if s.split("@")[0] not in doomed]
+        save(state)
+        return
+
+    sys.exit("stub zfs: unhandled invocation: {}".format(" ".join(argv)))
+
+
+main()
