@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+# A stand-in for ethtool, used by test-upgrade-container-teardown.py. The
+# teardown path calls it, but nothing the tests assert on depends on what
+# it does, so it only records the call.
+#
+echo "ethtool $*" >>"$STUB_TRACE"
+exit 0

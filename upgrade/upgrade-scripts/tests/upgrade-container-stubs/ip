@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+# A stand-in for ip(8), used by test-upgrade-container-teardown.py. stop()
+# walks the host's interfaces to re-enable LRO; the sandbox has none to
+# walk, so the loop body never runs.
+#
+echo "ip $*" >>"$STUB_TRACE"
+exit 0
