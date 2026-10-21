@@ -50,6 +50,11 @@ npm gap (CP-13467); DCT/Hyperscale producer-side SBOM generation.
 hook scans a directory. This change sets it to `application` — see §6a for where, and why
 it has to be done on the image side rather than relying on the package SBOMs.
 
+**Also in scope: connecting the dependency graph to the root.** Mend builds its tree only
+by walking `dependencies` from the root, and Syft gives the root no entry there. This
+change makes every component reachable from the root (§6b), and makes each owning `.deb`
+depend on the components nested under it (§6).
+
 ## 2. Why `cyclonedx-cli merge` is not the mechanism
 
 The earlier draft specified `cyclonedx-cli merge`. That was never verified, and testing
@@ -195,14 +200,19 @@ For each file in `live-build/build/sboms/`:
    own variants).
 3. Load the package SBOM. Nest its `components` array under the matched component's own
    `components` key.
-4. After all files: re-validate with `cyclonedx-cli validate --input-version v1_6
+4. Make the matched component depend on each nested component, and give each nested
+   component an empty `dependencies` entry of its own. The package SBOM's own graph is not
+   carried over: Phase 2 replaces it with a flat placeholder (root → every component), which
+   adds nothing beyond these edges.
+5. After all files: re-validate with `cyclonedx-cli validate --input-version v1_6
    --fail-on-errors`.
 
-Nesting — rather than appending flat and expressing ownership via `dependencies` edges —
-because it is what the top-level design specifies ("each 1st-party deb is a `deb` component
-with its bundled third-party components as **nested `components[]`**"), it is
-self-describing without a second structure to consult, and it leaves the image BOM's own
-dependency graph untouched (§8).
+Nesting — rather than appending flat — because it is what the top-level design specifies
+("each 1st-party deb is a `deb` component with its bundled third-party components as
+**nested `components[]`**"), and it is self-describing: a consumer that honours nesting
+sees the ownership without consulting a second structure. The `dependencies` edges of step
+4 carry the same ownership for consumers that only read the graph, which Mend does (see
+below). Both are needed; neither replaces the other.
 
 The merge does **not** sanitize the components it nests. They come from Phase 2's output,
 which is already de-duplicated, stripped of path-bearing properties, and reduced to
@@ -215,13 +225,21 @@ principle break that. It does not: Syft appends a content- and location-derived
 Verified on three real package SBOMs — `virtualization` (421), `delphix-sso-app` (86) and
 `windows-connector` (34) — giving 541 distinct refs and zero collisions.
 
-**Nested components are not referenced from `dependencies`, deliberately.** The image
-graph describes `.deb`-to-`.deb` relationships; nesting adds refs it knows nothing about,
-and in a test merge 0 of 421 nested components appeared in it. That is the intended shape —
-ownership is carried by the nesting — but whether a given consumer honours nesting has to be
-measured per consumer (§9, §10). Grype does: the unmerged `internal-qa-aws` image SBOM gives
-36,170 matches, the merged one 36,212, and the 42 extra are exactly the package SBOM's own
-standalone match count.
+**Nested components are also referenced from `dependencies`.** An earlier draft of this
+design left them out, so that nesting alone carried ownership. Consumers differ on whether
+that is enough, so it was measured per consumer:
+
+- Grype honours nesting: the unmerged `internal-qa-aws` image SBOM gives 36,170 matches,
+  the merged one 36,212, and the 42 extra are exactly the package SBOM's own standalone
+  match count.
+- Mend does not. Its CycloneDX importer builds the project tree from `dependencies`,
+  starting at the root, and its documentation does not describe nested components. When a
+  merged document was imported, none of `delphix-virtualization`'s nested components
+  appeared. Hence step 4.
+
+The merge is still idempotent with the edges: before adding a component's new edges and
+entries, it drops the ones an earlier merge into the same `.deb` left behind, so merging
+again gives the same document.
 
 ### Error handling
 
@@ -264,6 +282,38 @@ observed a failure attributable to `file`: scans of a `file`-rooted and an
 change follows Mend's stated requirement for consistency with Phase 2, and is pending their
 confirmation of what the type actually affects (§9).
 
+### 6b. Connecting the graph to the root
+
+Also in the Phase 1 hook, after the root is retyped: make every component reachable by
+walking `dependencies` from the root.
+
+**Why.** Mend builds its project tree only by walking `dependencies` from the root
+(`metadata.component`). Syft gives the root no entry there; it records only the `Depends:`
+edges between installed packages. So every package that nothing else depends on is
+unreachable, and Mend drops it. Mend's support team reported exactly this on an imported
+image SBOM: the root's `bom-ref` had no `dependencies` entry, 16 components were not a child
+of any other (`delphix-entire-aws`, `host-jdks`, …), and some components, such as
+`ncurses-base`, had no entry at all.
+
+**What the hook adds**, keeping every edge Syft produced:
+
+1. A `dependencies` entry for the root, depending on every top-level component that no
+   other component depends on.
+2. An empty entry for every component Syft left out of the array.
+3. For packages that depend on each other in a closed loop, with nothing outside the loop
+   depending on any of them, step 1 is not enough: each has a parent, but only inside the
+   loop. `internal-dev` has one: `ldap-auth-client`, `libpam-ldap`, `ldap-auth-config` and
+   `libnss-ldap`. So the hook walks the graph from the root and, while any component is still
+   unreachable, makes the root depend on the first such one. One edge per loop brings the
+   whole loop in.
+
+When the hook works out which components already have a parent, it ignores the root's own
+entry, so running it on its own output changes nothing.
+
+**Why in the hook and not in the merge.** The same reason as §6a: it has to hold for every
+image, including one with nothing to merge. The merge then only adds the owning `.deb` →
+nested edges (§6), and those are reachable because the owning `.deb` already is.
+
 ## 7. Where it runs
 
 In `scripts/run-live-build.sh`, after `lb build` succeeds and before the existing
@@ -301,19 +351,22 @@ filename, and a non-empty `extra` rejects a malformed one. `jq --slurpfile` does
 The script takes the image BOM path and the SBOM directory as arguments, so it runs
 standalone against artifacts on disk without a build. It is also idempotent: a second run
 over an already-merged document produces byte-identical output, since nesting replaces a
-component's `components` rather than appending to it.
+component's `components` rather than appending to it, and the matching `dependencies`
+edges and entries from the earlier run are dropped before the new ones are added (§6).
 
 No `devops-gate` change is required: Phase 3 produces the same filename at the same path,
 and `appliance_build_stage0.groovy` already fetches and archives `*.cdx.json`.
 
 ## 8. What this must not change
 
-**The image BOM's `dependencies` graph.** It is real and complete — 606 entries, 2,488
-edges, zero dangling refs, 100% component coverage — derived from Debian `Depends:` fields
+**The `Depends:` edges in the image BOM's `dependencies` graph.** They are real — 606
+entries, 2,488 edges, zero dangling refs, derived from Debian `Depends:` fields
 (`delphix-platform-aws` → 98 packages, `postgresql-14` → 23). Phase 2 rebuilt *its*
 dependency graph because Syft's version there covered 30% of components and held 90
-dangling refs; that reasoning does not transfer. Nesting components changes no `bom-ref`,
-so the graph stays valid untouched.
+dangling refs; that reasoning does not transfer. So the graph is only *added to*, never
+rebuilt: the root's entry and the entries for components Syft left out (§6b), and the
+owning `.deb` → nested edges (§6). Every edge Syft produced between two installed packages
+stays exactly as it was, and nesting changes no `bom-ref`.
 
 **The 685 top-level entries.** Components are nested, not appended. A consumer that ignores
 nesting sees exactly the document it sees today.
@@ -330,6 +383,7 @@ against each of the others before deciding:
   product-internal path. Phase 2's leak was product internals such as
   `resources.war:WEB-INF/lib/ST4-4.3.4.jar`; this is standard Debian metadata.
 - *Rebuilding `dependencies`* — covered above; doing it here would destroy 2,488 real edges.
+  Only the additions of §6 and §6b are made.
 
 Porting the Phase 2 filter wholesale would look consistent and make this document worse.
 
@@ -347,11 +401,11 @@ Porting the Phase 2 filter wholesale would look consistent and make this documen
   no effect, the rewrite can be dropped from both this hook and Phase 2's filter, so that
   both publish Syft's output unmodified. Originally filed separately as DLPX-99414, now
   delivered here.
-- **How Mend treats nested components.** Grype ingests them (§6). Mend has not been tested,
-  and its support team described its rule for components with no declared relationship as
-  "treated as a direct dependency of the root". If that applies to nested components, Mend
-  would flatten every nested jar to the root and lose the attribution this phase exists to
-  create. Needs a Mend scan of a merged document before this phase is called done.
+- **Mend re-import of a document with the connected graph.** Mend did not show nested
+  components from nesting alone (§6), and did not reach components the root's graph left
+  out (§6b). Both are now addressed, but this phase is not done until a merged document
+  from a build with both fixes has been imported into Mend and `delphix-virtualization`'s
+  nested components appear under it.
 - **Package SBOMs for `.deb`s not in `COMPONENTS`.** DCT and Hyperscale are downloaded by
   `download_dct_artifacts()` / `download_hyperscale_artifacts()` into the same work
   directory, so their SBOMs would be persisted and matched by the same filename rule *if
@@ -364,8 +418,12 @@ Porting the Phase 2 filter wholesale would look consistent and make this documen
   owning `pkg:deb` entry gains nested components and the document still validates.
 - A variant installing none of the flagged packages; confirm the output is identical to the
   Phase 1 document.
-- `dependencies` still reports 606 entries / 2,488 edges / 0 dangling / 100% coverage —
-  i.e. demonstrably untouched.
+- Every edge Syft produced between installed packages is unchanged, and every component,
+  nested or not, is reachable from the root by walking `dependencies`, with no dangling
+  refs and no duplicate entries. On the pre-push build of this change: `external-standard`
+  2,071/2,071, `internal-qa` 2,157/2,157 and `internal-dev` 2,294/2,294 reachable, and
+  `delphix-virtualization` depends on all 415 components nested under it, alongside its
+  36 `Depends:` edges.
 - **Each scanner ingests the nested components** — measured, not inferred from the document
   validating. Validation passing is not evidence of content: Phase 2 shipped schema-valid
   SBOMs that contained one component for a 1.2 GB application before anyone read the
@@ -373,7 +431,7 @@ Porting the Phase 2 filter wholesale would look consistent and make this documen
   image SBOM; the difference should equal the nested packages' own standalone match counts.
   - Grype: done in testing — 36,170 → 36,212 matches, a delta of 42 equal to the package
     SBOM's standalone count.
-  - Mend: not yet done (§9). Worth noting Mend and Grype were shown during Phase 2 to find
+  - Mend: re-import pending (§9). Worth noting Mend and Grype were shown during Phase 2 to find
     disjoint vulnerability sets, and Mend skips `type: application` components entirely, so
     Grype's result says nothing about Mend's.
 - The image SBOM's root is `application`, including on a variant where nothing is merged.
