@@ -69,7 +69,11 @@ def main() -> None:
         "snapshot"
     ]).decode("UTF-8").splitlines()
 
-    for snap in snapshots:
+    #
+    # The loop removes from "snapshots", so it must iterate over a copy;
+    # iterating the list itself would skip the entry after each removal.
+    #
+    for snap in list(snapshots):
         name = snap.split("@")[1]
 
         #

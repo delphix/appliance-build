@@ -83,3 +83,28 @@ Automated equivalent:
 
 - The harness always performs real create/start/destroy operations for its test containers.
 - The script includes best-effort exit cleanup for containers it creates.
+
+## `rootfs-cleanup`'s snapshot filter
+
+Use:
+
+- `./test-rootfs-cleanup.py`
+
+### Prerequisites
+
+`python3`, and `dpkg`, which `rootfs-cleanup` uses to compare versions. The
+test runs `rootfs-cleanup` itself with stand-ins for `zfs`,
+`get-appliance-version` and `rootfs-container` on `PATH`
+(`rootfs-cleanup-stubs/`), over an inventory it supplies, so it needs no
+appliance, no pool and no `root`.
+
+### What the harness verifies
+
+- No `container-delphix` snapshot reaches the deletion-candidate list, on a
+  boot environment carrying eleven of them.
+- An unrecognised snapshot name aborts the script, wherever it sits in the
+  list relative to a `container-delphix` snapshot.
+
+### Expected output
+
+Standard `unittest` output, ending in `OK`.
