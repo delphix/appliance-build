@@ -40,9 +40,6 @@ live-build/misc/ansible-roles/appliance-build.minimal-common/tasks/main.yml name
 live-build/misc/ansible-roles/appliance-build.minimal-common/tasks/main.yml no-changed-when
 live-build/misc/ansible-roles/appliance-build.minimal-common/tasks/main.yml yaml[octal-values]
 live-build/misc/ansible-roles/appliance-build.minimal-common/tasks/main.yml yaml[truthy]
-live-build/misc/ansible-roles/appliance-build.minimal-development/tasks/main.yml fqcn[action-core]
-live-build/misc/ansible-roles/appliance-build.minimal-development/tasks/main.yml name[missing]
-live-build/misc/ansible-roles/appliance-build.minimal-development/tasks/main.yml yaml[octal-values]
 live-build/misc/ansible-roles/appliance-build.minimal-internal/tasks/main.yml fqcn[action-core]
 live-build/misc/ansible-roles/appliance-build.minimal-internal/tasks/main.yml name[missing]
 live-build/misc/ansible-roles/appliance-build.minimal-internal/tasks/main.yml yaml[octal-values]
