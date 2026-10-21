@@ -9,6 +9,9 @@ machine images containing the Delphix Dynamic Data Platform, that are
 capable of running in cloud and non-cloud hypervisors alike (e.g. Amazon
 EC2, Microsoft Azure, VMware, OpenStack).
 
+For how to test and deploy a change to this repo — local checks, the CI that runs, and building
+and booting an image — see [`docs/testing/`](docs/testing/README.md).
+
 ## Quickstart (for the impatient)
 
 Run this command on "dlpxdc.co" to create the VM used to do the build:
