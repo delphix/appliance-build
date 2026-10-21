@@ -24,8 +24,15 @@
 # installed .deb as a flat pkg:deb component. linux-pkg publishes, beside each
 # .deb of a package that bundles third-party code, an SBOM describing what is
 # inside that .deb, named <deb-filename>.deb.cdx.json. For each of those whose
-# .deb is installed in this image, this nests its components under the owning
-# pkg:deb component. Every other component is left exactly as it was.
+# .deb is installed in this image, this adds its components to the image SBOM
+# and makes the owning pkg:deb component depend on each of them. Every other
+# component is left exactly as it was.
+#
+# The components are added to the top-level "components" array rather than
+# nested under the owning component, and ownership is carried only by the
+# "dependencies" edges. CycloneDX allows either, but Mend's importer reads only
+# the top-level array: an image SBOM with 1,472 nested components imported as
+# its 599 top-level ones alone.
 #
 # The match is made on the SBOM's *filename*, not on its contents: the SBOM's
 # metadata.component.name is the linux-pkg package name ("virtualization"),
@@ -44,10 +51,10 @@
 #
 # Missing data degrades gracefully; corrupt data fails. An SBOM whose .deb is
 # not installed (normal for variant-specific packages) is skipped, an
-# installed .deb with no SBOM stays flat, an SBOM with no components is
-# skipped rather than nesting an empty list, and a version mismatch is
-# reported but not merged. An SBOM that is not valid JSON fails the script,
-# since the result would ship to customers. See
+# installed .deb with no SBOM gets no components of its own, an SBOM with no
+# components is skipped, and a version mismatch is reported but not merged.
+# An SBOM that is not valid JSON fails the script, since the result would
+# ship to customers. See
 # docs/specs/2026-10-01-sbom-image-merge-design.md.
 #
 
@@ -115,7 +122,7 @@ for package_sbom in "${package_sboms[@]}"; do
 		die "Package SBOM '$package_sbom' is not valid JSON."
 
 	# Many .debs of a package carry none of its bundled content (most zfs
-	# .debs, for instance); nesting an empty list under them adds nothing.
+	# .debs, for instance); there is nothing to add for them.
 	count=$(jq '.components // [] | length' "$package_sbom")
 	if [[ "$count" -eq 0 ]]; then
 		empty=$((empty + 1))
@@ -148,30 +155,32 @@ for package_sbom in "${package_sboms[@]}"; do
 		tmp=$(mktemp "$image_sbom.XXXXXXXXXX")
 		cp -p "$image_sbom" "$tmp"
 		#
-		# Nesting alone is invisible to Mend, which builds its tree only by
-		# walking "dependencies" from the root. So the owning .deb is also
-		# made to depend on each nested component, and each nested
-		# component gets an entry of its own (the package SBOM's own graph
-		# is a flat placeholder and is not carried over). Edges and entries
-		# left by an earlier merge into the same .deb are dropped first,
-		# so that merging again gives the same document.
+		# Append the package SBOM's components (any nested ones flattened
+		# too) to the top-level array, make the owning .deb depend on each
+		# of them, and give each an empty entry of its own: Mend builds its
+		# tree only by walking "dependencies" from the root. The package
+		# SBOM's own graph is a flat placeholder and is not carried over.
+		# Components, edges and entries with the same bom-refs, left by an
+		# earlier run over the same document, are dropped first, so that
+		# merging again gives the same document.
 		#
 		jq --arg n "$name" --arg v "$installed" --arg a "$arch" \
 			--slurpfile pkg "$package_sbom" "
 			def owner: select(.name == \$n and .version == \$v
 			                  and $jq_arch == \$a);
 			([.components[] | owner | .\"bom-ref\"] | first) as \$ref
-			| ([.components[] | owner | .components // []
-			    | .[].\"bom-ref\"]) as \$old
-			| [\$pkg[0].components[].\"bom-ref\"] as \$new
-			| (.components[] | owner | .components) = \$pkg[0].components
+			| [\$pkg[0].components[] | recurse(.components[]?)
+			   | del(.components)] as \$add
+			| [\$add[].\"bom-ref\"] as \$new
+			| .components = [.components[]
+			    | select(.\"bom-ref\" | IN(\$new[]) | not)] + \$add
 			| .dependencies //= []
 			| .dependencies |= (
-				map(select(.ref | IN(\$old[]) | not))
+				map(select(.ref | IN(\$new[]) | not))
 				| if any(.[]; .ref == \$ref) then . else
 				  . + [{ref: \$ref, dependsOn: []}] end
 				| map(if .ref == \$ref then .dependsOn = (
-					[.dependsOn[] | select(IN(\$old[]) | not)]
+					[.dependsOn[] | select(IN(\$new[]) | not)]
 					+ \$new | unique) else . end)
 				| . + [\$new[] | {ref: ., dependsOn: []}])" \
 			"$image_sbom" >"$tmp"
@@ -181,7 +190,7 @@ for package_sbom in "${package_sboms[@]}"; do
 		if [[ "$installed" != "$version" ]]; then
 			note=" (its filename says $version; matched on the SBOM's version)"
 		fi
-		echo "Merged $count component(s) under $name $installed ($arch)$note."
+		echo "Merged $count component(s) owned by $name $installed ($arch)$note."
 		merged=$((merged + 1))
 		;;
 	version-mismatch)
