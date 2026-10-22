@@ -24,7 +24,6 @@
   roles:
     - appliance-build.minimal-common
     - appliance-build.minimal-internal
-    - appliance-build.minimal-development
     - appliance-build.dct-common
     - appliance-build.ucf-common
     - appliance-build.virtualization-common
