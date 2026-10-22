@@ -41,6 +41,19 @@
   retries: 3
   delay: 30
   when: lookup('env', 'GITHUB_TOKEN') != ''
+  no_log: yes
+
+#
+# git stores the clone URL, credential and all, in the checkout's own config,
+# which this image then ships. Reset the remote to a URL that carries none;
+# fetching from it on the running VM uses that user's own credential.
+#
+- community.general.git_config:
+    name: remote.origin.url
+    scope: local
+    repo: "/home/delphix/dms-core-gate"
+    value: "https://github.com/delphix/dms-core-gate.git"
+  when: dms_core_gate_clone is not skipped
 
 - file:
     path: "/home/delphix/{{ item }}"

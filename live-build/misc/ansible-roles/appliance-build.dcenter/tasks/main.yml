@@ -22,7 +22,22 @@
     dest: /opt/dcenter/lib/dcenter-gate
     accept_hostkey: true
     update: false
+  register: dcenter_gate_clone
   when: lookup('env', 'GITHUB_TOKEN') != ''
+  no_log: true
+
+#
+# git stores the clone URL, credential and all, in the checkout's own config,
+# which this image then ships. Reset the remote to a URL that carries none;
+# fetching from it on the running VM uses that user's own credential.
+#
+- name: Reset the dcenter-gate remote to a credential-free URL
+  community.general.git_config:
+    name: remote.origin.url
+    scope: local
+    repo: /opt/dcenter/lib/dcenter-gate
+    value: https://github.com/delphix/dcenter-gate.git
+  when: dcenter_gate_clone is not skipped
 
 - name: Set java to java-17-openjdk-amd64
   community.general.alternatives:
