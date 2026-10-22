@@ -136,3 +136,38 @@ appliance, no pool and no `root`.
 ### Expected output
 
 Standard `unittest` output, ending in `OK`.
+
+## The `/tmp` and `/var/tmp` datasets an upgrade container is built with
+
+Use:
+
+- `./test-upgrade-container-tmp-datasets.py`
+
+### Prerequisites
+
+`python3`, and `dpkg`, which `common.sh` uses to compare versions. The test runs the real
+`upgrade-container` with stand-ins for the commands it shells out to
+(`upgrade-container-tmp-datasets-stubs/`) over an inventory it supplies, so it needs no
+appliance and no pool. `upgrade-container` does need root, and writes to `/var/lib/machines` and
+`/etc/systemd`, so the test re-runs itself in a user and mount namespace with a scratch
+directory bound over each of those, and over `/var/tmp`. Nothing it writes reaches the host.
+On hosts that restrict unprivileged user namespaces, run it as `root` instead.
+
+### What the harness verifies
+
+- A container created from a boot environment that has `tmp` and `vartmp` datasets gets a
+  clone of each. Its fstab mounts them at `/tmp` and `/var/tmp` with `nosuid,nodev` once
+  `convert-to-rootfs` makes it a boot environment, and not before: while it runs as a
+  container, a `/var/tmp` mount would hide the log directory bound into it.
+- Those datasets are looked for on the snapshot the clones come from, under a name `zfs`
+  accepts.
+- A container created from a boot environment without them gets neither the datasets nor the
+  fstab entries.
+- A `rollback` container, which is cloned from the snapshot `execute` took before the
+  upgrade, gets both datasets when that snapshot holds both, and is created without them
+  rather than failing when it does not.
+- `destroy` unmounts the container's `tmp` and `vartmp` datasets before destroying it.
+
+### Expected output
+
+Standard `unittest` output, ending in `OK`.
