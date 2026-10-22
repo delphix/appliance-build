@@ -27,6 +27,14 @@ root `README.md` already uses for `DELPHIX_PLATFORMS`) rather than exporting the
 without them), and a `JAVA_HOME` left at the host default (17, per `bootstrap`) fails the Gradle
 5.1 wrapper before the build starts.
 
+The build reads S3 for the Secure Boot signing keys
+([`live-build/config/hooks/vm-artifacts/90-raw-disk-image.binary`](../../live-build/config/hooks/vm-artifacts/90-raw-disk-image.binary))
+and for the linux-pkg artifacts ([`scripts/common.sh`](../../scripts/common.sh),
+[`scripts/fetch-livebuild-artifacts.sh`](../../scripts/fetch-livebuild-artifacts.sh)), so the build
+host needs AWS credentials that can read those buckets. Jenkins binds them for its own builds; for
+a build by hand, put them in the environment `sudo -E` carries through, the same way `JAVA_HOME`
+and the mirror URLs are passed above. The images themselves carry no credential.
+
 This produces `live-build/build/artifacts/<variant>-kvm.qcow2` (among other artifacts). For a
 quick, minimal boot-verification that the change doesn't break the build or an obvious boot path:
 
