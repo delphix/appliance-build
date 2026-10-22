@@ -221,6 +221,7 @@
     dest: "{{ claude_internal_src_dir }}/{{ item.name }}"
     version: "{{ item.version }}"
     depth: "{{ item.depth | default(omit) }}"
+    single_branch: "{{ item.single_branch | default(omit) }}"
     update: false
   loop: "{{ claude_internal_repos }}"
   register: clone_result
@@ -240,16 +241,25 @@
   loop: "{{ claude_internal_repos }}"
   changed_when: false
 
-# A shallow clone is also a single-branch clone: git narrows remote.origin.fetch to just
-# the one branch that was cloned, so on the image neither "git fetch --unshallow" nor a
-# checkout of any other branch would see anything else. Restoring the wildcard refspec
-# makes both work. This is a no-op for the full clones, which already have this value.
-- name: Restore the wildcard fetch refspec (shallow clones are single-branch)
+# A shallow clone is also a single-branch clone, as is one with single_branch set: git
+# narrows remote.origin.fetch to just the one branch that was cloned, so on the image a
+# checkout of any other branch (or, for a shallow clone, "git fetch --unshallow") would
+# see nothing else. Restoring the wildcard refspec fixes that. This is a no-op for the
+# full clones, which already have this value.
+- name: Restore the wildcard fetch refspec (shallow and single-branch clones)
   ansible.builtin.command:
     cmd: >
       git -C {{ claude_internal_src_dir }}/{{ item.name }}
       config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
   loop: "{{ claude_internal_repos }}"
+  changed_when: false
+
+- name: Exclude fetch_exclude branches from the default fetch refspec
+  ansible.builtin.command:
+    cmd: >
+      git -C {{ claude_internal_src_dir }}/{{ item.0.name }}
+      config --add remote.origin.fetch ^refs/heads/{{ item.1 }}
+  loop: "{{ claude_internal_repos | subelements('fetch_exclude', skip_missing=True) }}"
   changed_when: false
 
 - name: Ensure ~delphix/src is owned by delphix:staff with group-write
