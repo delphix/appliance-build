@@ -311,7 +311,8 @@ image SBOM: the root's `bom-ref` had no `dependencies` entry, 16 components were
 of any other (`delphix-entire-aws`, `host-jdks`, …), and some components, such as
 `ncurses-base`, had no entry at all.
 
-**What the hook adds**, keeping every edge Syft produced:
+**What the hook adds**, keeping every edge Syft produced except those into Delphix products
+(step 4):
 
 1. A `dependencies` entry for the root, depending on every top-level component that no
    other component depends on.
@@ -322,6 +323,21 @@ of any other (`delphix-entire-aws`, `host-jdks`, …), and some components, such
    `libnss-ldap`. So the hook walks the graph from the root and, while any component is still
    unreachable, makes the root depend on the first such one. One edge per loop brings the
    whole loop in.
+4. Every Delphix product is made a direct dependency of the root, and of the root alone:
+   the hook drops the `Depends:` edges into each `delphix-*` `.deb`, and the merge does the
+   same for each `.deb` it adds bundled components to (§6), which brings in
+   `windows-connector`, `libzfslinux-dev` and the `zfs-modules-*` packages. The products
+   otherwise chain — `delphix-masking` → `delphix-virtualization` → `delphix-sso-app`,
+   `delphix-platform-aws` → `delphix-zfs` → `libzfslinux-dev` — and Mend takes the project's
+   "direct libraries" to be the components nothing but the root depends on, grouping
+   findings under them. Measured on `external-standard-aws`: with the chain, Mend listed one
+   direct library, `delphix-masking`, with every product's 75 findings under it, and adding
+   root edges to every product did not change that; with the edges into the products
+   dropped, it listed `delphix-masking` (45), `delphix-virtualization` (15),
+   `delphix-sso-app` (14) and `libzfslinux-dev` (11) separately, each with its own bundled
+   libraries below it. The cost is that the document no longer records which product
+   depends on which; each product's edges to other packages and to its own bundled
+   components are kept.
 
 When the hook works out which components already have a parent, it ignores the root's own
 entry, so running it on its own output changes nothing.
@@ -379,9 +395,10 @@ and `appliance_build_stage0.groovy` already fetches and archives `*.cdx.json`.
 entries, 2,488 edges, zero dangling refs, derived from Debian `Depends:` fields
 (`delphix-platform-aws` → 98 packages, `postgresql-14` → 23). Phase 2 rebuilt *its*
 dependency graph because Syft's version there covered 30% of components and held 90
-dangling refs; that reasoning does not transfer. So the graph is only *added to*, never
-rebuilt: the root's entry and the entries for components Syft left out (§6b), and the
-owning `.deb` → bundled-component edges (§6). Every edge Syft produced between two
+dangling refs; that reasoning does not transfer. So the graph is not rebuilt. It is added
+to — the root's entry and the entries for components Syft left out (§6b), and the owning
+`.deb` → bundled-component edges (§6) — and the only edges removed are those into Delphix
+products from other packages (§6b, step 4). Every other edge Syft produced between two
 installed packages stays exactly as it was, and the merge changes no existing `bom-ref`.
 
 **The installed `.deb` entries.** Each is kept exactly as it was; the merge only adds
@@ -438,8 +455,8 @@ Porting the Phase 2 filter wholesale would look consistent and make this documen
   owning `pkg:deb` entry depends on the added components and the document still validates.
 - A variant installing none of the flagged packages; confirm the output is identical to the
   Phase 1 document.
-- Every edge Syft produced between installed packages is unchanged, and every component is
-  reachable from the root by walking `dependencies`, with no dangling refs and no duplicate
+- Every edge Syft produced between installed packages is unchanged, apart from those into
+  Delphix products (§6b), and every component is reachable from the root by walking `dependencies`, with no dangling refs and no duplicate
   entries, and none nested. On the pre-push build of this change: `external-standard`
   2,065/2,065, `internal-qa` 2,151/2,151 and `internal-dev` 2,288/2,288 reachable, and
   `delphix-virtualization` depends on all 415 components it bundles, alongside its 36
