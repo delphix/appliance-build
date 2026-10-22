@@ -83,3 +83,56 @@ Automated equivalent:
 
 - The harness always performs real create/start/destroy operations for its test containers.
 - The script includes best-effort exit cleanup for containers it creates.
+
+## `upgrade-container`'s teardown
+
+Use:
+
+- `./test-upgrade-container-teardown.py`
+
+### Prerequisites
+
+`python3` and `unshare(1)`. The test runs `upgrade-container` itself inside a
+user and mount namespace, with stand-ins for the commands it shells out to on
+`PATH` (`upgrade-container-stubs/`) and tmpfs over `/etc/systemd/nspawn`,
+`/etc/systemd/system` and `/var/lib/machines`, so it needs no appliance, no
+pool and no `root`.
+
+### What the harness verifies
+
+- A `destroy` that fails because the container is still running leaves the
+  container's markers in place, so `list-all` still reports it.
+- `cleanup <container>` reclaims a container left behind by such a `destroy`,
+  once the container can be terminated.
+- An ordinary `destroy` of a stopped container still removes every marker,
+  dataset and snapshot it owns.
+- `cleanup <container>` destroys nothing while the container will not stop.
+
+### Expected output
+
+Standard `unittest` output, ending in `OK`.
+
+## `rootfs-cleanup`'s snapshot filter
+
+Use:
+
+- `./test-rootfs-cleanup.py`
+
+### Prerequisites
+
+`python3`, and `dpkg`, which `rootfs-cleanup` uses to compare versions. The
+test runs `rootfs-cleanup` itself with stand-ins for `zfs`,
+`get-appliance-version` and `rootfs-container` on `PATH`
+(`rootfs-cleanup-stubs/`), over an inventory it supplies, so it needs no
+appliance, no pool and no `root`.
+
+### What the harness verifies
+
+- No `container-delphix` snapshot reaches the deletion-candidate list, on a
+  boot environment carrying eleven of them.
+- An unrecognised snapshot name aborts the script, wherever it sits in the
+  list relative to a `container-delphix` snapshot.
+
+### Expected output
+
+Standard `unittest` output, ending in `OK`.

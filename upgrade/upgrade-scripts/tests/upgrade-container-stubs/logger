@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# A stand-in for logger(1), used by test-upgrade-container-teardown.py.
+#
+# common.sh points the scripts' xtrace output at a logger process. The
+# sandbox has no syslog, and that trace is not what the tests read, so it
+# is drained and dropped. Draining it matters: a logger that exited would
+# leave the scripts writing every traced line into a closed pipe.
+#
+cat >/dev/null

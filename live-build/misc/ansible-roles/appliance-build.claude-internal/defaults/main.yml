@@ -16,14 +16,15 @@
 
 ---
 #
-# The directory the repositories below are cloned into. This is the delphix user's home
-# (see the "delphix" user in the appliance-build.minimal-common role), which moved from
+# The delphix user's home (see the "delphix" user in the appliance-build.minimal-common
+# role), and the directory the repositories below are cloned into. The home moved from
 # /export/home to /home; there is deliberately no /export/home compatibility symlink, so
 # the old path would resolve to a stray directory tree on the root dataset rather than to
-# anything reachable as ~delphix. It is defined once here because six tasks consume it,
-# and repeating it inline is what let that move miss this role.
+# anything reachable as ~delphix. Both are defined once here because many tasks consume
+# them, and repeating the path inline is what let that move miss this role.
 #
-claude_internal_src_dir: /home/delphix/src
+claude_internal_home_dir: /home/delphix
+claude_internal_src_dir: "{{ claude_internal_home_dir }}/src"
 
 #
 # The repositories cloned into ~delphix/src on the internal-claude image, so that an agent
@@ -112,8 +113,8 @@ claude_internal_repos:
 
   #
   # The per-platform kernels, cloned shallow. At full depth these five are ~20GB packed --
-  # by themselves an order of magnitude more than everything else here combined, on a
-  # variant whose rpool is 70GB, and ~20GB pulled from GitHub on every image build.
+  # by themselves an order of magnitude more than everything else here combined, and
+  # ~20GB pulled from GitHub on every image build.
   #
   # The cost of depth=1 is that history is absent, so blame and bisect do not work until
   # someone runs "git fetch --unshallow" on the image. The tasks file rewrites the fetch
@@ -158,3 +159,15 @@ claude_internal_repos:
   - { name: dlpx-qa-gate, version: develop }
   - { name: qa-appdata-toolkits, version: main }
   - { name: golden-images, version: master }
+
+#
+# The official-marketplace plugins pre-installed for the delphix user. Installed is not
+# enabled: which of these load is up to enabledPlugins in the managed drop-in, and
+# clangd-lsp is deliberately left out of it. The tasks file both installs this list and
+# checks afterwards that every entry was recorded.
+#
+claude_internal_official_plugins:
+  - superpowers
+  - pyright-lsp
+  - rust-analyzer-lsp
+  - clangd-lsp

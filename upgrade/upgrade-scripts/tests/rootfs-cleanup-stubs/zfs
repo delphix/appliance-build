@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+#
+# A stand-in for zfs(8), used by test-rootfs-cleanup.py.
+#
+# It answers the four invocations rootfs-cleanup makes, out of the JSON
+# inventory named by $STUB_INVENTORY, and appends every invocation it is
+# given to $STUB_TRACE. The trace is what the test asserts on: it shows
+# which datasets rootfs-cleanup examined, and in what order.
+#
+# This is a model of an inventory, not of ZFS. It exists to record the
+# commands rootfs-cleanup issues; no claim about ZFS semantics rests on it.
+#
+import json
+import os
+import sys
+
+
+def main() -> None:
+    argv = sys.argv[1:]
+
+    with open(os.environ["STUB_TRACE"], "a") as f:
+        f.write("zfs " + " ".join(argv) + "\n")
+
+    with open(os.environ["STUB_INVENTORY"]) as f:
+        inventory = json.load(f)
+    datasets = inventory["filesystems"] + inventory["snapshots"]
+
+    #
+    # rootfs-cleanup's snapshot and filesystem enumerations. Both fixtures
+    # hold a single boot environment's snapshots, which zfs(8) returns in
+    # creation order, so the inventory's own order is the order zfs(8)
+    # would print.
+    #
+    if argv[:1] == ["list"] and "-t" in argv:
+        kind = argv[argv.index("-t") + 1]
+        pool = inventory["snapshots"] if kind == "snapshot" else \
+            inventory["filesystems"]
+        for dataset in pool:
+            print(dataset["name"])
+        return
+
+    # The existence probe behind rootfs-cleanup's exists().
+    if argv[:1] == ["list"]:
+        if not any(d["name"] == argv[-1] for d in datasets):
+            sys.exit("cannot open '{}': dataset does not exist".format(
+                argv[-1]))
+        print(argv[-1])
+        return
+
+    # The "com.delphix:current-version" read behind version().
+    if argv[:1] == ["get"]:
+        match = [d for d in datasets if d["name"] == argv[-1]]
+        if not match:
+            sys.exit("cannot open '{}': dataset does not exist".format(
+                argv[-1]))
+        print(match[0]["version"])
+        return
+
+    if argv[:1] == ["destroy"]:
+        name = argv[-1]
+        inventory["snapshots"] = [s for s in inventory["snapshots"]
+                                  if s["name"] != name]
+        with open(os.environ["STUB_INVENTORY"], "w") as f:
+            json.dump(inventory, f)
+        return
+
+    sys.exit("stub zfs: unhandled invocation: {}".format(" ".join(argv)))
+
+
+main()

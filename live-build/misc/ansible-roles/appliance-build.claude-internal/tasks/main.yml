@@ -68,11 +68,12 @@
     name: nas.mount
     enabled: true
 
-- name: Install curl, git, and Node.js
+- name: Install curl, git, jq, and Node.js
   ansible.builtin.apt:
     name:
       - curl
       - git
+      - jq
       - nodejs
       - npm
     state: present
@@ -92,12 +93,28 @@
     name: python3-venv
     state: present
 
+# The client is built from dcoa's python/command at the dcoa/live tag, the same source and
+# packaging dlpxdc.co installs from. The dlpxdccommand package on Artifactory is not
+# published from that tag, so it lags what dlpxdc.co runs.
+- name: Create a scratch directory for the dcoa checkout
+  ansible.builtin.tempfile:
+    state: directory
+  register: dcoa_checkout
+
+- name: Check out dcoa at the dcoa/live tag
+  ansible.builtin.git:
+    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dcoa.git"
+    dest: "{{ dcoa_checkout.path }}"
+    version: dcoa/live
+    depth: 1
+  no_log: true
+
 # The index is delphix-virtual-pypi, not the delphix-local one dcoa's README documents:
-# delphix-local carries dlpxdccommand but no setuptools, so pip cannot resolve its build
-# dependencies there and fails on "No matching distribution found for setuptools>=40.8.0".
+# delphix-local has no setuptools, so pip cannot resolve the build dependencies there and
+# fails on "No matching distribution found for setuptools>=40.8.0".
 - name: Install the DCenter client into /opt/dcenter-client
   ansible.builtin.pip:
-    name: dlpxdccommand
+    name: "{{ dcoa_checkout.path }}/python/command"
     virtualenv: /opt/dcenter-client
     virtualenv_command: /usr/bin/python3 -m venv
     extra_args: >-
@@ -105,29 +122,16 @@
       --index-url
       https://artifactory.delphix.com/artifactory/api/pypi/delphix-virtual-pypi/simple/
 
-# A wrapper rather than a symlink into the venv's bin, which also holds python3 and pip:
-# that directory on PATH would send every bare `python3` on the image into this virtualenv.
-- name: Install the dc wrapper into /usr/local/bin
-  ansible.builtin.copy:
+- name: Remove the dcoa checkout
+  ansible.builtin.file:
+    path: "{{ dcoa_checkout.path }}"
+    state: absent
+
+- name: Link dc into /usr/local/bin
+  ansible.builtin.file:
+    src: /opt/dcenter-client/bin/dc
     dest: /usr/local/bin/dc
-    mode: "0755"
-    content: |
-      #!/usr/bin/env bash
-      #
-      # Installed by appliance-build.claude-internal -- edit that role, not this file.
-      #
-      # DLPX_DC_API_HOST is pinned because the dlpxdccommand build on Artifactory defaults
-      # to a decommissioned API gateway (2.0.3 defaults to r46rgdk3u4..., which NXDOMAINs)
-      # while reporting the same --version as a working client, so the bad default cannot
-      # be spotted from the version. This value is DEFAULT_API_HOST in dcoa's
-      # components/dc-command/src/main/python/dlpxdccommand/command/dc_cmds.py.
-      #
-      # Credentials are left to the caller: interactively, run `dc login` once; in
-      # automation, export DLPX_DEFAULT_CREDENTIALS=true to authenticate off the standard
-      # AWS credential chain instead of a dcoa profile.
-      #
-      export DLPX_DC_API_HOST="${DLPX_DC_API_HOST:-sknncxtzxf.execute-api.us-west-2.amazonaws.com}"
-      exec /opt/dcenter-client/bin/dc "$@"
+    state: link
 
 - name: Create ~delphix/src directory
   ansible.builtin.file:
@@ -212,3 +216,207 @@
     dest: /etc/profile.d/knowledge-graph.sh
     mode: "0644"
     content: 'export KG_DIR="{{ claude_internal_src_dir }}/knowledge-graph"'
+
+- name: Create the Claude Code system configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/claude-code
+    - /etc/claude-code/managed-settings.d
+
+# Claude Code loads /etc/claude-code/CLAUDE.md into every session on the machine --
+# interactive, `claude -p`, and the Agent SDK -- ahead of any user or project CLAUDE.md.
+# It holds facts about this image that every session would otherwise re-derive; workflow
+# guidance belongs in the plugins' skills instead.
+- name: Install the system-wide CLAUDE.md
+  ansible.builtin.copy:
+    dest: /etc/claude-code/CLAUDE.md
+    mode: "0644"
+    content: |
+      <!-- Installed by appliance-build.claude-internal -- edit that role, not this file. -->
+      # This machine: the Delphix internal-claude image
+
+      ## Filesystem
+      - /nas is an NFS mount of the support-tools NAS: every customer's support bundles,
+        far too large to walk. Never search from / (find /, grep -r /, du /), and add -xdev
+        when a whole-disk search is unavoidable.
+      - To find source, search the one repo it belongs to: git -C ~delphix/src/<repo>
+        ls-files or rg there. Even ~delphix/src as a whole is over 600,000 files, slow to
+        walk on a cold cache.
+      - ~delphix/src holds a clone of every repo the engine is built from, plus the build,
+        CI, and agent-tooling repos; the list is claude_internal_repos in
+        ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.claude-internal/defaults/main.yml.
+        Clones are only as current as the image build: git fetch before trusting them.
+        The linux-kernel-* clones are shallow; git fetch --unshallow before blame or bisect.
+
+      ## Team knowledge graph
+      - delphix/knowledge-graph is cloned at $KG_DIR (~delphix/src/knowledge-graph):
+        escalation postmortems, CI known failures, investigations, subsystem notes.
+      - Before investigating or root-causing a Delphix problem, git -C $KG_DIR pull and
+        read $KG_DIR/INDEX.md for prior art.
+      - Record anything a teammate could reuse with the kg skills: /kg:ingest, or
+        kg:ingest-escl-postmortem / kg:ingest-known-failure for those cases. Never
+        hand-edit INDEX.md; it is generated. The kg skills push to main directly, no PR.
+
+      ## Tools
+      - dc (DCenter CLI) runs locally. Interactively, run dc login once; in automation,
+        export DLPX_DEFAULT_CREDENTIALS=true to use the AWS credential chain.
+      - gh is installed; git-utils/bin is on PATH for login shells.
+
+      ## Git and PRs
+      - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push. Do
+        not use git review, even where a repo's docs say to.
+      - Name development branches projects/<slug>. Delphix branch protection permits
+        creating, force-pushing, and deleting branches only under projects/; other
+        namespaces are rejected.
+      - Commit, branch, PR and linking conventions come from the git, github and writing
+        plugins; their skills load as needed.
+
+      ## Claude Code configuration
+      - This file and the plugins in /etc/claude-code/managed-settings.d/ are installed by
+        the appliance-build.claude-internal role; change them there, not on the VM.
+
+# The language servers the LSP plugins below drive. They go in /usr/local/bin and
+# /usr/bin so that every session finds them: a PATH entry in /etc/profile.d, the way
+# git-utils is added above, reaches login shells but not an automated `claude -p`.
+# rust-analyzer is already on the image, from the delphix-rust package. The pyright
+# version is pinned so that an image build is reproducible rather than taking whatever
+# npm published that day; clangd's is a function of the apt mirror the image builds
+# against, which pins the whole archive at once.
+- name: Install the pyright language server
+  ansible.builtin.command: npm install -g pyright@1.1.414
+  args:
+    creates: /usr/local/bin/pyright-langserver
+  changed_when: true
+
+- name: Install the clangd language server
+  ansible.builtin.apt:
+    name: clangd
+    state: present
+
+# Plugins from the official marketplace are fetched from GitHub rather than read from a
+# clone on the image, and a headless session never fetches a plugin hosted that way: it
+# skips the plugin as an orphan. Installing them for delphix here leaves the marketplace
+# registered and the plugins cached and recorded, so the first session -- the only one an
+# automation VM ever runs -- loads them. With an empty ~delphix/.claude/plugins a session
+# loads none of them, exposes no LSP tool at all, and reports no error.
+#
+# jdtls-lsp is not here: it needs a JVM newer than the one the image's javac is on, and on
+# dlpx-app-gate it answers from a stale checked-in Eclipse classpath.
+- name: Register the official Claude Code plugin marketplace
+  ansible.builtin.command: claude plugin marketplace add anthropics/claude-plugins-official
+  environment:
+    HOME: "{{ claude_internal_home_dir }}"
+  args:
+    creates: "{{ claude_internal_home_dir }}/.claude/plugins/marketplaces/claude-plugins-official"
+
+- name: Pre-install the official plugins for the delphix user
+  ansible.builtin.command: claude plugin install {{ item }}@claude-plugins-official
+  environment:
+    HOME: "{{ claude_internal_home_dir }}"
+  args:
+    creates: "{{ claude_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/{{ item }}"
+  loop: "{{ claude_internal_official_plugins }}"
+
+# The first session on a booted VM silently skips a plugin that is cached but has no
+# user-scope record in installed_plugins.json; see the ordering note on the managed
+# settings task below. The creates: guard above sees only the cache directory, which an
+# interrupted install also leaves, so check the record itself and fail the build without it.
+- name: Check that each official plugin was recorded at user scope
+  ansible.builtin.command: >-
+    jq -e --arg p "{{ item }}@claude-plugins-official"
+    '(.plugins[$p] // []) | any(.scope == "user")'
+    {{ claude_internal_home_dir }}/.claude/plugins/installed_plugins.json
+  changed_when: false
+  loop: "{{ claude_internal_official_plugins }}"
+
+# The installs above also write CLI state that should not ship in an image: .claude.json
+# carries a machineID and userID every clone would share, and settings.json would enable
+# the plugins a second time at user scope, where it would outlive a change to the managed
+# settings. For clangd-lsp it would not be a second time: settings.json is the only place
+# it is enabled, so removing it is also what keeps clangd-lsp off. Only
+# ~delphix/.claude/plugins is kept.
+- name: Remove the CLI state left by the plugin installs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ claude_internal_home_dir }}/.claude.json"
+    - "{{ claude_internal_home_dir }}/.claude/settings.json"
+    - "{{ claude_internal_home_dir }}/.claude/backups"
+
+- name: Ensure ~delphix/.claude is owned by delphix:staff
+  ansible.builtin.file:
+    path: "{{ claude_internal_home_dir }}/.claude"
+    state: directory
+    owner: delphix
+    group: staff
+    recurse: true
+
+# Managed settings take precedence over every user and project scope, so these plugins
+# load for every session and a user cannot switch them off without root. A drop-in in
+# managed-settings.d rather than managed-settings.json, so a policy file someone else
+# owns can sit beside it. The platform marketplace is read in place from its clone in
+# ~delphix/src -- no GitHub credentials are needed at session start, and automation that
+# checks out a PLUGINS_BRANCH there gets that branch's plugins. Only plugins the platform
+# team has vetted are enabled; zfs and hotfix depend on git and blackbox, which are
+# listed so the whole enabled set is visible here. attribution is pinned true here too,
+# so no user or project setting can turn Claude co-authorship off.
+#
+# This task comes last, after the plugins above are installed. A `claude plugin install`
+# run with these settings already in place leaves the plugin out of
+# ~delphix/.claude/plugins/installed_plugins.json, because the plugin is enabled at
+# managed scope while the install records user scope. The image then ships it cached but
+# unrecorded, and the first session on a booted VM -- the only one an automation VM runs
+# -- installs it at managed scope too late to load it, and reports no error. The role
+# therefore assumes this file is not yet in place when it runs, as on a fresh image
+# build; the record check above fails a run where it was.
+#
+# clangd-lsp is installed above but deliberately absent from enabledPlugins: without
+# a compile_commands.json clangd resolves nothing and pushes false errors into every
+# session's context. The key is omitted rather than set to false because a managed false
+# also makes "claude plugin enable" refuse outright, as blocked by organization policy,
+# which would leave no way to switch it on short of root.
+- name: Install the managed Claude Code plugin settings
+  ansible.builtin.copy:
+    dest: /etc/claude-code/managed-settings.d/internal-claude.json
+    mode: "0644"
+    content: |
+      {
+        "extraKnownMarketplaces": {
+          "delphix-platform-team-claude-plugins": {
+            "source": {
+              "source": "directory",
+              "path": "{{ claude_internal_src_dir }}/platform-team-claude-plugins"
+            }
+          },
+          "claude-plugins-official": {
+            "source": {
+              "source": "github",
+              "repo": "anthropics/claude-plugins-official"
+            }
+          }
+        },
+        "enabledPlugins": {
+          "kg@delphix-platform-team-claude-plugins": true,
+          "jira@delphix-platform-team-claude-plugins": true,
+          "dcenter@delphix-platform-team-claude-plugins": true,
+          "secrets@delphix-platform-team-claude-plugins": true,
+          "git-utils@delphix-platform-team-claude-plugins": true,
+          "code-standards@delphix-platform-team-claude-plugins": true,
+          "app@delphix-platform-team-claude-plugins": true,
+          "zfs@delphix-platform-team-claude-plugins": true,
+          "hotfix@delphix-platform-team-claude-plugins": true,
+          "jenkins@delphix-platform-team-claude-plugins": true,
+          "git@delphix-platform-team-claude-plugins": true,
+          "github@delphix-platform-team-claude-plugins": true,
+          "writing@delphix-platform-team-claude-plugins": true,
+          "blackbox@delphix-platform-team-claude-plugins": true,
+          "superpowers@claude-plugins-official": true,
+          "pyright-lsp@claude-plugins-official": true,
+          "rust-analyzer-lsp@claude-plugins-official": true
+        },
+        "attribution": true
+      }

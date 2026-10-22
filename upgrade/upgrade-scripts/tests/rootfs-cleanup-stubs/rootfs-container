@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+#
+# A stand-in for rootfs-container, used by test-rootfs-cleanup.py. Only
+# "delete" is reachable from rootfs-cleanup.
+#
+# Deleting a boot environment takes its snapshots with it, which is why
+# rootfs-cleanup guards its later iterations with exists(). The stub drops
+# them too, so a later probe answers the way an engine's would.
+#
+import json
+import os
+import sys
+
+with open(os.environ["STUB_TRACE"], "a") as f:
+    f.write("rootfs-container " + " ".join(sys.argv[1:]) + "\n")
+
+assert sys.argv[1] == "delete", sys.argv
+boot_environment = "rpool/ROOT/" + sys.argv[2]
+
+with open(os.environ["STUB_INVENTORY"]) as f:
+    inventory = json.load(f)
+inventory["filesystems"] = [
+    d for d in inventory["filesystems"] if d["name"] != boot_environment]
+inventory["snapshots"] = [
+    s for s in inventory["snapshots"]
+    if s["name"].split("@")[0] != boot_environment]
+with open(os.environ["STUB_INVENTORY"], "w") as f:
+    json.dump(inventory, f)

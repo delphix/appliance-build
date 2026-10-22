@@ -20,6 +20,10 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.util.regex.Pattern
 
 ext.allPlatforms = ["aws", "azure", "esx", "gcp", "hyperv", "kvm", "oci"]
+/*
+ * This is the source of truth for which appliance variants exist. Adding, removing, or renaming
+ * a variant directory here needs the testing docs under docs/testing/ updated to match.
+ */
 ext.allVariants = new File("${rootProject.projectDir}/live-build/variants").list()
 ext.allInternal = allVariants.findAll { it.startsWith("internal-") }
 ext.allExternal = allVariants.findAll { it.startsWith("external-") }

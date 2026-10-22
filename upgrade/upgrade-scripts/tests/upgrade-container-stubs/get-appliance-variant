@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+# A stand-in for get-appliance-variant, used by
+# test-upgrade-container-teardown.py. Anything that is neither "dct" nor
+# "hyperscale" sends stop() down needs_ip_forwarding()'s common path.
+#
+echo "get-appliance-variant $*" >>"$STUB_TRACE"
+echo "appliance"

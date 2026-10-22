@@ -87,10 +87,13 @@ def shellScripts = fileTree("scripts").include({ details ->
                    }) +
                    fileTree("upgrade", {
                        include "prepare"
+                       include "tests/*.sh"
                    }) +
                    fileTree("upgrade/upgrade-scripts", {
                        exclude "README.md"
                        exclude "rootfs-cleanup"
+                       exclude "**/*.py"
+                       exclude "tests/rootfs-cleanup-stubs/**"
                    })
 
 task shfmt(type: Exec) {
@@ -101,7 +104,37 @@ task shfmtCheck(type: Exec) {
     commandLine(["shfmt", "-d"] + shellScripts.getFiles())
 }
 
-tasks.check.dependsOn shfmtCheck
+/*
+ * Fails if a variant directory under live-build/variants/ (the same list allVariants in
+ * gradle-lib/util.gradle reads) isn't mentioned anywhere under docs/testing/ — this is what
+ * keeps that doc set from silently going stale as variants are added or removed.
+ */
+task checkTestingDocsVariantCoverage {
+    doLast {
+        def docsDir = file("${rootProject.projectDir}/docs/testing")
+        def docsText = fileTree(docsDir).matching { include "**/*.md" }
+                .collect { it.text.toLowerCase() }
+                .join("\n")
+        // Plain String.contains() would let a variant count as documented merely because its
+        // name is a substring of a *different*, hyphen-adjacent token (e.g. "internal-dct"
+        // inside a future "internal-dct-v2" mention) -- require that no word/hyphen character
+        // immediately precedes or follows the match, so a variant only counts as mentioned when
+        // it appears as its own standalone token.
+        def undocumented = allVariants.findAll { variant ->
+            def pattern = java.util.regex.Pattern.compile(
+                    "(?<![a-z0-9-])" + java.util.regex.Pattern.quote(variant.toLowerCase()) + "(?![a-z0-9-])")
+            !pattern.matcher(docsText).find()
+        }
+        if (!undocumented.isEmpty()) {
+            throw new GradleException(
+                    "The following live-build/variants/ entries aren't mentioned anywhere " +
+                    "under docs/testing/: ${undocumented.join(', ')}. Update docs/testing/ " +
+                    "(or remove the stale variant directory) to match.")
+        }
+    }
+}
+
+tasks.check.dependsOn shfmtCheck, checkTestingDocsVariantCoverage
 
 task format() {
     dependsOn shfmt
