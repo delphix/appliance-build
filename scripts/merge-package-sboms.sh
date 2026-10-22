@@ -164,11 +164,20 @@ for package_sbom in "${package_sboms[@]}"; do
 		# earlier run over the same document, are dropped first, so that
 		# merging again gives the same document.
 		#
+		# The owning .deb is also made a direct dependency of the root, and
+		# of the root alone, as the "95-generate-sbom.binary" hook does for
+		# every delphix-* package: Mend groups findings under the
+		# components that nothing but the root depends on, so each package
+		# that bundles third-party code has to be one of them rather than
+		# sit under whichever package depends on it. Other packages'
+		# Depends: edges to it are dropped.
+		#
 		jq --arg n "$name" --arg v "$installed" --arg a "$arch" \
 			--slurpfile pkg "$package_sbom" "
 			def owner: select(.name == \$n and .version == \$v
 			                  and $jq_arch == \$a);
 			([.components[] | owner | .\"bom-ref\"] | first) as \$ref
+			| .metadata.component.\"bom-ref\" as \$root
 			| [\$pkg[0].components[] | recurse(.components[]?)
 			   | del(.components)] as \$add
 			| [\$add[].\"bom-ref\"] as \$new
@@ -182,6 +191,13 @@ for package_sbom in "${package_sboms[@]}"; do
 				| map(if .ref == \$ref then .dependsOn = (
 					[.dependsOn[] | select(IN(\$new[]) | not)]
 					+ \$new | unique) else . end)
+				| if any(.[]; .ref == \$root) then . else
+				  . + [{ref: \$root, dependsOn: []}] end
+				| map(if .ref == \$root then
+					(if .dependsOn | index(\$ref) then . else
+					 .dependsOn += [\$ref] end)
+				  elif .dependsOn == null then .
+				  else .dependsOn |= map(select(. != \$ref)) end)
 				| . + [\$new[] | {ref: ., dependsOn: []}])" \
 			"$image_sbom" >"$tmp"
 		mv "$tmp" "$image_sbom"

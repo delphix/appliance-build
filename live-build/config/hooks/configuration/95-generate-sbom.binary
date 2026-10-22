@@ -77,7 +77,8 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 # (dash, host-jdks, delphix-entire-aws, ...) is therefore unreachable, and
 # Mend drops it. So make the root depend on each such top-level component,
 # and give any component Syft left out of the array an empty entry of its
-# own. The existing Depends: edges are kept exactly as Syft produced them.
+# own. The existing Depends: edges are kept as Syft produced them, except
+# for those into delphix-* packages (below).
 #
 # That still misses packages that depend on each other in a closed loop with
 # nothing outside depending on them: in internal-dev, ldap-auth-client,
@@ -85,6 +86,19 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 # within that loop. So walk the graph from the root and, while some component
 # is still unreachable, make the root depend on the first such one; one edge
 # per loop is enough to bring the whole loop in.
+#
+# Every delphix-* package is also made a direct dependency of the root, and
+# of the root alone: the Depends: edges from other packages to it are
+# dropped. The products otherwise chain (delphix-masking depends on
+# delphix-virtualization, which depends on delphix-sso-app and
+# delphix-platform-aws, ...), and Mend groups findings under the project's
+# "direct libraries", which it takes to be the components that nothing but
+# the root depends on; even with root edges to every product, it listed only
+# delphix-masking, with every product's findings under it. The cost is that
+# the document no longer records which product depends on which. Each
+# product's edges to other packages, and to its own bundled components, are
+# kept. scripts/merge-package-sboms.sh does the same for each package it
+# merges bundled components into.
 #
 jq '
 	def reachable($g; $from):
@@ -100,6 +114,11 @@ jq '
 	| .metadata.component.type = "application"
 	| .dependencies //= []
 	| .metadata.component["bom-ref"] as $root
+	| [.components[] | select((.name | startswith("delphix-"))
+	                          and (.purl // "" | startswith("pkg:deb/")))
+	   | .["bom-ref"]] as $products
+	| .dependencies |= map(if .ref == $root or .dependsOn == null then .
+		else .dependsOn |= map(select(IN($products[]) | not)) end)
 	| ([.dependencies[] | select(.ref != $root) | .dependsOn[]?]
 	   | unique) as $children
 	| ([.dependencies[].ref] | unique) as $listed
