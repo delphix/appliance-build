@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+#
+# A stand-in for systemd-detect-virt(1), used by
+# test-upgrade-container-tmp-datasets.py.
+#
+# Exiting 0 answers "yes, this is a container", which is how
+# fix_and_migrate_services returns without touching the host's services.
+# That function reads and masks units on the running system; it has
+# nothing to do with the datasets under test here.
+#

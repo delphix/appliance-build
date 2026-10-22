@@ -94,6 +94,7 @@ def shellScripts = fileTree("scripts").include({ details ->
                        exclude "rootfs-cleanup"
                        exclude "**/*.py"
                        exclude "tests/rootfs-cleanup-stubs/**"
+                       exclude "tests/upgrade-container-tmp-datasets-stubs/**"
                    })
 
 task shfmt(type: Exec) {
