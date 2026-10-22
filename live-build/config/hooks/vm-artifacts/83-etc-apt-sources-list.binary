@@ -1,6 +1,6 @@
 #!/bin/bash -eux
 #
-# Copyright 2018-2025 Delphix
+# Copyright 2018-2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,5 +39,16 @@ if [[ $APPLIANCE_VARIANT = "internal-dev" ||
 		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble main restricted multiverse universe
 		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble-updates main restricted multiverse universe
 		deb http://linux-package-mirror-v2.delphix.com/develop/latest/ubuntu noble-security main
+	EOF'
+fi
+
+#
+# The internal-claude variant installs gh from GitHub's apt repository (see the
+# appliance-build.claude-internal role); restore that source, removed above, so
+# the VM can upgrade gh with apt like the rest of its packages.
+#
+if [[ $APPLIANCE_VARIANT = "internal-claude" ]]; then
+	chroot binary bash -c 'cat <<-EOF >/etc/apt/sources.list.d/github-cli.list
+		deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main
 	EOF'
 fi
