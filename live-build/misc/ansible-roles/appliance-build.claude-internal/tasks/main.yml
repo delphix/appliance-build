@@ -133,6 +133,52 @@
     dest: /usr/local/bin/dc
     state: link
 
+# gitleaks, which every writer to the knowledge graph runs before pushing, and without
+# which that repo's append-run.sh refuses to write (its SCHEMA.md Section 14). Ubuntu's
+# package is too old for the configuration the knowledge graph uses, so the latest
+# release is installed instead, verified against the checksums published with it. The
+# release is found from github.com's /releases/latest redirect rather than the API, which
+# rate-limits unauthenticated requests.
+- name: Find the latest gitleaks release
+  ansible.builtin.uri:
+    url: https://github.com/gitleaks/gitleaks/releases/latest
+    method: HEAD
+    follow_redirects: none
+    status_code: 302
+  register: gitleaks_latest
+
+- name: Set the gitleaks release to install
+  ansible.builtin.set_fact:
+    gitleaks_tag: "{{ gitleaks_latest.location | basename }}"
+    gitleaks_version: "{{ gitleaks_latest.location | basename | regex_replace('^v', '') }}"
+
+- name: Create a scratch directory for the gitleaks download
+  ansible.builtin.tempfile:
+    state: directory
+  register: gitleaks_download
+
+- name: Download gitleaks
+  ansible.builtin.get_url:
+    url: "https://github.com/gitleaks/gitleaks/releases/download/{{ gitleaks_tag }}/gitleaks_{{ gitleaks_version }}_linux_x64.tar.gz"
+    dest: "{{ gitleaks_download.path }}/gitleaks.tar.gz"
+    checksum: "sha256:https://github.com/gitleaks/gitleaks/releases/download/{{ gitleaks_tag }}/gitleaks_{{ gitleaks_version }}_checksums.txt"
+    mode: "0644"
+
+- name: Install gitleaks into /usr/local/bin
+  ansible.builtin.unarchive:
+    src: "{{ gitleaks_download.path }}/gitleaks.tar.gz"
+    dest: /usr/local/bin
+    remote_src: true
+    include: [gitleaks]
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Remove the gitleaks download
+  ansible.builtin.file:
+    path: "{{ gitleaks_download.path }}"
+    state: absent
+
 - name: Create ~delphix/src directory
   ansible.builtin.file:
     path: "{{ claude_internal_src_dir }}"
