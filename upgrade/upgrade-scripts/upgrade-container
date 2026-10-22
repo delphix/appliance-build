@@ -530,12 +530,6 @@ function stop() {
 }
 
 function destroy() {
-	rm -f "/etc/systemd/nspawn/$CONTAINER.nspawn" ||
-		die "failed to remove file: '$CONTAINER.nspawn'"
-
-	rm -rf "/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d" ||
-		die "failed to remove directory: $CONTAINER.service.d"
-
 	if zfs list "rpool/ROOT/$CONTAINER" &>/dev/null; then
 		#
 		# In order to safely perform the recursive destroy below,
@@ -564,6 +558,19 @@ function destroy() {
 		zfs destroy -r "rpool/ROOT/$CONTAINER" ||
 			die "failed to destroy container dataset: '$CONTAINER'"
 	fi
+
+	#
+	# These two are what is_upgrade_container() recognises a container
+	# by, so they go only once the destroy above has succeeded. A
+	# container that is still running fails that destroy, and it has to
+	# stay recognisable for "list-all" to report it and "cleanup" to
+	# reclaim it.
+	#
+	rm -f "/etc/systemd/nspawn/$CONTAINER.nspawn" ||
+		die "failed to remove file: '$CONTAINER.nspawn'"
+
+	rm -rf "/etc/systemd/system/systemd-nspawn@$CONTAINER.service.d" ||
+		die "failed to remove directory: $CONTAINER.service.d"
 
 	ROOTFS_DATASET=$(get_mounted_rootfs_container_dataset)
 	[[ -n "$ROOTFS_DATASET" ]] ||
