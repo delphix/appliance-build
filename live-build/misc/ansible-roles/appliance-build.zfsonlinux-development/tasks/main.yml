@@ -71,7 +71,9 @@
     version: develop
     accept_hostkey: yes
     update: no
-  when: lookup('env', 'GITHUB_TOKEN') != ''
+  when:
+    - lookup('env', 'GITHUB_TOKEN') != ''
+    - not (skip_home_source_clones | default(false))
 
 - file:
     path: "/home/delphix/zfs"
@@ -79,6 +81,7 @@
     group: staff
     state: directory
     recurse: yes
+  when: not (skip_home_source_clones | default(false))
 
 - file:
     path: "/home/delphix/.cargo/"

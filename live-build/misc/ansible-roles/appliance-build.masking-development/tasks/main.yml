@@ -40,7 +40,9 @@
   until: dms_core_gate_clone is not failed
   retries: 3
   delay: 30
-  when: lookup('env', 'GITHUB_TOKEN') != ''
+  when:
+    - lookup('env', 'GITHUB_TOKEN') != ''
+    - not (skip_home_source_clones | default(false))
 
 - file:
     path: "/home/delphix/{{ item }}"
@@ -51,6 +53,7 @@
     recurse: yes
   with_items:
     - dms-core-gate
+  when: not (skip_home_source_clones | default(false))
 
 - file:
     path: "/etc/systemd/system/delphix-masking.service.d"
