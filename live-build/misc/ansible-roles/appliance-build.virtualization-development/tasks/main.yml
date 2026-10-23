@@ -103,6 +103,19 @@
   when:
     - lookup('env', 'GITHUB_TOKEN') != ''
     - not (skip_home_source_clones | default(false))
+  no_log: yes
+
+#
+# git stores the clone URL, credential and all, in the checkout's own config,
+# which this image then ships. Reset the remote to a URL that carries none;
+# fetching from it on the running VM uses that user's own credential.
+#
+- community.general.git_config:
+    name: remote.origin.url
+    scope: local
+    repo: "/home/delphix/dlpx-app-gate"
+    value: "https://github.com/delphix/dlpx-app-gate.git"
+  when: dlpx_app_gate_clone is not skipped
 
 - file:
     path: "/home/delphix/{{ item }}"
