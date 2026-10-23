@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+#
+# A stand-in for zfs(8), used by test-upgrade-container-tmp-datasets.py.
+#
+# It answers the invocations "upgrade-container create",
+# "upgrade-container convert-to-rootfs" and "upgrade-container destroy"
+# make, out of the JSON inventory named by
+# $STUB_INVENTORY, which it updates in place so each command sees what the
+# commands before it did. Every invocation is appended to $STUB_TRACE.
+#
+# This is a model of an inventory, not of ZFS. Three of its behaviours
+# carry the test's meaning, and only those are modelled with care:
+#
+#   * a name with an empty component is rejected the way zfs(8) rejects
+#     it, which is what "rpool/ROOT/$CONTAINER/tmp" is when CONTAINER is
+#     empty;
+#   * a snapshot answers for the properties of the dataset it was taken
+#     from, which is how upgrade-container reads the version properties
+#     off one, and a dataset's snapshots can be listed, which is how it
+#     finds the one a rollback container is cloned from;
+#   * mounting a clone of a boot environment's root filesystem gives it
+#     the "/etc" the boot environment has, which is where
+#     upgrade-container writes the container's fstab.
+#
+import json
+import os
+import shutil
+import sys
+
+
+def inventory_path():
+    return os.environ["STUB_INVENTORY"]
+
+
+def load():
+    with open(inventory_path()) as f:
+        return json.load(f)
+
+
+def save(inventory):
+    with open(inventory_path(), "w") as f:
+        json.dump(inventory, f)
+
+
+#
+# zfs(8) validates a name before it looks anything up, so an empty
+# component fails the same way whatever the pool holds.
+#
+def check_name(name):
+    if "" in name.replace("@", "/").split("/"):
+        sys.exit("cannot open '{}': empty component or misplaced '@' or "
+                 "'#' delimiter in name".format(name))
+
+
+def properties(datasets, name):
+    own = datasets[name]["properties"]
+    if "@" not in name:
+        return own
+    inherited = dict(datasets[name.split("@")[0]]["properties"])
+    inherited.update(own)
+    return inherited
+
+
+#
+# The "-o property=value" options a create or a clone is given, and the
+# positional arguments left over.
+#
+def split_options(argv):
+    props = {}
+    positional = []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "-o":
+            key, _, value = argv[i + 1].partition("=")
+            props[key] = value
+            i += 2
+        elif argv[i].startswith("-"):
+            i += 1
+        else:
+            positional.append(argv[i])
+            i += 1
+    return props, positional
+
+
+def children(datasets, name):
+    return [d for d in datasets
+            if d == name or d.startswith(name + "/") or
+            d.startswith(name + "@")]
+
+
+def do_list(datasets, argv):
+    target = argv[-1]
+
+    #
+    # The snapshots of one dataset: "zfs list -d 1 -rt snapshot -Hpo name
+    # -s creation <dataset>". The inventory holds no creation time, so
+    # they come out in the order they were taken.
+    #
+    if "snapshot" in argv:
+        check_name(target)
+        for name in datasets:
+            if name.startswith(target + "@"):
+                print(name)
+        return
+
+    # The dataset mounted at a given directory: "zfs list -Hpo name /".
+    if target.startswith("/"):
+        for name, dataset in datasets.items():
+            if dataset["properties"].get("mountpoint") == target:
+                print(name)
+                return
+        sys.exit("cannot open '{}': dataset does not exist".format(target))
+
+    check_name(target)
+    if target not in datasets:
+        sys.exit("cannot open '{}': dataset does not exist".format(target))
+    print(target)
+
+
+def do_create(datasets, argv):
+    props, positional = split_options(argv)
+    name = positional[-1]
+    check_name(name)
+    datasets[name] = {"properties": props}
+
+
+def do_snapshot(datasets, argv):
+    target = argv[-1]
+    dataset, _, snapshot = target.partition("@")
+    check_name(target)
+    sources = [dataset]
+    if "-r" in argv:
+        sources = [d for d in datasets
+                   if "@" not in d and
+                   (d == dataset or d.startswith(dataset + "/"))]
+    for source in sources:
+        datasets["{}@{}".format(source, snapshot)] = {"properties": {}}
+
+
+def do_clone(datasets, argv):
+    props, positional = split_options(argv)
+    source, destination = positional[-2], positional[-1]
+    check_name(source)
+    check_name(destination)
+    if source not in datasets:
+        sys.exit("cannot open '{}': dataset does not exist".format(source))
+    datasets[destination] = {"properties": props, "origin": source}
+
+
+def do_mount(datasets, argv):
+    name = argv[-1]
+    if name not in datasets:
+        sys.exit("cannot open '{}': dataset does not exist".format(name))
+    mountpoint = datasets[name]["properties"].get("mountpoint")
+    if mountpoint and mountpoint.startswith("/"):
+        os.makedirs(os.path.join(mountpoint, "etc"), exist_ok=True)
+
+
+def do_get(datasets, argv):
+    _, positional = split_options(argv)
+    name = positional[-1]
+    prop = positional[-2]
+    if name not in datasets:
+        sys.exit("cannot open '{}': dataset does not exist".format(name))
+    if "-s" in argv:
+        value = datasets[name]["properties"].get(prop)
+    else:
+        value = properties(datasets, name).get(prop)
+    print(value if value else "-")
+
+
+def do_set(datasets, argv):
+    _, positional = split_options(argv)
+    name = positional[-1]
+    key, _, value = positional[-2].partition("=")
+    if name not in datasets:
+        sys.exit("cannot open '{}': dataset does not exist".format(name))
+    datasets[name]["properties"][key] = value
+
+
+def do_destroy(datasets, argv):
+    name = argv[-1]
+    check_name(name)
+    if name not in datasets:
+        sys.exit("cannot open '{}': dataset does not exist".format(name))
+    victims = children(datasets, name) if "-r" in argv else [name]
+    for victim in victims:
+        #
+        # A destroyed dataset takes the files it held with it, which is
+        # what leaves the container's directory empty for its own
+        # removal.
+        #
+        mountpoint = datasets[victim]["properties"].get("mountpoint", "")
+        if mountpoint.startswith("/") and os.path.isdir(mountpoint):
+            for entry in os.listdir(mountpoint):
+                path = os.path.join(mountpoint, entry)
+                shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
+        del datasets[victim]
+
+
+def main():
+    argv = sys.argv[1:]
+
+    with open(os.environ["STUB_TRACE"], "a") as f:
+        f.write("zfs " + " ".join(argv) + "\n")
+
+    inventory = load()
+    datasets = inventory["datasets"]
+
+    handlers = {
+        "list": lambda: do_list(datasets, argv[1:]),
+        "create": lambda: do_create(datasets, argv[1:]),
+        "snapshot": lambda: do_snapshot(datasets, argv[1:]),
+        "clone": lambda: do_clone(datasets, argv[1:]),
+        "mount": lambda: do_mount(datasets, argv[1:]),
+        "umount": lambda: None,
+        "get": lambda: do_get(datasets, argv[1:]),
+        "set": lambda: do_set(datasets, argv[1:]),
+        "destroy": lambda: do_destroy(datasets, argv[1:]),
+    }
+    if argv[:1] and argv[0] in handlers:
+        handlers[argv[0]]()
+        save(inventory)
+        return
+
+    sys.exit("stub zfs: unhandled invocation: {}".format(" ".join(argv)))
+
+
+main()
