@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright 2018-2020 Delphix
+# Copyright 2018-2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,6 +100,16 @@ sed -i "s/@@PACKAGED_APP_VERSION@@/$DELPHIX_PACKAGED_APP_VERSION/" version.info 
 	die "failed to set PACKAGED_APP_VERSION in version.info file"
 
 #
+# Only a sparse build sets DELPHIX_UPGRADE_REQUIRED_BASE_VERSION, to the
+# image its repository was diffed against. An image built from a
+# repository that holds every package it installs leaves the field empty,
+# which is what tells the appliance it may be applied to any version the
+# gates above allow.
+#
+sed -i "s/@@REQUIRED_BASE_VERSION@@/$DELPHIX_UPGRADE_REQUIRED_BASE_VERSION/" version.info ||
+	die "failed to set REQUIRED_BASE_VERSION in version.info file"
+
+#
 # On 6.0 versions, the virtualization application expects to find the
 # "verification-version.info" file within the unpacked upgrade image
 # directory. Thus, to satisfy those requirements, we must provide that
@@ -144,6 +154,15 @@ else
 	sed -i "s/@@MINIMUM_REBOOT_OPTIONAL_VERSION@@/0.0.0.0/" version.info ||
 		die "failed to set MINIMUM_REBOOT_OPTIONAL_VERSION in version.info"
 fi
+
+#
+# A field left unsubstituted reaches the engine as the template's own
+# placeholder. REQUIRED_BASE_VERSION in that state matches no installed
+# version, so every engine would refuse the image; fail the build here
+# instead.
+#
+! grep -q '@@' version.info ||
+	die "version.info has an unsubstituted field: $(grep '@@' version.info)"
 
 cp "$TOP/upgrade/prepare" prepare || die "failed to copy prepare"
 
