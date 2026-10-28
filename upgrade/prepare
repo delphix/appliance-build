@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018, 2019 Delphix
+# Copyright 2018, 2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -116,6 +116,28 @@ fi
 [[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION variable is empty"
 [[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
 	die "MINIMUM_REBOOT_OPTIONAL_VERSION variable is empty"
+
+#
+# Only a sparse image sets this. Such an image holds just the packages
+# that the release named here does not already have, so every other
+# package it installs has to be present at the version that release
+# shipped. On any other release the upgrade gets as far as the upgrade
+# container and dies there on a package it has no source for, once the
+# appliance has already been put into upgrade mode. Refuse it here,
+# where the combined image of the same hotfix is still an option.
+#
+if [[ -n "$REQUIRED_BASE_VERSION" ]]; then
+	INSTALLED_VERSION=$(get-appliance-version) ||
+		die "failed to determine the installed version"
+
+	if [[ "$INSTALLED_VERSION" != "$REQUIRED_BASE_VERSION" ]]; then
+		rm -f "$UNPACK_DIR/$EXTRACTED_MARKER"
+		die 19 "this upgrade image applies only to version" \
+			"$REQUIRED_BASE_VERSION, and this appliance is running" \
+			"$INSTALLED_VERSION; upload the combined image of this" \
+			"hotfix instead"
+	fi
+fi
 
 if $opt_x; then
 	sed -i \

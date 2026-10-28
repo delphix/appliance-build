@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,3 +72,16 @@ MINIMUM_REBOOT_OPTIONAL_VERSION=@@MINIMUM_REBOOT_OPTIONAL_VERSION@@
 # The version of the upgrade verification package contained in the upgrade image.
 #
 VERIFICATION_VERSION=@@VERIFICATION_VERSION@@
+
+#
+# The product version an engine must have installed, exactly, in order to
+# upgrade using this upgrade image. Empty for an image that carries every
+# package of the version it installs.
+#
+# A sparse image carries only the packages that the version named here
+# does not already have, and relies on the engine for the rest, so it can
+# be applied to that version and no other. This is a separate field from
+# MINIMUM_VERSION above because that one is also persisted onto the engine
+# as the minimum version it will accept replication from.
+#
+REQUIRED_BASE_VERSION=@@REQUIRED_BASE_VERSION@@
