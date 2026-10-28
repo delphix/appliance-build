@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018, 2019 Delphix
+# Copyright 2018, 2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,12 @@
 # limitations under the License.
 #
 UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
+
+#
+# Where the appliance's own version reporters live. unpack-image, which
+# hands this script the image, calls them by absolute path too.
+#
+APPLIANCE_BIN=${APPLIANCE_BIN:-/usr/bin}
 
 #
 # Records that the image's payload has been extracted into the unpack
@@ -116,6 +122,37 @@ fi
 [[ -n "$MINIMUM_VERSION" ]] || die "MINIMUM_VERSION variable is empty"
 [[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
 	die "MINIMUM_REBOOT_OPTIONAL_VERSION variable is empty"
+
+#
+# Only a sparse image sets this. Such an image holds just the packages
+# that one other image does not already have, so every package it
+# installs that is not in it has to be present at the version that other
+# image shipped. That makes it installable on exactly the appliance that
+# image produces, and the field names it, in the same form this script
+# gives an image below. Anywhere else the upgrade gets as far as the
+# upgrade container and dies there on a package it has no source for,
+# once the appliance has already been put into upgrade mode. Refuse it
+# here, where the combined image of the same hotfix is still an option.
+#
+if [[ -n "$REQUIRED_BASE_VERSION" ]]; then
+	INSTALLED=$("$APPLIANCE_BIN/get-appliance-version") ||
+		die "failed to determine the installed version"
+	INSTALLED_HOTFIX=$("$APPLIANCE_BIN/get-hotfix-version") ||
+		die "failed to determine the installed hotfix version"
+	INSTALLED_APP_VERSION=$("$APPLIANCE_BIN/get-packaged-app-version") ||
+		die "failed to determine the installed app version"
+
+	INSTALLED="$INSTALLED${INSTALLED_HOTFIX:+-$INSTALLED_HOTFIX}"
+	INSTALLED="$INSTALLED${INSTALLED_APP_VERSION:+-$INSTALLED_APP_VERSION}"
+
+	if [[ "$INSTALLED" != "$REQUIRED_BASE_VERSION" ]]; then
+		rm -f "$UNPACK_DIR/$EXTRACTED_MARKER"
+		die 19 "this upgrade image applies only to version" \
+			"$REQUIRED_BASE_VERSION, and this appliance is running" \
+			"$INSTALLED; upload the combined image of this hotfix" \
+			"instead"
+	fi
+fi
 
 if $opt_x; then
 	sed -i \
