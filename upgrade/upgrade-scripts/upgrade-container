@@ -257,6 +257,22 @@ function create_upgrade_container() {
 			die "failed to create override file for '$svc' service"
 	done
 
+	#
+	# The upgrade verification checks run inside the container, where
+	# they can't query the host's systemd. Thus, we record the state
+	# of the host's Data Control Tower service for them here. DCT
+	# upgrades its database the first time it starts on a 2026.5
+	# release, and the checks refuse an upgrade to a release that
+	# can't open the old database format until DCT has finished
+	# starting. A failure here isn't fatal: the checks treat a
+	# missing record as an unknown state.
+	#
+	mkdir -p "$DIRECTORY/var/lib/upgrade-container/host-units" &&
+		systemctl show delphix-dct.service \
+			--property=LoadState,ActiveState,SubState,StatusText \
+			>"$DIRECTORY/var/lib/upgrade-container/host-units/delphix-dct.service" ||
+		warn "failed to record the state of the 'delphix-dct' service"
+
 	mkdir -p "/etc/systemd/nspawn" ||
 		die "failed to create directory: '/etc/systemd/nspawn'"
 
