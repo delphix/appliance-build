@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Delphix
+# Copyright 2018, 2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,3 +72,21 @@ MINIMUM_REBOOT_OPTIONAL_VERSION=@@MINIMUM_REBOOT_OPTIONAL_VERSION@@
 # The version of the upgrade verification package contained in the upgrade image.
 #
 VERIFICATION_VERSION=@@VERIFICATION_VERSION@@
+
+#
+# The image an appliance must already have installed, exactly, in order to
+# upgrade using this upgrade image. Empty for an image that carries every
+# package of the version it installs.
+#
+# A sparse image carries only the packages that the image named here does
+# not already have, and relies on the appliance for the rest, so it can be
+# applied to the appliance that image produces and no other. The value is
+# the VERSION, HOTFIX and PACKAGED_APP_VERSION of that image joined by
+# "-", the same form the "prepare" upgrade-script gives an image, so an
+# appliance carrying a hotfix is told apart from one that is not.
+#
+# This is a separate field from MINIMUM_VERSION above because that one is
+# also persisted onto the appliance as the minimum version it will accept
+# replication from.
+#
+REQUIRED_BASE_VERSION=@@REQUIRED_BASE_VERSION@@
