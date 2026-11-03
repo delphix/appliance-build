@@ -36,8 +36,8 @@
 # installed package (jars, npm modules, Rust crates, etc.) isn't
 # attributable this way, so language-level catalogers are left off here
 # to avoid misattributing it; that content is covered separately by
-# per-package sidecar SBOMs produced upstream in linux-pkg, merged in at
-# a later stage.
+# per-package SBOMs produced upstream in linux-pkg, which
+# run-live-build.sh merges into this document once the image is built.
 #
 # SYFT_FILE_METADATA_SELECTION=none suppresses Syft's default behavior of
 # emitting a separate CycloneDX "file" component (with SHA-1/SHA-256
@@ -53,6 +53,36 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 	--source-name "$ARTIFACT_NAME" \
 	--source-version "$DELPHIX_APPLIANCE_VERSION" \
 	-o "cyclonedx-json@1.6=$ARTIFACT_NAME.cdx.json"
+
+#
+# Syft types the document's root component by what it scanned, and scanning
+# a directory makes it "file". Mend's support team stated that their importer
+# only treats metadata.component as the project root when it is typed
+# "application", so retype it here. This is done where the document is
+# produced, rather than when per-package SBOMs are merged into it later
+# (scripts/merge-package-sboms.sh), so that it holds for every image --
+# including one with nothing to merge -- and the merged document simply
+# inherits it.
+#
+#
+# Mend also rejects the whole document if a license "id" isn't on its own list
+# of SPDX identifiers, which is shorter than the real SPDX list. These two are
+# valid SPDX ids that Debian's copyright files use (SMAIL-GPL on debianutils,
+# Artistic-dist on perl), so carry them as free-text license names instead,
+# which CycloneDX allows. Add to this list if Mend reports another.
+#
+jq '
+	["SMAIL-GPL", "Artistic-dist"] as $unknown_to_mend
+	| .metadata.component.type = "application"
+	| .components |= map(
+		if .licenses then
+			.licenses |= map(
+				if .license.id and (.license.id | IN($unknown_to_mend[]))
+				then .license = {name: .license.id}
+				else . end)
+		else . end)
+' "$ARTIFACT_NAME.cdx.json" >"$ARTIFACT_NAME.cdx.json.tmp"
+mv "$ARTIFACT_NAME.cdx.json.tmp" "$ARTIFACT_NAME.cdx.json"
 
 cyclonedx-cli validate \
 	--input-file "$ARTIFACT_NAME.cdx.json" \

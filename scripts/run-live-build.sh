@@ -202,6 +202,28 @@ oci) vm_artifact_ext=qcow2 ;;
 esac
 
 #
+# Merge the per-package SBOMs that build-ancillary-repository.sh kept into
+# this image's SBOM, nesting each one's components under the .deb it
+# describes (see scripts/merge-package-sboms.sh). This runs here, on the
+# finished image, rather than in a live-build hook, because only the host
+# side has the kept SBOMs, and the merge must run once per variant/platform
+# against that combination's own set of installed .debs.
+#
+# The merged document is re-validated, since it is what gets published:
+# a structurally broken result must fail the build, the same as it would
+# coming straight out of the hook.
+#
+if [[ -f "$ARTIFACT_NAME.cdx.json" ]]; then
+	"$TOP/scripts/merge-package-sboms.sh" "$ARTIFACT_NAME.cdx.json" \
+		"$TOP/live-build/build/sboms"
+	cyclonedx-cli validate \
+		--input-file "$ARTIFACT_NAME.cdx.json" \
+		--input-format json \
+		--input-version v1_6 \
+		--fail-on-errors
+fi
+
+#
 # After running the build successfully, it should have produced various
 # virtual machine artifacts. We move these artifacts into a specific
 # directory to make it easy for the artifacts to be consumed by the
