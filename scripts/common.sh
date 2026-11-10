@@ -267,3 +267,33 @@ function check_env() {
 	[[ -n "$val" ]] || die "check_env: $1 must be non-empty"
 	return 0
 }
+
+#
+# Print the base Ubuntu suite (e.g. "noble" or "resolute") that the given
+# package mirror publishes.
+#
+# Different branches mirror different Ubuntu releases (the os-upgrade branch
+# mirrors the next release under test, not the current one), so the suite
+# can't be hardcoded. The mirror's "dists" directory listing is the source of
+# truth: the base suite is the one entry without a "-backports", "-security",
+# "-updates" or "-pgdg" suffix.
+#
+function get_ubuntu_suite() {
+	local mirror_url="$1"
+	local listing
+	local suite_names
+	local suites
+
+	[[ -n "$mirror_url" ]] || die "get_ubuntu_suite: no package mirror URL given"
+
+	listing=$(curl --silent --show-error --fail --location "$mirror_url/dists/") ||
+		die "get_ubuntu_suite: unable to list $mirror_url/dists/"
+
+	suite_names=$(grep -oE 'href="[a-z]+/"' <<<"$listing" | sed -E 's|href="([a-z]+)/"|\1|' || true)
+	# shellcheck disable=SC2206
+	suites=($suite_names)
+	[[ ${#suites[@]} -eq 1 ]] ||
+		die "get_ubuntu_suite: expected exactly one base suite in $mirror_url/dists/, found: ${suites[*]:-none}"
+
+	echo "${suites[0]}"
+}

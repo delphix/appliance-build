@@ -14,6 +14,6 @@
 # limitations under the License.
 #
 
-deb @@URL@@ noble main multiverse universe contrib stable
-deb @@URL@@ noble-pgdg main
+deb @@URL@@ @@SUITE@@ main multiverse universe contrib stable
+deb @@URL@@ @@SUITE@@-pgdg main
 deb @@URL@@ stable main

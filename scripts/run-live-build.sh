@@ -74,6 +74,15 @@ export APPLIANCE_PLATFORM="$2"
 export RUN_TYPE="$3"
 export ARTIFACT_NAME="$APPLIANCE_VARIANT-$APPLIANCE_PLATFORM"
 
+#
+# The Ubuntu suite to build against is whichever one the main package mirror
+# publishes. It can be overridden by setting DELPHIX_UBUNTU_SUITE.
+#
+if [[ -z "${DELPHIX_UBUNTU_SUITE:-}" ]]; then
+	DELPHIX_UBUNTU_SUITE=$(get_ubuntu_suite "$DELPHIX_PACKAGE_MIRROR_MAIN")
+fi
+export DELPHIX_UBUNTU_SUITE
+
 if [[ ! -d "$TOP/live-build/variants/$APPLIANCE_VARIANT" ]]; then
 	echo "Invalid live-build variant specified: $1" 1>&2
 	exit 1
@@ -142,7 +151,8 @@ while ! curl --output /dev/null --silent --head --fail \
 	sleep 1
 done
 
-sed "s|@@URL@@|$DELPHIX_PACKAGE_MIRROR_SECONDARY|" \
+sed -e "s|@@URL@@|$DELPHIX_PACKAGE_MIRROR_SECONDARY|" \
+	-e "s|@@SUITE@@|$DELPHIX_UBUNTU_SUITE|g" \
 	<config/archives/delphix-secondary-mirror.list.in \
 	>config/archives/delphix-secondary-mirror.list
 
