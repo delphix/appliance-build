@@ -71,6 +71,7 @@
       - aptly
       - bc
       - coreutils
+      - debootstrap
       - devscripts
       - equivs
       - gdisk
@@ -94,6 +95,22 @@
       - zfsutils-linux
     state: present
     update_cache: true
+
+# debootstrap only ships a script for the Ubuntu releases that existed when its package was built,
+# so a branch that builds against a newer release (e.g. os-upgrade) fails with "No such script".
+# Every Ubuntu release is bootstrapped by the same generic script (gutsy), which is how debootstrap
+# itself defines each new release, so link the missing one to it.
+- name: Check for a debootstrap script for the Ubuntu suite
+  ansible.builtin.stat:
+    path: "/usr/share/debootstrap/scripts/{{ ubuntu_suite }}"
+  register: debootstrap_suite_script
+
+- name: Link the debootstrap script for the Ubuntu suite to the generic Ubuntu script
+  ansible.builtin.file:
+    src: gutsy
+    dest: "/usr/share/debootstrap/scripts/{{ ubuntu_suite }}"
+    state: link
+  when: not debootstrap_suite_script.stat.exists
 
 # awscli is distributed via pip or snap on 24.04. While the package is not required by the product,
 # it is required by appliance-build itself.
