@@ -47,6 +47,7 @@ IMAGE_VERSION=2026.5.0.2
 BASE_VERSION=2026.5.0.2
 OTHER_VERSION=2026.5.0.1
 OTHER_HOTFIX=HF-1600
+APP_VERSION=7.0.0.0
 TEST_ROOT=""
 APPLIANCE_BIN=""
 
@@ -357,10 +358,11 @@ function test_rejects_a_sparse_image_on_a_hotfixed_appliance() {
 	UPDATE_DIR="$update_dir" "$PREPARE" "$unpack_dir" 2>/dev/null || rc=$?
 
 	[[ $rc -eq 19 ]] ||
-		fail "prepare exited $rc on a sparse image for an appliance with no hotfix, expected 19"
+		fail "prepare exited $rc on a sparse image on a hotfixed appliance, expected 19"
 	[[ ! -d "$update_dir/$IMAGE_VERSION" ]] ||
 		fail "prepare installed a sparse image the appliance cannot upgrade with"
-	pass "prepare refuses a sparse image built against an appliance without this hotfix"
+	[[ ! -d "$unpack_dir" ]] || fail "prepare left the refused image behind"
+	pass "prepare refuses a sparse image on an appliance carrying another hotfix"
 }
 
 #
@@ -405,6 +407,93 @@ function test_unpacks_a_sparse_image_on_its_base_hotfix() {
 	pass "prepare unpacks a sparse image built against the hotfix in use"
 }
 
+#
+# An appliance with a packaged app installed reports its version too, and
+# a sparse image built against that appliance names it the same way.
+#
+function test_unpacks_a_sparse_image_on_its_base_app_version() {
+	local update_dir unpack_dir rc
+
+	update_dir=$(make_update_dir unpacks-a-sparse-image-on-its-base-app-version)
+	unpack_dir=$(make_unpack_dir "$update_dir" "$BASE_VERSION-$APP_VERSION")
+	set_appliance_version "$BASE_VERSION" "" "$APP_VERSION"
+
+	log "Running prepare on a sparse image built against" \
+		"$BASE_VERSION-$APP_VERSION, on an appliance running it"
+	rc=0
+	UPDATE_DIR="$update_dir" "$PREPARE" "$unpack_dir" || rc=$?
+
+	[[ $rc -eq 0 ]] || fail "prepare exited $rc on a sparse image for this appliance"
+	assert_image_is_unpacked "$update_dir"
+	pass "prepare unpacks a sparse image built against the app version in use"
+}
+
+#
+# Releases older than the hotfix and packaged app reporters have neither
+# a hotfix nor a packaged app to report. prepare still has to tell them
+# apart from the base, and still accept the base without them.
+#
+function test_handles_an_appliance_without_the_newer_reporters() {
+	local update_dir unpack_dir rc
+
+	update_dir=$(make_update_dir handles-an-appliance-without-the-newer-reporters)
+	unpack_dir=$(make_unpack_dir "$update_dir" "$BASE_VERSION")
+	set_appliance_version "$OTHER_VERSION"
+	rm "$APPLIANCE_BIN/get-hotfix-version" "$APPLIANCE_BIN/get-packaged-app-version"
+
+	log "Running prepare on a sparse image built against $BASE_VERSION," \
+		"on an appliance running $OTHER_VERSION with no hotfix or app reporter"
+	rc=0
+	UPDATE_DIR="$update_dir" "$PREPARE" "$unpack_dir" 2>/dev/null || rc=$?
+
+	[[ $rc -eq 19 ]] ||
+		fail "prepare exited $rc on an appliance without the newer reporters, expected 19"
+	[[ ! -d "$unpack_dir" ]] || fail "prepare left the refused image behind"
+
+	unpack_dir=$(make_unpack_dir "$update_dir" "$BASE_VERSION")
+	write_reporter get-appliance-version "$BASE_VERSION"
+
+	log "Running prepare on the same image, on an appliance running" \
+		"$BASE_VERSION with no hotfix or app reporter"
+	rc=0
+	UPDATE_DIR="$update_dir" "$PREPARE" "$unpack_dir" || rc=$?
+
+	[[ $rc -eq 0 ]] ||
+		fail "prepare exited $rc on its base without the newer reporters, expected 0"
+	assert_image_is_unpacked "$update_dir"
+	set_appliance_version "$IMAGE_VERSION"
+	pass "prepare checks an appliance without the hotfix and app reporters"
+}
+
+#
+# Once a sparse image is installed, applying it moves the appliance off
+# the image it was built against. Someone recovering an upgrade by hand
+# may run prepare over the installed image again, and that must not
+# delete it.
+#
+function test_keeps_an_installed_sparse_image_off_its_base() {
+	local update_dir unpack_dir rc
+
+	update_dir=$(make_update_dir keeps-an-installed-sparse-image-off-its-base)
+	unpack_dir=$(make_unpack_dir "$update_dir" "$BASE_VERSION")
+	set_appliance_version "$BASE_VERSION"
+
+	UPDATE_DIR="$update_dir" "$PREPARE" "$unpack_dir" >/dev/null ||
+		fail "prepare failed to unpack a sparse image on its base"
+
+	set_appliance_version "$BASE_VERSION" "$OTHER_HOTFIX"
+
+	log "Running prepare -f over an installed sparse image, on an" \
+		"appliance no longer running its base"
+	rc=0
+	UPDATE_DIR="$update_dir" "$PREPARE" -f "$update_dir/$IMAGE_VERSION" 2>/dev/null || rc=$?
+
+	[[ $rc -eq 18 ]] ||
+		fail "prepare -f exited $rc over an installed sparse image, expected 18"
+	assert_image_is_unpacked "$update_dir"
+	pass "prepare leaves an installed sparse image in place off its base"
+}
+
 function main() {
 	[[ -x "$PREPARE" ]] || fail "missing executable script: '$PREPARE'"
 
@@ -431,6 +520,9 @@ function main() {
 	test_rejects_a_sparse_image_on_a_hotfixed_appliance
 	test_unpacks_a_sparse_image_on_its_base_release
 	test_unpacks_a_sparse_image_on_its_base_hotfix
+	test_unpacks_a_sparse_image_on_its_base_app_version
+	test_handles_an_appliance_without_the_newer_reporters
+	test_keeps_an_installed_sparse_image_off_its_base
 
 	pass "All prepare tests passed"
 }
