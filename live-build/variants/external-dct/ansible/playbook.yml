@@ -24,5 +24,12 @@
   roles:
     - appliance-build.minimal-common
     - appliance-build.dct-common
-    - appliance-build.ucf-common
+    #
+    # A DCT release that doesn't ship UCF (PUC) builds without its packages:
+    # devops-gate's appliance-build-stage1 sets DELPHIX_INCLUDE_UCF=false
+    # from INCLUDE_UCF, and leaves AWS_S3_URI_UCF_PACKAGES empty. Unset, or
+    # any other value, installs UCF as before.
+    #
+    - role: appliance-build.ucf-common
+      when: lookup('env', 'DELPHIX_INCLUDE_UCF') != 'false'
     - appliance-build.virtualization-common
