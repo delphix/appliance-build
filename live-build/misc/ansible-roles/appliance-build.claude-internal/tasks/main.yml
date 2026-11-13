@@ -347,8 +347,7 @@
         for login shells.
 
       ## Git and PRs
-      - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push. Do
-        not use git review, even where a repo's docs say to.
+      - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push.
       - Name development branches projects/<slug>. Delphix branch protection permits
         creating, force-pushing, and deleting branches only under projects/; other
         namespaces are rejected.
