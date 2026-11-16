@@ -60,6 +60,8 @@
         src: "{{ release_download.path }}/release.tar.gz"
         dest: "{{ agents_internal_opt_dir }}/{{ release_name }}/{{ release_version }}"
         remote_src: true
+        owner: root
+        group: root
 
   always:
     - name: Remove the download of {{ release_name }}

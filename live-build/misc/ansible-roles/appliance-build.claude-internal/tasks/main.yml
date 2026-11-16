@@ -90,7 +90,7 @@
 
 # The language servers the LSP plugins below drive. They go in /usr/local/bin and
 # /usr/bin so that every session finds them: a PATH entry in /etc/profile.d, the way
-# git-utils is added above, reaches login shells but not an automated `claude -p`.
+# agents-internal adds git-utils, reaches login shells but not an automated `claude -p`.
 # rust-analyzer is already on the image, from the delphix-rust package. The pyright
 # version is pinned so that an image build is reproducible rather than taking whatever
 # npm published that day; clangd's is a function of the apt mirror the image builds
@@ -176,8 +176,8 @@
 # team has vetted are enabled; zfs and hotfix depend on git and blackbox, which are
 # listed so the whole enabled set is visible here. attribution is pinned true here too,
 # so no user or project setting can turn Claude co-authorship off. The auto-updater is
-# off because the image pins Claude Code's version, and the updater cannot replace the
-# root-owned install anyway.
+# off because the image pins Claude Code's version; left on, it would install a newer
+# copy under ~/.local/bin, ahead of the pinned one on a login shell's PATH.
 #
 # This task comes last, after the plugins above are installed. A `claude plugin install`
 # run with these settings already in place leaves the plugin out of
