@@ -15,11 +15,17 @@
 #
 
 ---
-- name: Install Claude CLI via npm
-  ansible.builtin.command: npm install -g @anthropic-ai/claude-code
-  args:
-    creates: /usr/local/bin/claude
-  changed_when: true
+- name: Install Claude Code
+  ansible.builtin.include_role:
+    name: appliance-build.agents-internal
+    tasks_from: install-release
+  vars:
+    release_name: claude
+    release_version: "{{ claude_internal_version }}"
+    release_url: "https://downloads.claude.ai/claude-code-releases/{{ claude_internal_version }}/linux-x64/claude"
+    release_sha256: "{{ claude_internal_sha256 }}"
+    release_archive: false
+    release_binary: claude
 
 - name: Create the Claude Code system configuration directories
   ansible.builtin.file:
@@ -51,7 +57,7 @@
         walk on a cold cache.
       - ~delphix/src holds a clone of every repo the engine is built from, plus the build,
         CI, and agent-tooling repos; the list is agents_internal_repos in
-        ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.claude-internal/defaults/main.yml.
+        ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.agents-internal/defaults/main.yml.
         Clones are only as current as the image build: git fetch before trusting them.
         The linux-kernel-* clones are shallow; git fetch --unshallow before blame or bisect.
 
@@ -113,6 +119,7 @@
   ansible.builtin.command: claude plugin marketplace add anthropics/claude-plugins-official
   environment:
     HOME: "{{ agents_internal_home_dir }}"
+    DISABLE_AUTOUPDATER: "1"
   args:
     creates: "{{ agents_internal_home_dir }}/.claude/plugins/marketplaces/claude-plugins-official"
 
@@ -120,6 +127,7 @@
   ansible.builtin.command: claude plugin install {{ item }}@claude-plugins-official
   environment:
     HOME: "{{ agents_internal_home_dir }}"
+    DISABLE_AUTOUPDATER: "1"
   args:
     creates: "{{ agents_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/{{ item }}"
   loop: "{{ claude_internal_official_plugins }}"
@@ -167,7 +175,9 @@
 # checks out a PLUGINS_BRANCH there gets that branch's plugins. Only plugins the platform
 # team has vetted are enabled; zfs and hotfix depend on git and blackbox, which are
 # listed so the whole enabled set is visible here. attribution is pinned true here too,
-# so no user or project setting can turn Claude co-authorship off.
+# so no user or project setting can turn Claude co-authorship off. The auto-updater is
+# off because the image pins Claude Code's version, and the updater cannot replace the
+# root-owned install anyway.
 #
 # This task comes last, after the plugins above are installed. A `claude plugin install`
 # run with these settings already in place leaves the plugin out of
@@ -222,5 +232,8 @@
           "pyright-lsp@claude-plugins-official": true,
           "rust-analyzer-lsp@claude-plugins-official": true
         },
-        "attribution": true
+        "attribution": true,
+        "env": {
+          "DISABLE_AUTOUPDATER": "1"
+        }
       }

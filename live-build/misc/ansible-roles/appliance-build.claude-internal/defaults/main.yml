@@ -15,6 +15,15 @@
 #
 
 ---
+#
+# The Claude Code release installed, from downloads.claude.ai. Bump both together: the
+# sha256 is the linux-x64 checksum in
+# https://downloads.claude.ai/claude-code-releases/<version>/manifest.json.
+#
+claude_internal_version: "2.1.325"
+claude_internal_sha256: 0dc4f4a9a165fc60746d7ae8489712e5fc352f1e7ad4eb22e7141bd0812eb0cf
+
+#
 # The official-marketplace plugins pre-installed for the delphix user. Installed is not
 # enabled: which of these load is up to enabledPlugins in the managed drop-in, and
 # clangd-lsp is deliberately left out of it. The tasks file both installs this list and
