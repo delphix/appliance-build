@@ -26,3 +26,23 @@
     release_sha256: "{{ opencode_internal_sha256 }}"
     release_archive: true
     release_binary: opencode
+
+- name: Create the opencode managed configuration directory
+  ansible.builtin.file:
+    path: /etc/opencode
+    state: directory
+    mode: "0755"
+
+# opencode merges /etc/opencode/opencode.json over every user's own configuration. It
+# reads a repo's CLAUDE.md natively. autoupdate is off because the image pins the
+# release; left on, opencode replaces itself at startup.
+- name: Install the opencode managed configuration
+  ansible.builtin.copy:
+    dest: /etc/opencode/opencode.json
+    mode: "0644"
+    content: |
+      {
+        "$schema": "https://opencode.ai/config.json",
+        "instructions": ["/etc/agents/AGENTS.md"],
+        "autoupdate": false
+      }

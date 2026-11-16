@@ -289,3 +289,17 @@
     dest: /etc/profile.d/knowledge-graph.sh
     mode: "0644"
     content: 'export KG_DIR="{{ agents_internal_src_dir }}/knowledge-graph"'
+
+- name: Create the agent instructions directory
+  ansible.builtin.file:
+    path: /etc/agents
+    state: directory
+    mode: "0755"
+
+- name: Install the agent instructions
+  ansible.builtin.copy:
+    dest: /etc/agents/AGENTS.md
+    mode: "0644"
+    content: |
+      <!-- Installed by appliance-build.agents-internal -- edit that role, not this file. -->
+      {{ agents_internal_instructions }}

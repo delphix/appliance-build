@@ -184,3 +184,55 @@ agents_internal_repos:
 #
 agents_internal_opt_dir: /opt
 agents_internal_bin_dir: /usr/local/bin
+
+#
+# Facts about this image that every agent session would otherwise re-derive, installed
+# as /etc/agents/AGENTS.md. Each harness role hands this text to its harness in whatever
+# way that harness reads global instructions. Workflow guidance belongs in skills instead.
+#
+agents_internal_instructions: |
+  # This machine: the Delphix internal-claude image
+
+  ## Filesystem
+  - /nas is an NFS mount of the support-tools NAS: every customer's support bundles,
+    far too large to walk. Never search from / (find /, grep -r /, du /), and add -xdev
+    when a whole-disk search is unavoidable.
+  - To find source, search the one repo it belongs to: git -C ~delphix/src/<repo>
+    ls-files or rg there. Even ~delphix/src as a whole is over 600,000 files, slow to
+    walk on a cold cache.
+  - ~delphix/src holds a clone of every repo the engine is built from, plus the build,
+    CI, and agent-tooling repos; the list is agents_internal_repos in
+    ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.agents-internal/defaults/main.yml.
+    Clones are only as current as the image build: git fetch before trusting them.
+    The linux-kernel-* clones are shallow; git fetch --unshallow before blame or bisect.
+
+  ## Team knowledge graph
+  - delphix/knowledge-graph is cloned at $KG_DIR (~delphix/src/knowledge-graph):
+    escalation postmortems, CI known failures, investigations, subsystem notes.
+  - Before investigating or root-causing a Delphix problem, git -C $KG_DIR pull and
+    read $KG_DIR/INDEX.md for prior art.
+  - Record anything a teammate could reuse with the kg skills: /kg:ingest, or
+    kg:ingest-escl-postmortem / kg:ingest-known-failure for those cases. Where the
+    harness has no skills, read their SKILL.md under
+    ~delphix/src/platform-team-claude-plugins/plugins/kg/skills/ and follow it. Never
+    hand-edit INDEX.md; it is generated. The kg skills push to main directly, no PR.
+
+  ## Tools
+  - dc (DCenter CLI) runs locally. Interactively, run dc login once; in automation,
+    export DLPX_DEFAULT_CREDENTIALS=true to use the AWS credential chain.
+  - gh is installed; interactively, run gh auth login once. git-utils/bin is on PATH
+    for login shells.
+
+  ## Git and PRs
+  - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push.
+  - Name development branches projects/<slug>. Delphix branch protection permits
+    creating, force-pushing, and deleting branches only under projects/; other
+    namespaces are rejected.
+  - Commit, branch, PR and linking conventions come from the git, github and writing
+    plugins in ~delphix/src/platform-team-claude-plugins/plugins/. Claude Code loads
+    them as skills; other harnesses can read the SKILL.md files there directly.
+
+  ## Agent configuration
+  - These instructions come from the appliance-build.agents-internal role. Each
+    harness's own role (appliance-build.<harness>-internal) hands them to that harness
+    and holds the rest of its configuration. Change them there, not on the VM.

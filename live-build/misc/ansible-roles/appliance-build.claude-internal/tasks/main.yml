@@ -38,55 +38,14 @@
 
 # Claude Code loads /etc/claude-code/CLAUDE.md into every session on the machine --
 # interactive, `claude -p`, and the Agent SDK -- ahead of any user or project CLAUDE.md.
-# It holds facts about this image that every session would otherwise re-derive; workflow
-# guidance belongs in the plugins' skills instead.
+# Its text is the instructions agents-internal installs for every harness.
 - name: Install the system-wide CLAUDE.md
   ansible.builtin.copy:
     dest: /etc/claude-code/CLAUDE.md
     mode: "0644"
     content: |
-      <!-- Installed by appliance-build.claude-internal -- edit that role, not this file. -->
-      # This machine: the Delphix internal-claude image
-
-      ## Filesystem
-      - /nas is an NFS mount of the support-tools NAS: every customer's support bundles,
-        far too large to walk. Never search from / (find /, grep -r /, du /), and add -xdev
-        when a whole-disk search is unavoidable.
-      - To find source, search the one repo it belongs to: git -C ~delphix/src/<repo>
-        ls-files or rg there. Even ~delphix/src as a whole is over 600,000 files, slow to
-        walk on a cold cache.
-      - ~delphix/src holds a clone of every repo the engine is built from, plus the build,
-        CI, and agent-tooling repos; the list is agents_internal_repos in
-        ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.agents-internal/defaults/main.yml.
-        Clones are only as current as the image build: git fetch before trusting them.
-        The linux-kernel-* clones are shallow; git fetch --unshallow before blame or bisect.
-
-      ## Team knowledge graph
-      - delphix/knowledge-graph is cloned at $KG_DIR (~delphix/src/knowledge-graph):
-        escalation postmortems, CI known failures, investigations, subsystem notes.
-      - Before investigating or root-causing a Delphix problem, git -C $KG_DIR pull and
-        read $KG_DIR/INDEX.md for prior art.
-      - Record anything a teammate could reuse with the kg skills: /kg:ingest, or
-        kg:ingest-escl-postmortem / kg:ingest-known-failure for those cases. Never
-        hand-edit INDEX.md; it is generated. The kg skills push to main directly, no PR.
-
-      ## Tools
-      - dc (DCenter CLI) runs locally. Interactively, run dc login once; in automation,
-        export DLPX_DEFAULT_CREDENTIALS=true to use the AWS credential chain.
-      - gh is installed; interactively, run gh auth login once. git-utils/bin is on PATH
-        for login shells.
-
-      ## Git and PRs
-      - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push.
-      - Name development branches projects/<slug>. Delphix branch protection permits
-        creating, force-pushing, and deleting branches only under projects/; other
-        namespaces are rejected.
-      - Commit, branch, PR and linking conventions come from the git, github and writing
-        plugins; their skills load as needed.
-
-      ## Claude Code configuration
-      - This file and the plugins in /etc/claude-code/managed-settings.d/ are installed by
-        the appliance-build.claude-internal role; change them there, not on the VM.
+      <!-- Installed by appliance-build.claude-internal -- edit appliance-build.agents-internal's agents_internal_instructions, not this file. -->
+      {{ agents_internal_instructions }}
 
 # The language servers the LSP plugins below drive. They go in /usr/local/bin and
 # /usr/bin so that every session finds them: a PATH entry in /etc/profile.d, the way

@@ -28,3 +28,26 @@
     release_sha256: "{{ pi_internal_sha256 }}"
     release_archive: true
     release_binary: pi/pi
+
+# pi has no system-wide configuration; it reads global instructions only from
+# ~/.pi/agent/AGENTS.md. A link keeps the delphix user's copy the image's. pi also writes
+# its sessions and credentials under ~/.pi/agent, so the directories belong to delphix.
+- name: Create the pi agent directory for the delphix user
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: delphix
+    group: staff
+    mode: "0755"
+  loop:
+    - "{{ agents_internal_home_dir }}/.pi"
+    - "{{ agents_internal_home_dir }}/.pi/agent"
+
+- name: Link the agent instructions into pi's agent directory
+  ansible.builtin.file:
+    src: /etc/agents/AGENTS.md
+    dest: "{{ agents_internal_home_dir }}/.pi/agent/AGENTS.md"
+    state: link
+    owner: delphix
+    group: staff
+    follow: false

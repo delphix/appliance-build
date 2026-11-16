@@ -26,3 +26,23 @@
     release_sha256: "{{ codex_internal_sha256 }}"
     release_archive: true
     release_binary: codex-x86_64-unknown-linux-musl
+
+- name: Create the codex system configuration directory
+  ansible.builtin.file:
+    path: /etc/codex
+    state: directory
+    mode: "0755"
+
+# codex reads /etc/codex/config.toml for every user, beneath ~/.codex/config.toml. Its
+# global AGENTS.md is only looked for under ~/.codex, so the image's instructions go in
+# as developer_instructions instead; to_json yields a valid TOML basic string. Several
+# Delphix repos carry a CLAUDE.md and no AGENTS.md, which codex reads only as a fallback
+# name.
+- name: Install the codex system configuration
+  ansible.builtin.copy:
+    dest: /etc/codex/config.toml
+    mode: "0644"
+    content: |
+      # Installed by appliance-build.codex-internal -- edit that role, not this file.
+      developer_instructions = {{ agents_internal_instructions | to_json }}
+      project_doc_fallback_filenames = ["CLAUDE.md"]
