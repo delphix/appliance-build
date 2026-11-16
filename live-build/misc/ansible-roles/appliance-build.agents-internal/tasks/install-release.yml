@@ -1,0 +1,89 @@
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+#
+# Installs one agent harness from a pinned, prebuilt release, for the per-harness roles
+# (claude-internal, codex-internal, ...) to call with include_role/tasks_from. Prebuilt
+# binaries rather than npm packages, so no harness depends on the image's Node.js or on
+# another harness's: each release is self-contained under its own versioned directory.
+#
+# Inputs:
+#   release_name     directory under agents_internal_opt_dir, and the command name
+#   release_version  the pinned version; also the install subdirectory
+#   release_url      the release asset to download
+#   release_sha256   the asset's sha256; a mismatch fails the build
+#   release_archive  true for a .tar.gz to unpack, false when the asset is the binary
+#   release_binary   the executable's path relative to the install directory
+#
+- name: Create the versioned install directory for {{ release_name }}
+  ansible.builtin.file:
+    path: "{{ agents_internal_opt_dir }}/{{ release_name }}/{{ release_version }}"
+    state: directory
+    mode: "0755"
+
+- name: Check whether this version is already unpacked for {{ release_name }}
+  ansible.builtin.stat:
+    path: "{{ agents_internal_opt_dir }}/{{ release_name }}/{{ release_version }}/{{ release_binary }}"
+  register: release_installed
+
+- name: Install from a release archive for {{ release_name }}
+  when: release_archive | bool and not release_installed.stat.exists
+  block:
+    - name: Create a scratch directory for the download of {{ release_name }}
+      ansible.builtin.tempfile:
+        state: directory
+      register: release_download
+
+    - name: Download the release archive of {{ release_name }}
+      ansible.builtin.get_url:
+        url: "{{ release_url }}"
+        dest: "{{ release_download.path }}/release.tar.gz"
+        checksum: "sha256:{{ release_sha256 }}"
+        mode: "0644"
+
+    - name: Unpack the release archive of {{ release_name }}
+      ansible.builtin.unarchive:
+        src: "{{ release_download.path }}/release.tar.gz"
+        dest: "{{ agents_internal_opt_dir }}/{{ release_name }}/{{ release_version }}"
+        remote_src: true
+
+  always:
+    - name: Remove the download of {{ release_name }}
+      ansible.builtin.file:
+        path: "{{ release_download.path }}"
+        state: absent
+      when: release_download.path is defined
+
+- name: Download the release binary of {{ release_name }}
+  ansible.builtin.get_url:
+    url: "{{ release_url }}"
+    dest: "{{ agents_internal_opt_dir }}/{{ release_name }}/{{ release_version }}/{{ release_binary }}"
+    checksum: "sha256:{{ release_sha256 }}"
+    mode: "0755"
+  when: not (release_archive | bool)
+
+- name: Link into agents_internal_bin_dir the binary of {{ release_name }}
+  ansible.builtin.file:
+    src: "{{ agents_internal_opt_dir }}/{{ release_name }}/{{ release_version }}/{{ release_binary }}"
+    dest: "{{ agents_internal_bin_dir }}/{{ release_name }}"
+    state: link
+
+# A release that needs a library the image lacks fails here, during the build, instead of
+# in the first session on a booted VM.
+- name: Check that the installed binary runs for {{ release_name }}
+  ansible.builtin.command: "{{ agents_internal_bin_dir }}/{{ release_name }} --version"
+  changed_when: false
