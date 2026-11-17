@@ -86,6 +86,26 @@
 
 # A release that needs a library the image lacks fails here, during the build, instead of
 # in the first session on a booted VM.
+#
+# The check runs under a throwaway HOME. Even --version makes codex and opencode create
+# their state directories (~/.codex, ~/.local/share/opencode, ...), and under the build's
+# HOME those would be left in ~delphix owned by root, failing every later run as delphix.
 - name: Check that the installed binary runs for {{ release_name }}
-  ansible.builtin.command: "{{ agents_internal_bin_dir }}/{{ release_name }} --version"
-  changed_when: false
+  block:
+    - name: Create a scratch HOME for the check of {{ release_name }}
+      ansible.builtin.tempfile:
+        state: directory
+      register: release_check_home
+
+    - name: Run --version of {{ release_name }}
+      ansible.builtin.command: "{{ agents_internal_bin_dir }}/{{ release_name }} --version"
+      environment:
+        HOME: "{{ release_check_home.path }}"
+      changed_when: false
+
+  always:
+    - name: Remove the scratch HOME of {{ release_name }}
+      ansible.builtin.file:
+        path: "{{ release_check_home.path }}"
+        state: absent
+      when: release_check_home.path is defined
