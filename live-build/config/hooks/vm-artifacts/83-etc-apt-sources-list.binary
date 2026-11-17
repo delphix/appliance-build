@@ -44,7 +44,7 @@ fi
 
 #
 # The internal-claude variant installs gh from GitHub's apt repository (see the
-# appliance-build.claude-internal role); restore that source, removed above, so
+# appliance-build.agents-internal role); restore that source, removed above, so
 # the VM can upgrade gh with apt like the rest of its packages.
 #
 if [[ $APPLIANCE_VARIANT = "internal-claude" ]]; then

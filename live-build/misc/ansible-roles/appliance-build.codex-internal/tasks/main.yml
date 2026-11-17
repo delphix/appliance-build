@@ -1,0 +1,48 @@
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+- name: Install codex
+  ansible.builtin.include_role:
+    name: appliance-build.agents-internal
+    tasks_from: install-release
+  vars:
+    release_name: codex
+    release_version: "{{ codex_internal_version }}"
+    release_url: "https://github.com/openai/codex/releases/download/rust-v{{ codex_internal_version }}/codex-x86_64-unknown-linux-musl.tar.gz"
+    release_sha256: "{{ codex_internal_sha256 }}"
+    release_archive: true
+    release_binary: codex-x86_64-unknown-linux-musl
+
+- name: Create the codex system configuration directory
+  ansible.builtin.file:
+    path: /etc/codex
+    state: directory
+    mode: "0755"
+
+# codex reads /etc/codex/config.toml for every user, beneath ~/.codex/config.toml. Its
+# global AGENTS.md is only looked for under ~/.codex, so the image's instructions go in
+# as developer_instructions instead; to_json yields a valid TOML basic string. Several
+# Delphix repos carry a CLAUDE.md and no AGENTS.md, which codex reads only as a fallback
+# name.
+- name: Install the codex system configuration
+  ansible.builtin.copy:
+    dest: /etc/codex/config.toml
+    mode: "0644"
+    content: |
+      # Installed by appliance-build.codex-internal -- edit that role, not this file.
+      developer_instructions = {{ agents_internal_instructions | to_json }}
+      project_doc_fallback_filenames = ["CLAUDE.md"]
