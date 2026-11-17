@@ -16,9 +16,9 @@
 
 ---
 #
-# The pi coding agent release installed, from the badlogic/pi-mono GitHub releases. Bump
+# The pi coding agent release installed, from the earendil-works/pi GitHub releases. Bump
 # both together: the sha256 is the release asset's digest, from
-# gh api repos/badlogic/pi-mono/releases/tags/v<version>.
+# gh api repos/earendil-works/pi/releases/tags/v<version>.
 #
 pi_internal_version: "1.5.2"
 pi_internal_sha256: 811c6f2c9e7aaee252b5404252e556fb713aa209c1f7f924226aa77d4ef70cb5

@@ -24,7 +24,7 @@
   vars:
     release_name: pi
     release_version: "{{ pi_internal_version }}"
-    release_url: "https://github.com/badlogic/pi-mono/releases/download/v{{ pi_internal_version }}/pi-linux-x64.tar.gz"
+    release_url: "https://github.com/earendil-works/pi/releases/download/v{{ pi_internal_version }}/pi-linux-x64.tar.gz"
     release_sha256: "{{ pi_internal_sha256 }}"
     release_archive: true
     release_binary: pi/pi
