@@ -292,13 +292,13 @@
 
 - name: Create the agent instructions directory
   ansible.builtin.file:
-    path: /etc/agents
+    path: "{{ agents_internal_instructions_file | dirname }}"
     state: directory
     mode: "0755"
 
 - name: Install the agent instructions
   ansible.builtin.copy:
-    dest: /etc/agents/AGENTS.md
+    dest: "{{ agents_internal_instructions_file }}"
     mode: "0644"
     content: |
       <!-- Installed by appliance-build.agents-internal -- edit that role, not this file. -->

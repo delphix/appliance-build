@@ -45,7 +45,7 @@
 
 - name: Link the agent instructions into pi's agent directory
   ansible.builtin.file:
-    src: /etc/agents/AGENTS.md
+    src: "{{ agents_internal_instructions_file }}"
     dest: "{{ agents_internal_home_dir }}/.pi/agent/AGENTS.md"
     state: link
     owner: delphix

@@ -43,6 +43,6 @@
     content: |
       {
         "$schema": "https://opencode.ai/config.json",
-        "instructions": ["/etc/agents/AGENTS.md"],
+        "instructions": [{{ agents_internal_instructions_file | to_json }}],
         "autoupdate": false
       }

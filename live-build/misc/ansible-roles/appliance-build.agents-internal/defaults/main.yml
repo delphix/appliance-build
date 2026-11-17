@@ -186,10 +186,13 @@ agents_internal_opt_dir: /opt
 agents_internal_bin_dir: /usr/local/bin
 
 #
-# Facts about this image that every agent session would otherwise re-derive, installed
-# as /etc/agents/AGENTS.md. Each harness role hands this text to its harness in whatever
-# way that harness reads global instructions. Workflow guidance belongs in skills instead.
+# Facts about this image that every agent session would otherwise re-derive, and the file
+# they are installed in. Each harness role hands this text to its harness in whatever way
+# that harness reads global instructions. The path is a variable because those roles
+# consume it too, and a copy of it that falls out of step points at nothing instead of
+# failing. Workflow guidance belongs in skills instead.
 #
+agents_internal_instructions_file: /etc/agents/AGENTS.md
 agents_internal_instructions: |
   # This machine: the Delphix internal-claude image
 
