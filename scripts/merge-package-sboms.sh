@@ -21,12 +21,12 @@
 # Usage: merge-package-sboms.sh <image-sbom> <package-sbom-dir>
 #
 # The image SBOM, produced by the "95-generate-sbom.binary" hook, lists every
-# installed .deb as a flat pkg:deb component. linux-pkg publishes, beside each
-# .deb of a package that bundles third-party code, an SBOM describing what is
-# inside that .deb, named <deb-filename>.deb.cdx.json. For each of those whose
-# .deb is installed in this image, this adds its components to the image SBOM
-# and makes the owning pkg:deb component depend on each of them. Every other
-# component is left exactly as it was.
+# installed .deb as a flat pkg:deb component. For packages that bundle
+# third-party code, linux-pkg also publishes an SBOM beside each .deb they
+# build, describing what is inside it, named <deb-filename>.deb.cdx.json. For
+# each of those whose .deb is installed in this image, this adds its components
+# to the image SBOM and makes the owning pkg:deb component depend on each of
+# them. Every other component is left exactly as it was.
 #
 # The components are added to the top-level "components" array rather than
 # nested under the owning component, and ownership is carried only by the
@@ -121,8 +121,9 @@ for package_sbom in "${package_sboms[@]}"; do
 	jq -e . "$package_sbom" >/dev/null 2>&1 ||
 		die "Package SBOM '$package_sbom' is not valid JSON."
 
-	# Many .debs of a package carry none of its bundled content (most zfs
-	# .debs, for instance); there is nothing to add for them.
+	# Skip SBOMs with no components. linux-pkg writes an SBOM for every .deb
+	# a package builds, and most .debs contain no third-party code (most of
+	# zfs's, for instance).
 	count=$(jq '.components // [] | length' "$package_sbom")
 	if [[ "$count" -eq 0 ]]; then
 		empty=$((empty + 1))

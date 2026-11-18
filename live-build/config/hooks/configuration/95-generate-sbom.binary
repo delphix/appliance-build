@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+# The jq programs passed to sbom_jq() below use jq's own $variables.
+# shellcheck disable=SC2016
+
 #
 # Generate a CycloneDX SBOM for this image by scanning the populated
 # "binary" directory (i.e. the appliance's root filesystem). The syft and
@@ -55,52 +58,106 @@ SYFT_FILE_METADATA_SELECTION=none syft scan dir:binary \
 	-o "cyclonedx-json@1.6=$ARTIFACT_NAME.cdx.json"
 
 #
-# Syft types the document's root component by what it scanned, and scanning
-# a directory makes it "file". Mend's support team stated that their importer
-# only treats metadata.component as the project root when it is typed
-# "application", so retype it here. This is done where the document is
+# Post-process the document Syft produced, in the steps below, so that
+# standard SBOM scanners can read all of it.
+#
+# One of the requirements for this SBOM is that it can be processed by
+# standard scanners such as Mend, which is how it is checked for licenses and
+# known vulnerabilities. Mend's importer adds these constraints to the format
+# that Syft's output does not meet as is:
+#
+#  - The root component (metadata.component) must be typed "application", or
+#    Mend does not treat it as the project root.
+#  - Every license "id" must be on Mend's list of SPDX identifiers, which is
+#    shorter than the real SPDX list, or Mend rejects the whole document.
+#  - Every component must be reachable from the root through the
+#    "dependencies" array, which Mend walks to build its tree; it drops
+#    anything it does not reach.
+#  - Each Delphix product must be depended on by the root alone, because Mend
+#    groups findings under its "direct libraries": the components that nothing
+#    but the root depends on.
+#
+# Each step is a separate jq command that rewrites the document in place.
+#
+sbom="$ARTIFACT_NAME.cdx.json"
+
+function sbom_jq() {
+	jq "$@" "$sbom" >"$sbom.tmp"
+	mv "$sbom.tmp" "$sbom"
+}
+
+#
+# Type the root "application". Syft types it by what it scanned, and scanning
+# a directory makes it "file". This is done here, where the document is
 # produced, rather than when per-package SBOMs are merged into it later
-# (scripts/merge-package-sboms.sh), so that it holds for every image --
-# including one with nothing to merge -- and the merged document simply
-# inherits it.
+# (scripts/merge-package-sboms.sh), so that it holds for every image,
+# including one with nothing to merge.
 #
+sbom_jq '.metadata.component.type = "application"'
+
 #
-# Mend also rejects the whole document if a license "id" isn't on its own list
-# of SPDX identifiers, which is shorter than the real SPDX list. These two are
-# valid SPDX ids that Debian's copyright files use (SMAIL-GPL on debianutils,
-# Artistic-dist on perl), so carry them as free-text license names instead,
-# which CycloneDX allows. Add to this list if Mend reports another.
+# Carry license ids that Mend does not know as free-text names, which
+# CycloneDX allows. These are valid SPDX ids that Debian's copyright files use
+# (SMAIL-GPL on debianutils, Artistic-dist on perl). Add to this list if Mend
+# reports another.
 #
-# Mend builds its dependency tree by walking the "dependencies" array from
-# the root, but Syft never gives the root an entry there: it records only the
-# Depends: edges between packages. Every package that nothing else depends on
-# (dash, host-jdks, delphix-entire-aws, ...) is therefore unreachable, and
-# Mend drops it. So make the root depend on each such top-level component,
-# and give any component Syft left out of the array an empty entry of its
-# own. The existing Depends: edges are kept as Syft produced them, except
-# for those into delphix-* packages (below).
+sbom_jq '
+	["SMAIL-GPL", "Artistic-dist"] as $unknown_to_mend
+	| .components |= map(
+		if .licenses then
+			.licenses |= map(
+				if .license.id and (.license.id | IN($unknown_to_mend[]))
+				then .license = {name: .license.id}
+				else . end)
+		else . end)'
+
 #
-# That still misses packages that depend on each other in a closed loop with
-# nothing outside depending on them: in internal-dev, ldap-auth-client,
-# libpam-ldap, ldap-auth-config and libnss-ldap each have a parent, but only
-# within that loop. So walk the graph from the root and, while some component
-# is still unreachable, make the root depend on the first such one; one edge
-# per loop is enough to bring the whole loop in.
+# Drop every Depends: edge into a delphix-* package, so that the next step
+# makes each product a dependency of the root alone. The products otherwise
+# chain (delphix-masking depends on delphix-virtualization, which depends on
+# delphix-sso-app and delphix-platform-aws, ...), and Mend listed only
+# delphix-masking as a direct library, with every product's findings under it.
+# The cost is that the document no longer records which product depends on
+# which. Each product's edges to other packages are kept.
+# scripts/merge-package-sboms.sh does the same for each package it merges
+# bundled components into.
 #
-# Every delphix-* package is also made a direct dependency of the root, and
-# of the root alone: the Depends: edges from other packages to it are
-# dropped. The products otherwise chain (delphix-masking depends on
-# delphix-virtualization, which depends on delphix-sso-app and
-# delphix-platform-aws, ...), and Mend groups findings under the project's
-# "direct libraries", which it takes to be the components that nothing but
-# the root depends on; even with root edges to every product, it listed only
-# delphix-masking, with every product's findings under it. The cost is that
-# the document no longer records which product depends on which. Each
-# product's edges to other packages, and to its own bundled components, are
-# kept. scripts/merge-package-sboms.sh does the same for each package it
-# merges bundled components into.
+sbom_jq '
+	.metadata.component["bom-ref"] as $root
+	| [.components[] | select((.name | startswith("delphix-"))
+	                          and (.purl // "" | startswith("pkg:deb/")))
+	   | .["bom-ref"]] as $products
+	| .dependencies //= []
+	| .dependencies |= map(if .ref == $root or .dependsOn == null then .
+		else .dependsOn |= map(select(IN($products[]) | not)) end)'
+
 #
-jq '
+# Make the root depend on every component that nothing else depends on.
+# Syft records only the Depends: edges between packages and gives the root no
+# entry, so these (dash, host-jdks, delphix-entire-aws, ...) are otherwise
+# unreachable. Also give each component Syft left out of the array an empty
+# entry of its own.
+#
+sbom_jq '
+	.metadata.component["bom-ref"] as $root
+	| ([.dependencies[] | select(.ref != $root) | .dependsOn[]?]
+	   | unique) as $children
+	| ([.dependencies[].ref] | unique) as $listed
+	| [.components[]["bom-ref"]] as $top
+	| .dependencies = [.dependencies[] | select(.ref != $root)]
+		+ [{ref: $root, dependsOn:
+			[$top[] | select(IN($children[]) | not)]}]
+		+ [$top[] | select(IN($listed[]) | not) | {ref: ., dependsOn: []}]'
+
+#
+# Connect packages that depend on each other in a closed loop with nothing
+# outside depending on them, which the previous step misses: in internal-dev,
+# ldap-auth-client, libpam-ldap, ldap-auth-config and libnss-ldap each have a
+# parent, but only within that loop. While some component is unreachable from
+# the root, make the root depend on the first such one; one edge per loop is
+# enough to bring the whole loop in.
+#
+sbom_jq '
 	def reachable($g; $from):
 		{seen: {($from): true}, todo: [$from]}
 		| until(.todo == [];
@@ -110,23 +167,8 @@ jq '
 			| .seen += (reduce $new[] as $n ({}; .[$n] = true))
 			| .todo = $new)
 		| .seen;
-	["SMAIL-GPL", "Artistic-dist"] as $unknown_to_mend
-	| .metadata.component.type = "application"
-	| .dependencies //= []
-	| .metadata.component["bom-ref"] as $root
-	| [.components[] | select((.name | startswith("delphix-"))
-	                          and (.purl // "" | startswith("pkg:deb/")))
-	   | .["bom-ref"]] as $products
-	| .dependencies |= map(if .ref == $root or .dependsOn == null then .
-		else .dependsOn |= map(select(IN($products[]) | not)) end)
-	| ([.dependencies[] | select(.ref != $root) | .dependsOn[]?]
-	   | unique) as $children
-	| ([.dependencies[].ref] | unique) as $listed
+	.metadata.component["bom-ref"] as $root
 	| [.components[]["bom-ref"]] as $top
-	| .dependencies = [.dependencies[] | select(.ref != $root)]
-		+ [{ref: $root, dependsOn:
-			[$top[] | select(IN($children[]) | not)]}]
-		+ [$top[] | select(IN($listed[]) | not) | {ref: ., dependsOn: []}]
 	| def unreached:
 		(reduce .dependencies[] as $e ({}; .[$e.ref] = $e.dependsOn))
 			as $g
@@ -135,19 +177,10 @@ jq '
 	  until(unreached == null;
 		unreached as $c
 		| .dependencies |= map(if .ref == $root
-			then .dependsOn += [$c] else . end))
-	| .components |= map(
-		if .licenses then
-			.licenses |= map(
-				if .license.id and (.license.id | IN($unknown_to_mend[]))
-				then .license = {name: .license.id}
-				else . end)
-		else . end)
-' "$ARTIFACT_NAME.cdx.json" >"$ARTIFACT_NAME.cdx.json.tmp"
-mv "$ARTIFACT_NAME.cdx.json.tmp" "$ARTIFACT_NAME.cdx.json"
+			then .dependsOn += [$c] else . end))'
 
 cyclonedx-cli validate \
-	--input-file "$ARTIFACT_NAME.cdx.json" \
+	--input-file "$sbom" \
 	--input-format json \
 	--input-version v1_6 \
 	--fail-on-errors
