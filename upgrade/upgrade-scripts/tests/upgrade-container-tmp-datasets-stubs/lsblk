@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+#
+# A stand-in for lsblk(8), used by test-upgrade-container-tmp-datasets.py.
+#
+# create_upgrade_container asks it for the parent of the device
+# grub-probe named, which on a partitioned disk is the whole disk.
+#
+print("/dev/sda")

@@ -21,4 +21,18 @@
     dest: /opt/devops-gate
     accept_hostkey: yes
     update: no
+  register: devops_gate_clone
   when: lookup('env', 'GITHUB_TOKEN') != ''
+  no_log: yes
+
+#
+# git stores the clone URL, credential and all, in the checkout's own config,
+# which this image then ships. Reset the remote to a URL that carries none;
+# fetching from it on the running VM uses that user's own credential.
+#
+- community.general.git_config:
+    name: remote.origin.url
+    scope: local
+    repo: /opt/devops-gate
+    value: https://github.com/delphix/devops-gate.git
+  when: devops_gate_clone is not skipped

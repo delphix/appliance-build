@@ -8,7 +8,9 @@ How to run `appliance-build`'s local checks, to verify a change before relying o
 things: `shfmtCheck` — a shell-script formatting check
 (`shfmt -d` against every shell script under `scripts/`, the executable hooks under
 `live-build/config/hooks`, `upgrade/prepare`, `upgrade/tests/*.sh`, and `upgrade/upgrade-scripts/`
-except `README.md` and `rootfs-cleanup`) — and `checkTestingDocsVariantCoverage` (below).
+except `README.md`, `rootfs-cleanup`, Python, and the Python stand-ins under
+`tests/rootfs-cleanup-stubs/` and `tests/upgrade-container-tmp-datasets-stubs/`) — and
+`checkTestingDocsVariantCoverage` (below).
 
 `upgrade/tests/test-prepare.sh` exercises `upgrade/prepare` against a scratch `UPDATE_DIR`. Gradle
 only formats it; run it by hand with `upgrade/tests/test-prepare.sh`. It needs no appliance, and

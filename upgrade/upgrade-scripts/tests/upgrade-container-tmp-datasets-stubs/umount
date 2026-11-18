@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+#
+# A stand-in for umount(8), used by test-upgrade-container-tmp-datasets.py.
+#
+# upgrade-container's destroy() ignores what its umounts return, so this
+# only has to record them: which datasets destroy() unmounts before it
+# destroys the container is what the test asserts on.
+#
+import os
+import sys
+
+with open(os.environ["STUB_TRACE"], "a") as f:
+    f.write("umount " + " ".join(sys.argv[1:]) + "\n")

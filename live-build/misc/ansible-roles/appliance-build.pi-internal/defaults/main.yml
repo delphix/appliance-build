@@ -1,0 +1,24 @@
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+#
+# The pi coding agent release installed, from the earendil-works/pi GitHub releases. Bump
+# both together: the sha256 is the release asset's digest, from
+# gh api repos/earendil-works/pi/releases/tags/v<version>.
+#
+pi_internal_version: "1.5.2"
+pi_internal_sha256: 811c6f2c9e7aaee252b5404252e556fb713aa209c1f7f924226aa77d4ef70cb5

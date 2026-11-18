@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018, 2019 Delphix
+# Copyright 2018, 2026 Delphix
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,12 @@
 # limitations under the License.
 #
 UPDATE_DIR=${UPDATE_DIR:-/var/dlpx-update}
+
+#
+# Where the appliance's own version reporters live. The tests point this
+# at stand-ins.
+#
+APPLIANCE_BIN=${APPLIANCE_BIN:-/usr/bin}
 
 #
 # Records that the image's payload has been extracted into the unpack
@@ -40,6 +46,16 @@ function usage() {
 	echo "$(basename "$0"): $*" >&2
 	echo "Usage: $(basename "$0") [-f] [-s] [-x] <image>"
 	exit 2
+}
+
+#
+# Prints what one of the appliance's version reporters says. Releases that
+# predate a reporter have nothing for it to report, so a missing one
+# prints nothing.
+#
+function installed_property() {
+	[[ -x "$APPLIANCE_BIN/$1" ]] || return 0
+	"$APPLIANCE_BIN/$1"
 }
 
 function report_progress_inc() {
@@ -117,6 +133,44 @@ fi
 [[ -n "$MINIMUM_REBOOT_OPTIONAL_VERSION" ]] ||
 	die "MINIMUM_REBOOT_OPTIONAL_VERSION variable is empty"
 
+#
+# Only a sparse image sets this. Such an image holds just the packages
+# that one other image does not already have, so every package it
+# installs that is not in it has to be present at the version that other
+# image shipped. That makes it installable on exactly the appliance that
+# image produces, and the field names it, in the form IMAGE_NAME takes
+# below. Anywhere else the upgrade gets as far as the upgrade container
+# and dies there on a package it has no source for, once the appliance
+# has already been put into upgrade mode. Refuse it here, where the
+# combined image of the same hotfix is still an option.
+#
+# An image already in place in $UPDATE_DIR passed this check when it was
+# unpacked, and applying it moves the appliance off its base, so a later
+# run over it skips the check rather than deleting it.
+#
+IMAGE_NAME="$VERSION${HOTFIX:+-$HOTFIX}"
+IMAGE_NAME="$IMAGE_NAME${PACKAGED_APP_VERSION:+-$PACKAGED_APP_VERSION}"
+if [[ -n "$REQUIRED_BASE_VERSION" ]] && ! [[ . -ef "$UPDATE_DIR/$IMAGE_NAME" ]]; then
+	INSTALLED=$("$APPLIANCE_BIN/get-appliance-version") ||
+		die "failed to determine the installed version"
+	INSTALLED_HOTFIX=$(installed_property get-hotfix-version) ||
+		die "failed to determine the installed hotfix version"
+	INSTALLED_APP_VERSION=$(installed_property get-packaged-app-version) ||
+		die "failed to determine the installed app version"
+
+	INSTALLED="$INSTALLED${INSTALLED_HOTFIX:+-$INSTALLED_HOTFIX}"
+	INSTALLED="$INSTALLED${INSTALLED_APP_VERSION:+-$INSTALLED_APP_VERSION}"
+
+	if [[ "$INSTALLED" != "$REQUIRED_BASE_VERSION" ]]; then
+		# Unusable on this appliance, so let cleanup reclaim it.
+		rm -f "$EXTRACTED_MARKER"
+		die 19 "this upgrade image applies only to version" \
+			"$REQUIRED_BASE_VERSION, and this appliance is running" \
+			"$INSTALLED; upload the combined image of this hotfix" \
+			"instead"
+	fi
+fi
+
 if $opt_x; then
 	sed -i \
 		"s/^\\(MINIMUM_REBOOT_OPTIONAL_VERSION\\)=.*$/\\1=$VERSION/" \
@@ -129,12 +183,7 @@ fi
 
 popd &>/dev/null || die "'popd' failed"
 
-if [[ -n "$HOTFIX" ]]; then
-	VERSION="$VERSION-$HOTFIX"
-fi
-if [[ -n "$PACKAGED_APP_VERSION" ]]; then
-	VERSION="$VERSION-$PACKAGED_APP_VERSION"
-fi
+VERSION="$IMAGE_NAME"
 
 #
 # -f replaces an image that is already in place. When the directory being

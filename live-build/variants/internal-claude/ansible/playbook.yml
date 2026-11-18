@@ -20,13 +20,23 @@
   gather_facts: false
   vars:
     ansible_python_interpreter: /usr/bin/python3
+    #
+    # The *-development roles clone dlpx-app-gate, dms-core-gate and zfs
+    # straight into ~delphix. agents-internal already clones those repos,
+    # and every other engine repo, into ~delphix/src, so skip the ~delphix
+    # copies: two clones of the same repo in different places leave an
+    # agent unsure which one to read and change.
+    #
+    skip_home_source_clones: true
   #
-  # This variant is the internal-dev variant plus the Claude Code tooling in
-  # claude-internal, so every role up to that one should match the internal-dev
+  # This variant is the internal-dev variant plus the agent tooling:
+  # agents-internal for what every agent harness needs, then one role per
+  # harness. Every role up to agents-internal should match the internal-dev
   # playbook, in the same order. When a role is added to or removed from that
-  # playbook, this one should follow. The one deliberate difference is that
-  # delphix-ldap (and the passwordless_ldap_sudo it reads) is left out: this
-  # image is driven as the local delphix user, not by LDAP logins.
+  # playbook, this one should follow. There are two deliberate differences:
+  # delphix-ldap (and the passwordless_ldap_sudo it reads) is left out, because
+  # this image is driven as the local delphix user, not by LDAP logins; and
+  # skip_home_source_clones is set, for the reason above.
   #
   roles:
     - appliance-build.minimal-common
@@ -37,4 +47,8 @@
     - appliance-build.virtualization-common
     - appliance-build.virtualization-development
     - appliance-build.zfsonlinux-development
+    - appliance-build.agents-internal
     - appliance-build.claude-internal
+    - appliance-build.codex-internal
+    - appliance-build.opencode-internal
+    - appliance-build.pi-internal

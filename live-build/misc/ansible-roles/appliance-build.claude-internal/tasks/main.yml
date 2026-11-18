@@ -15,207 +15,17 @@
 #
 
 ---
-- name: Assert GITHUB_TOKEN is set
-  ansible.builtin.assert:
-    that:
-      - lookup('env', 'GITHUB_TOKEN') | length > 0
-    fail_msg: "GITHUB_TOKEN must be set to build the internal-claude variant."
-
-- name: Install NFS client
-  ansible.builtin.apt:
-    name: nfs-common
-    state: present
-
-- name: Create support-tools group
-  ansible.builtin.group:
-    name: support-tools
-    gid: 4000
-    state: present
-
-- name: Add delphix user to support-tools group
-  ansible.builtin.user:
-    name: delphix
-    groups: support-tools
-    append: true
-
-- name: Create /nas mount point
-  ansible.builtin.file:
-    path: /nas
-    state: directory
-    mode: "0755"
-
-- name: Install nas.mount systemd unit
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/nas.mount
-    mode: "0644"
-    content: |
-      [Unit]
-      Description=Support Tools NAS
-      After=network-online.target
-      Wants=network-online.target
-
-      [Mount]
-      What=support-tools-nas.delphix.com:/
-      Where=/nas
-      Type=nfs4
-      Options=defaults
-
-      [Install]
-      WantedBy=multi-user.target
-
-- name: Enable nas.mount unit
-  ansible.builtin.systemd:
-    name: nas.mount
-    enabled: true
-
-- name: Install curl, git, jq, and Node.js
-  ansible.builtin.apt:
-    name:
-      - curl
-      - git
-      - jq
-      - nodejs
-      - npm
-    state: present
-
-- name: Install Claude CLI via npm
-  ansible.builtin.command: npm install -g @anthropic-ai/claude-code
-  args:
-    creates: /usr/local/bin/claude
-  changed_when: true
-
-# The DCenter CLI, so skills can run `dc` on the image itself rather than over ssh to
-# dlpxdc.co -- a clone carries authorized_keys but no private key to make that hop with. It
-# gets its own virtualenv because dlpxdccommand pins boto3/botocore, which would fight the
-# awscli install in minimal-internal.
-- name: Install python3-venv for the DCenter client
-  ansible.builtin.apt:
-    name: python3-venv
-    state: present
-
-# The client is built from dcoa's python/command at the dcoa/live tag, the same source and
-# packaging dlpxdc.co installs from. The dlpxdccommand package on Artifactory is not
-# published from that tag, so it lags what dlpxdc.co runs.
-- name: Create a scratch directory for the dcoa checkout
-  ansible.builtin.tempfile:
-    state: directory
-  register: dcoa_checkout
-
-- name: Check out dcoa at the dcoa/live tag
-  ansible.builtin.git:
-    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/delphix/dcoa.git"
-    dest: "{{ dcoa_checkout.path }}"
-    version: dcoa/live
-    depth: 1
-  no_log: true
-
-# The index is delphix-virtual-pypi, not the delphix-local one dcoa's README documents:
-# delphix-local has no setuptools, so pip cannot resolve the build dependencies there and
-# fails on "No matching distribution found for setuptools>=40.8.0".
-- name: Install the DCenter client into /opt/dcenter-client
-  ansible.builtin.pip:
-    name: "{{ dcoa_checkout.path }}/python/command"
-    virtualenv: /opt/dcenter-client
-    virtualenv_command: /usr/bin/python3 -m venv
-    extra_args: >-
-      --no-cache-dir
-      --index-url
-      https://artifactory.delphix.com/artifactory/api/pypi/delphix-virtual-pypi/simple/
-
-- name: Remove the dcoa checkout
-  ansible.builtin.file:
-    path: "{{ dcoa_checkout.path }}"
-    state: absent
-
-- name: Link dc into /usr/local/bin
-  ansible.builtin.file:
-    src: /opt/dcenter-client/bin/dc
-    dest: /usr/local/bin/dc
-    state: link
-
-- name: Create ~delphix/src directory
-  ansible.builtin.file:
-    path: "{{ claude_internal_src_dir }}"
-    state: directory
-    owner: delphix
-    group: staff
-    mode: "g+w"
-
-# The repository list lives in this role's defaults/main.yml -- see the comments there for
-# what is in it and why. Retries are worth it here because the list is long enough, and
-# the gates large enough, that a single transient GitHub failure would otherwise discard
-# an entire image build.
-- name: Clone product repositories
-  ansible.builtin.git:
-    repo: "https://{{ lookup('env', 'GITHUB_TOKEN') }}@github.com/{{ item.org | default('delphix') }}/{{ item.name }}.git"
-    dest: "{{ claude_internal_src_dir }}/{{ item.name }}"
-    version: "{{ item.version }}"
-    depth: "{{ item.depth | default(omit) }}"
-    update: false
-  loop: "{{ claude_internal_repos }}"
-  register: clone_result
-  until: clone_result is succeeded
-  retries: 3
-  delay: 5
-  no_log: true
-
-# No no_log here, unlike the clone above: these commands carry no token, and suppressing
-# their output only makes a failure among this many repositories harder to place.
-- name: Reset clone URLs to SSH (strips the build-time bot token)
-  ansible.builtin.command:
-    cmd: >
-      git -C {{ claude_internal_src_dir }}/{{ item.name }}
-      remote set-url origin
-      git@github.com:{{ item.org | default('delphix') }}/{{ item.name }}.git
-  loop: "{{ claude_internal_repos }}"
-  changed_when: false
-
-# A shallow clone is also a single-branch clone: git narrows remote.origin.fetch to just
-# the one branch that was cloned, so on the image neither "git fetch --unshallow" nor a
-# checkout of any other branch would see anything else. Restoring the wildcard refspec
-# makes both work. This is a no-op for the full clones, which already have this value.
-- name: Restore the wildcard fetch refspec (shallow clones are single-branch)
-  ansible.builtin.command:
-    cmd: >
-      git -C {{ claude_internal_src_dir }}/{{ item.name }}
-      config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
-  loop: "{{ claude_internal_repos }}"
-  changed_when: false
-
-- name: Ensure ~delphix/src is owned by delphix:staff with group-write
-  ansible.builtin.file:
-    path: "{{ claude_internal_src_dir }}"
-    state: directory
-    owner: delphix
-    group: staff
-    mode: "g+w"
-    recurse: true
-
-- name: Allow apt sources to be modified post-boot
-  ansible.builtin.copy:
-    dest: /etc/cloud/cloud.cfg.d/99-delphix-claude.cfg
-    mode: "0644"
-    content: |
-      apt:
-        preserve_sources_list: false
-
-- name: Add git-utils/bin to PATH for login shells
-  ansible.builtin.copy:
-    dest: /etc/profile.d/git-utils-path.sh
-    mode: "0644"
-    content: 'export PATH="$PATH:{{ claude_internal_src_dir }}/git-utils/bin"'
-
-# The kg plugin's skills look at $KG_DIR first and otherwise clone the corpus into
-# ~/.cache/delphix-kg themselves, so without this an agentic run on a fresh image pays for
-# a second copy of a repository the image already carries. profile.d rather than the role's
-# other config sites because that is where this role already puts shell environment (see
-# git-utils-path.sh above), and it is what an interactive shell and Claude Code's own bash
-# tool both read.
-- name: Point the kg skills at the pre-installed knowledge-graph clone
-  ansible.builtin.copy:
-    dest: /etc/profile.d/knowledge-graph.sh
-    mode: "0644"
-    content: 'export KG_DIR="{{ claude_internal_src_dir }}/knowledge-graph"'
+- name: Install Claude Code
+  ansible.builtin.include_role:
+    name: appliance-build.agents-internal
+    tasks_from: install-release
+  vars:
+    release_name: claude
+    release_version: "{{ claude_internal_version }}"
+    release_url: "https://downloads.claude.ai/claude-code-releases/{{ claude_internal_version }}/linux-x64/claude"
+    release_sha256: "{{ claude_internal_sha256 }}"
+    release_archive: false
+    release_binary: claude
 
 - name: Create the Claude Code system configuration directories
   ansible.builtin.file:
@@ -228,59 +38,18 @@
 
 # Claude Code loads /etc/claude-code/CLAUDE.md into every session on the machine --
 # interactive, `claude -p`, and the Agent SDK -- ahead of any user or project CLAUDE.md.
-# It holds facts about this image that every session would otherwise re-derive; workflow
-# guidance belongs in the plugins' skills instead.
+# Its text is the instructions agents-internal installs for every harness.
 - name: Install the system-wide CLAUDE.md
   ansible.builtin.copy:
     dest: /etc/claude-code/CLAUDE.md
     mode: "0644"
     content: |
-      <!-- Installed by appliance-build.claude-internal -- edit that role, not this file. -->
-      # This machine: the Delphix internal-claude image
-
-      ## Filesystem
-      - /nas is an NFS mount of the support-tools NAS: every customer's support bundles,
-        far too large to walk. Never search from / (find /, grep -r /, du /), and add -xdev
-        when a whole-disk search is unavoidable.
-      - To find source, search the one repo it belongs to: git -C ~delphix/src/<repo>
-        ls-files or rg there. Even ~delphix/src as a whole is over 600,000 files, slow to
-        walk on a cold cache.
-      - ~delphix/src holds a clone of every repo the engine is built from, plus the build,
-        CI, and agent-tooling repos; the list is claude_internal_repos in
-        ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.claude-internal/defaults/main.yml.
-        Clones are only as current as the image build: git fetch before trusting them.
-        The linux-kernel-* clones are shallow; git fetch --unshallow before blame or bisect.
-
-      ## Team knowledge graph
-      - delphix/knowledge-graph is cloned at $KG_DIR (~delphix/src/knowledge-graph):
-        escalation postmortems, CI known failures, investigations, subsystem notes.
-      - Before investigating or root-causing a Delphix problem, git -C $KG_DIR pull and
-        read $KG_DIR/INDEX.md for prior art.
-      - Record anything a teammate could reuse with the kg skills: /kg:ingest, or
-        kg:ingest-escl-postmortem / kg:ingest-known-failure for those cases. Never
-        hand-edit INDEX.md; it is generated. The kg skills push to main directly, no PR.
-
-      ## Tools
-      - dc (DCenter CLI) runs locally. Interactively, run dc login once; in automation,
-        export DLPX_DEFAULT_CREDENTIALS=true to use the AWS credential chain.
-      - gh is installed; git-utils/bin is on PATH for login shells.
-
-      ## Git and PRs
-      - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push. Do
-        not use git review, even where a repo's docs say to.
-      - Name development branches projects/<slug>. Delphix branch protection permits
-        creating, force-pushing, and deleting branches only under projects/; other
-        namespaces are rejected.
-      - Commit, branch, PR and linking conventions come from the git, github and writing
-        plugins; their skills load as needed.
-
-      ## Claude Code configuration
-      - This file and the plugins in /etc/claude-code/managed-settings.d/ are installed by
-        the appliance-build.claude-internal role; change them there, not on the VM.
+      <!-- Installed by appliance-build.claude-internal -- edit appliance-build.agents-internal's agents_internal_instructions, not this file. -->
+      {{ agents_internal_instructions }}
 
 # The language servers the LSP plugins below drive. They go in /usr/local/bin and
 # /usr/bin so that every session finds them: a PATH entry in /etc/profile.d, the way
-# git-utils is added above, reaches login shells but not an automated `claude -p`.
+# agents-internal adds git-utils, reaches login shells but not an automated `claude -p`.
 # rust-analyzer is already on the image, from the delphix-rust package. The pyright
 # version is pinned so that an image build is reproducible rather than taking whatever
 # npm published that day; clangd's is a function of the apt mirror the image builds
@@ -308,16 +77,18 @@
 - name: Register the official Claude Code plugin marketplace
   ansible.builtin.command: claude plugin marketplace add anthropics/claude-plugins-official
   environment:
-    HOME: "{{ claude_internal_home_dir }}"
+    HOME: "{{ agents_internal_home_dir }}"
+    DISABLE_AUTOUPDATER: "1"
   args:
-    creates: "{{ claude_internal_home_dir }}/.claude/plugins/marketplaces/claude-plugins-official"
+    creates: "{{ agents_internal_home_dir }}/.claude/plugins/marketplaces/claude-plugins-official"
 
 - name: Pre-install the official plugins for the delphix user
   ansible.builtin.command: claude plugin install {{ item }}@claude-plugins-official
   environment:
-    HOME: "{{ claude_internal_home_dir }}"
+    HOME: "{{ agents_internal_home_dir }}"
+    DISABLE_AUTOUPDATER: "1"
   args:
-    creates: "{{ claude_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/{{ item }}"
+    creates: "{{ agents_internal_home_dir }}/.claude/plugins/cache/claude-plugins-official/{{ item }}"
   loop: "{{ claude_internal_official_plugins }}"
 
 # The first session on a booted VM silently skips a plugin that is cached but has no
@@ -328,7 +99,7 @@
   ansible.builtin.command: >-
     jq -e --arg p "{{ item }}@claude-plugins-official"
     '(.plugins[$p] // []) | any(.scope == "user")'
-    {{ claude_internal_home_dir }}/.claude/plugins/installed_plugins.json
+    {{ agents_internal_home_dir }}/.claude/plugins/installed_plugins.json
   changed_when: false
   loop: "{{ claude_internal_official_plugins }}"
 
@@ -343,13 +114,13 @@
     path: "{{ item }}"
     state: absent
   loop:
-    - "{{ claude_internal_home_dir }}/.claude.json"
-    - "{{ claude_internal_home_dir }}/.claude/settings.json"
-    - "{{ claude_internal_home_dir }}/.claude/backups"
+    - "{{ agents_internal_home_dir }}/.claude.json"
+    - "{{ agents_internal_home_dir }}/.claude/settings.json"
+    - "{{ agents_internal_home_dir }}/.claude/backups"
 
 - name: Ensure ~delphix/.claude is owned by delphix:staff
   ansible.builtin.file:
-    path: "{{ claude_internal_home_dir }}/.claude"
+    path: "{{ agents_internal_home_dir }}/.claude"
     state: directory
     owner: delphix
     group: staff
@@ -363,7 +134,9 @@
 # checks out a PLUGINS_BRANCH there gets that branch's plugins. Only plugins the platform
 # team has vetted are enabled; zfs and hotfix depend on git and blackbox, which are
 # listed so the whole enabled set is visible here. attribution is pinned true here too,
-# so no user or project setting can turn Claude co-authorship off.
+# so no user or project setting can turn Claude co-authorship off. The auto-updater is
+# off because the image pins Claude Code's version; left on, it would install a newer
+# copy under ~/.local/bin, ahead of the pinned one on a login shell's PATH.
 #
 # This task comes last, after the plugins above are installed. A `claude plugin install`
 # run with these settings already in place leaves the plugin out of
@@ -389,7 +162,7 @@
           "delphix-platform-team-claude-plugins": {
             "source": {
               "source": "directory",
-              "path": "{{ claude_internal_src_dir }}/platform-team-claude-plugins"
+              "path": "{{ agents_internal_src_dir }}/platform-team-claude-plugins"
             }
           },
           "claude-plugins-official": {
@@ -418,5 +191,8 @@
           "pyright-lsp@claude-plugins-official": true,
           "rust-analyzer-lsp@claude-plugins-official": true
         },
-        "attribution": true
+        "attribution": true,
+        "env": {
+          "DISABLE_AUTOUPDATER": "1"
+        }
       }
