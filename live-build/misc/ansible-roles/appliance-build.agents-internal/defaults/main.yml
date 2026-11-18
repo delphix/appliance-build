@@ -197,6 +197,16 @@ agents_internal_instructions: |
   # This machine: the Delphix internal-claude image
 
   ## Filesystem
+  - Swap on ZFS stops this machine. A swap zvol stalls the whole VM within seconds:
+    the console goes silent while the network still answers, so the VM is lost rather
+    than slow. A pool of its own does not help, and swapon refuses a swap file on a
+    ZFS dataset outright. Never run zfs create -V, mkswap and swapon to get a build
+    through ($KG_DIR/topics/swap-on-rpool-zvol-machine-wide-stall.md). Swap that is
+    genuinely needed goes on a raw partition on one of this VM's spare disks, the way
+    pipeline-shared's enable-swap.sh makes it.
+  - When a build or test needs more memory than this VM has, clone a bigger one with
+    dc clone-latest --size and run it there. Reporting that the workload does not fit
+    this node is also a result; stalling the VM to make it fit is not.
   - /nas is an NFS mount of the support-tools NAS: every customer's support bundles,
     far too large to walk. Never search from / (find /, grep -r /, du /), and add -xdev
     when a whole-disk search is unavoidable.
