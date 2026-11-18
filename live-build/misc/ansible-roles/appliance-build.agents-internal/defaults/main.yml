@@ -1,0 +1,241 @@
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+#
+# The delphix user's home (see the "delphix" user in the appliance-build.minimal-common
+# role), and the directory the repositories below are cloned into. The home moved from
+# /export/home to /home; there is deliberately no /export/home compatibility symlink, so
+# the old path would resolve to a stray directory tree on the root dataset rather than to
+# anything reachable as ~delphix. Both are defined once here because many tasks consume
+# them, and repeating the path inline is what let that move miss this role.
+#
+agents_internal_home_dir: /home/delphix
+agents_internal_src_dir: "{{ agents_internal_home_dir }}/src"
+
+#
+# The repositories cloned into ~delphix/src on the internal-claude image, so that an agent
+# on the image can read and modify the sources the Delphix Engine is built from without
+# first having to discover and clone them.
+#
+# The engine-input half of this list is not hand-curated: it is every repository that
+# linux-pkg names in a package's DEFAULT_PACKAGE_GIT_URL, plus the two build frameworks
+# (appliance-build, linux-pkg) that drive it. When a package is added to or removed from
+# linux-pkg, this list should follow. Two linux-pkg packages are deliberately absent
+# because they have no git source to clone -- grub2 fetches a prebuilt from the
+# release-de-images S3 bucket and misc-debs fetches prebuilt .debs from Artifactory; both
+# set DEFAULT_PACKAGE_GIT_URL=none.
+#
+# Fields:
+#   name     repository name; also the directory under ~delphix/src
+#   version  the branch to check out -- these are NOT uniformly "develop", so each entry
+#            carries the repository's actual default branch
+#   org      GitHub organization, defaulting to "delphix"
+#   depth    when set, clone shallow to this many commits (see the kernels below)
+#   single_branch
+#            when true, clone only the branch in version (see the dashboard below)
+#   fetch_exclude
+#            branches a plain "git fetch" on the image skips; "git fetch origin <branch>"
+#            still gets one (see the dashboard below)
+#
+agents_internal_repos:
+  #
+  # The build frameworks, and the platform/kernel metapackages they assemble.
+  #
+  - { name: appliance-build, version: develop }
+  - { name: linux-pkg, version: develop }
+  - { name: delphix-platform, version: develop }
+  - { name: delphix-kernel, version: develop }
+
+  #
+  # The product gates. These three and the API gateway below are the bulk of the total,
+  # at roughly 1.9GB between them.
+  #
+  - { name: dlpx-app-gate, version: develop }
+  - { name: dms-core-gate, version: develop }
+  - { name: zfs, version: develop }
+
+  #
+  # The API gateway: the services, their Angular UI, and the support tooling. None of
+  # these are linux-pkg packages, so unlike most of the list above they don't come from
+  # a DEFAULT_PACKAGE_GIT_URL. All three are on main.
+  #
+  - { name: apigw-services, version: main }
+  - { name: apigw-ui, version: main }
+  - { name: apigw-support, version: main }
+
+  #
+  # Upgrade verification, and the SSO app (built as the delphix-sso-app package).
+  #
+  - { name: delphix-upgrade-verification, version: main }
+  - { name: saml-app, version: develop }
+
+  #
+  # First-party packages and Delphix forks of upstream packages. All small; the whole
+  # group is well under 100MB.
+  #
+  - { name: bcc, version: develop }
+  - { name: challenge-response, version: develop }
+  - { name: cloud-init, version: develop }
+  - { name: connstat, version: develop }
+  - { name: crypt-blowfish, version: develop }
+  - { name: delphix-go, version: master }
+  - { name: delphix-rust, version: develop }
+  - { name: docker-python-image, version: develop }
+  - { name: drgn, version: develop }
+  - { name: dwarves, version: master }
+  - { name: fluentd-gems, version: develop }
+  - { name: host-jdks, version: develop }
+  - { name: libkdumpfile, version: develop }
+  - { name: makedumpfile, version: develop }
+  - { name: nfs-utils, version: develop }
+  - { name: performance-diagnostics, version: develop }
+  - { name: ptools, version: develop }
+  - { name: python-rtslib-fb, version: develop }
+  - { name: savedump, version: develop }
+  - { name: sdb, version: develop }
+  - { name: targetcli-fb, version: develop }
+
+  #
+  # SBOM tooling. Installed on the linux-pkg and appliance-build hosts rather than into
+  # the shipped image, but still an input to how images are produced (DLPX-98618).
+  #
+  - { name: syft, version: develop }
+  - { name: cyclonedx-cli, version: develop }
+
+  #
+  # The per-platform kernels, cloned shallow. At full depth these five are ~20GB packed --
+  # by themselves an order of magnitude more than everything else here combined, and
+  # ~20GB pulled from GitHub on every image build.
+  #
+  # The cost of depth=1 is that history is absent, so blame and bisect do not work until
+  # someone runs "git fetch --unshallow" on the image. The tasks file rewrites the fetch
+  # refspec after cloning so that unshallowing, and checking out any other branch, works.
+  #
+  - { name: linux-kernel-generic, version: develop, depth: 1 }
+  - { name: linux-kernel-aws, version: develop, depth: 1 }
+  - { name: linux-kernel-azure, version: develop, depth: 1 }
+  - { name: linux-kernel-gcp, version: develop, depth: 1 }
+  - { name: linux-kernel-oracle, version: develop, depth: 1 }
+
+  #
+  # Build, CI, and agent-tooling repositories. Not engine inputs, but the skills already
+  # shipped on this image drive them -- git-utils provides git-ab-pre-push, dcoa provides
+  # the dc CLI's source of truth, and devops-gate/pipeline-shared hold the Jenkins jobs
+  # those triggers land in.
+  #
+  - { name: devops-gate, version: main }
+  - { name: git-utils, version: main }
+  - { name: pipeline-shared, version: main }
+  - { name: dcoa, version: stage }
+  - { name: qa-infra, version: master }
+  - { name: github-infra, version: main }
+  - { name: dlpx-claude-plugins, version: main }
+  - { name: platform-team-claude-plugins, version: main }
+  - { name: cd-aidlc, version: main }
+
+  #
+  # The dashboard over the claude-automation Jenkins jobs, whose publisher job is in
+  # devops-gate above. Nearly all of its size is the gh-pages branch the publisher commits
+  # to on every run, so it keeps growing; main, the source, is under 1MB. The clone skips
+  # gh-pages, and so does a later plain "git fetch" on the image.
+  #
+  - name: dlpx-claude-automation-dashboard
+    version: main
+    single_branch: true
+    fetch_exclude: [gh-pages]
+
+  #
+  # The team knowledge graph. Not tooling but the corpus the tooling reads: the kg plugin's
+  # skills (shipped from platform-team-claude-plugins above) resolve it from $KG_DIR, which
+  # the tasks file points at this clone. Without it their fallback is to clone into
+  # ~/.cache/delphix-kg on first use, which an agentic run on a fresh image would pay for
+  # every time. The tradeoff is that this copy is only as current as the image, where that
+  # cache is hard-reset to origin/main on every use -- pull it before trusting it.
+  #
+  - { name: knowledge-graph, version: main }
+
+  #
+  # QA: the test gate itself, the VSDK test plugins it provisions, and the golden images
+  # the environments under test are built from.
+  #
+  - { name: dlpx-qa-gate, version: develop }
+  - { name: qa-appdata-toolkits, version: main }
+  - { name: golden-images, version: master }
+
+
+#
+# Where tasks/install-release.yml puts each agent harness: the release is unpacked under
+# <opt_dir>/<name>/<version> and linked as <bin_dir>/<name>. Variables rather than inline
+# paths only so the task can be exercised against scratch directories off the image.
+#
+agents_internal_opt_dir: /opt
+agents_internal_bin_dir: /usr/local/bin
+
+#
+# Facts about this image that every agent session would otherwise re-derive, and the file
+# they are installed in. Each harness role hands this text to its harness in whatever way
+# that harness reads global instructions. The path is a variable because those roles
+# consume it too, and a copy of it that falls out of step points at nothing instead of
+# failing. Workflow guidance belongs in skills instead.
+#
+agents_internal_instructions_file: /etc/agents/AGENTS.md
+agents_internal_instructions: |
+  # This machine: the Delphix internal-claude image
+
+  ## Filesystem
+  - /nas is an NFS mount of the support-tools NAS: every customer's support bundles,
+    far too large to walk. Never search from / (find /, grep -r /, du /), and add -xdev
+    when a whole-disk search is unavoidable.
+  - To find source, search the one repo it belongs to: git -C ~delphix/src/<repo>
+    ls-files or rg there. Even ~delphix/src as a whole is over 600,000 files, slow to
+    walk on a cold cache.
+  - ~delphix/src holds a clone of every repo the engine is built from, plus the build,
+    CI, and agent-tooling repos; the list is agents_internal_repos in
+    ~delphix/src/appliance-build/live-build/misc/ansible-roles/appliance-build.agents-internal/defaults/main.yml.
+    Clones are only as current as the image build: git fetch before trusting them.
+    The linux-kernel-* clones are shallow; git fetch --unshallow before blame or bisect.
+
+  ## Team knowledge graph
+  - delphix/knowledge-graph is cloned at $KG_DIR (~delphix/src/knowledge-graph):
+    escalation postmortems, CI known failures, investigations, subsystem notes.
+  - Before investigating or root-causing a Delphix problem, git -C $KG_DIR pull and
+    read $KG_DIR/INDEX.md for prior art.
+  - Record anything a teammate could reuse with the kg skills: /kg:ingest, or
+    kg:ingest-escl-postmortem / kg:ingest-known-failure for those cases. Where the
+    harness has no skills, read their SKILL.md under
+    ~delphix/src/platform-team-claude-plugins/plugins/kg/skills/ and follow it. Never
+    hand-edit INDEX.md; it is generated. The kg skills push to main directly, no PR.
+
+  ## Tools
+  - dc (DCenter CLI) runs locally. Interactively, run dc login once; in automation,
+    export DLPX_DEFAULT_CREDENTIALS=true to use the AWS credential chain.
+  - gh is installed; interactively, run gh auth login once. git-utils/bin is on PATH
+    for login shells.
+
+  ## Git and PRs
+  - File and update PRs with gh (gh pr create, gh pr edit) or a plain git push.
+  - Name development branches projects/<slug>. Delphix branch protection permits
+    creating, force-pushing, and deleting branches only under projects/; other
+    namespaces are rejected.
+  - Commit, branch, PR and linking conventions come from the git, github and writing
+    plugins in ~delphix/src/platform-team-claude-plugins/plugins/. Claude Code loads
+    them as skills; other harnesses can read the SKILL.md files there directly.
+
+  ## Agent configuration
+  - These instructions come from the appliance-build.agents-internal role. Each
+    harness's own role (appliance-build.<harness>-internal) hands them to that harness
+    and holds the rest of its configuration. Change them there, not on the VM.
