@@ -267,7 +267,8 @@
 
 # git-utils' bin/ goes on every login shell's PATH below, but none of its Python
 # commands run without this virtualenv. It is built after the ownership task above,
-# never before it; the file says why.
+# never before it; the file says why, and check-system-python.yml at the end of this
+# file is what stops a build where that ordering was lost.
 - name: Build git-utils' Python environment
   ansible.builtin.import_tasks: git-utils-venv.yml
 
@@ -309,3 +310,11 @@
     content: |
       <!-- Installed by appliance-build.agents-internal -- edit that role, not this file. -->
       {{ agents_internal_instructions }}
+
+#
+# Last in the role, deliberately: it checks that nothing above it chowned its way out of
+# ~delphix/src through the git-utils virtualenv. Keep any task added to this role above
+# this import.
+#
+- name: Check that the system python3 is still root-owned
+  ansible.builtin.import_tasks: check-system-python.yml

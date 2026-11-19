@@ -26,7 +26,8 @@
 # to stay after it. "python3 -m venv" leaves one absolute symlink,
 # .venv/bin/python3 -> /usr/bin/python3, and the file module follows symlinks while
 # recursing, so a virtualenv built earlier hands /usr/bin/python3 itself to delphix:staff
-# on every image that includes this role.
+# on every image that includes this role. check-system-python.yml, imported last in
+# main.yml, fails the build if anything ever does.
 #
 - name: Build the git-utils virtualenv
   ansible.builtin.command:
