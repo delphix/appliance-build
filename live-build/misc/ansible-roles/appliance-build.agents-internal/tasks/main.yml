@@ -265,6 +265,12 @@
     mode: "g+w"
     recurse: true
 
+# git-utils' bin/ goes on every login shell's PATH below, but none of its Python
+# commands run without this virtualenv. It is built after the ownership task above,
+# never before it; the file says why.
+- name: Build git-utils' Python environment
+  ansible.builtin.import_tasks: git-utils-venv.yml
+
 - name: Allow apt sources to be modified post-boot
   ansible.builtin.copy:
     dest: /etc/cloud/cloud.cfg.d/99-delphix-claude.cfg
