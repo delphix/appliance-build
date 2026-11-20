@@ -24,10 +24,12 @@
 #
 # This file is imported after the task that gives ~delphix/src to delphix:staff, and has
 # to stay after it. "python3 -m venv" leaves one absolute symlink,
-# .venv/bin/python3 -> /usr/bin/python3, and the file module follows symlinks while
-# recursing, so a virtualenv built earlier hands /usr/bin/python3 itself to delphix:staff
-# on every image that includes this role. check-system-python.yml, imported last in
-# main.yml, fails the build if anything ever does.
+# .venv/bin/python3 -> /usr/bin/python3, and the file module's recursion sets ownership
+# on what a symlink resolves to unless it is passed follow: false, so a virtualenv built
+# earlier is one missing flag away from handing /usr/bin/python3 itself to delphix:staff.
+# That task passes the flag, the chown below uses "chown -R -P", which does not
+# dereference either, and check-system-python.yml, imported last in main.yml, fails the
+# build if a task that does neither is ever added after this one.
 #
 - name: Build the git-utils virtualenv
   ansible.builtin.command:

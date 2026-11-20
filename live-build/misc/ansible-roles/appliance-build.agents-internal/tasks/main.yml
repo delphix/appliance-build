@@ -256,6 +256,12 @@
   loop: "{{ agents_internal_repos | subelements('fetch_exclude', skip_missing=True) }}"
   changed_when: false
 
+# follow: false because the module's default sets owner, group and mode on what each
+# symlink resolves to as well as on the link itself, and that is this task's only reach
+# outside ~delphix/src. Two links in the tree point out of it: delphix-platform's
+# etc/kernel/postinst.d/update-notifier, and .venv/bin/python3 -> /usr/bin/python3 once
+# the virtualenv below exists. Recursion walks every in-tree path either way, so the
+# tree itself is left the same.
 - name: Ensure ~delphix/src is owned by delphix:staff with group-write
   ansible.builtin.file:
     path: "{{ agents_internal_src_dir }}"
@@ -264,6 +270,7 @@
     group: staff
     mode: "g+w"
     recurse: true
+    follow: false
 
 # git-utils' bin/ goes on every login shell's PATH below, but none of its Python
 # commands run without this virtualenv. It is built after the ownership task above,

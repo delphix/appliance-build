@@ -19,8 +19,9 @@
 # The guard on the one ordering constraint git-utils-venv.yml has, imported last in this
 # role so that it sees every task that could have broken it. "python3 -m venv" leaves
 # .venv/bin/python3 as an absolute symlink to /usr/bin/python3, and Ansible's file module
-# lchowns what a symlink names while recursing, so any recursive chown of ~delphix/src
-# that runs once the virtualenv exists hands /usr/bin/python3 itself to delphix:staff.
+# lchowns what a symlink names while recursing unless it is passed follow: false, so a
+# recursive chown of ~delphix/src added without that flag, once the virtualenv exists,
+# hands /usr/bin/python3 itself to delphix:staff.
 # Nothing else in the build looks at /usr/bin/python3, and the image boots either way, so
 # without this the mistake reaches a VM rather than a build log.
 #
