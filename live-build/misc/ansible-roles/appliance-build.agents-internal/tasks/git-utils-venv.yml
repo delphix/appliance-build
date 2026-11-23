@@ -1,0 +1,53 @@
+#
+# Copyright 2026 Delphix
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+#
+# git-utils' Python environment. Thirty-five of the fifty-six commands in its bin/ exec
+# ../.venv/bin/python with no fallback, so without this virtualenv git-fetch-secret,
+# git-ab-pre-push, git-blackbox and the rest exit 127 on every VM cloned from the image.
+# The dependencies come from the delphix-virtual-pypi index that git-utils'
+# requirements.txt pins, which is the index the DCenter client is installed from too.
+#
+# This file is imported after the task that gives ~delphix/src to delphix:staff, and has
+# to stay after it. "python3 -m venv" leaves one absolute symlink,
+# .venv/bin/python3 -> /usr/bin/python3, and the file module's recursion sets ownership
+# on what a symlink resolves to unless it is passed follow: false, so a virtualenv built
+# earlier is one missing flag away from handing /usr/bin/python3 itself to delphix:staff.
+# That task passes the flag, the chown below uses "chown -R -P", which does not
+# dereference either, and check-system-python.yml, imported last in main.yml, fails the
+# build if a task that does neither is ever added after this one.
+#
+- name: Build the git-utils virtualenv
+  ansible.builtin.command:
+    # -u skips the "git pull --rebase" that the plain form starts with. The clone's
+    # origin is the ssh form by now, and the build has no key for it.
+    cmd: "{{ agents_internal_src_dir }}/git-utils/bin/git-update-git-utils -u"
+    creates: "{{ agents_internal_src_dir }}/git-utils/.venv/bin/python"
+  environment:
+    # The build runs as root, so pip would otherwise leave its cache in /root/.cache.
+    PIP_NO_CACHE_DIR: "1"
+
+#
+# chown(1) rather than the file module, because of the symlink above: GNU chown does not
+# dereference while recursing, and the file module does. The whole clone, because
+# requirements.txt installs git-utils itself with "pip install -e", which writes build
+# metadata beside the sources.
+#
+- name: Give the git-utils virtualenv to delphix
+  ansible.builtin.command:
+    cmd: chown -R -P delphix:staff {{ agents_internal_src_dir }}/git-utils
+  changed_when: false
