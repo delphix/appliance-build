@@ -231,4 +231,24 @@ for pkg in delphix-syft delphix-cyclonedx-cli; do
 	apt-get install -y --no-install-recommends "$deb"
 done
 
+#
+# Keep the per-package CycloneDX SBOMs that linux-pkg publishes beside each
+# .deb (<deb-filename>.deb.cdx.json), so run-live-build.sh can merge them
+# into each image's SBOM (see scripts/merge-package-sboms.sh). They arrived
+# with the directory sync above, but $WORK_DIRECTORY is removed below, and
+# this script runs once per build while run-live-build.sh runs once per
+# variant/platform afterwards -- so they have to outlive it, the same way
+# the ancillary repository does.
+#
+# The directory is recreated rather than appended to, so SBOMs left over from
+# an earlier build can never be merged into this one. Packages built before
+# linux-pkg started producing SBOMs simply contribute nothing here.
+#
+SBOM_DIR=$TOP/live-build/build/sboms
+rm -rf "$SBOM_DIR"
+mkdir -p "$SBOM_DIR"
+find "$WORK_DIRECTORY/artifacts" -type f -name '*.deb.cdx.json' \
+	-exec cp {} "$SBOM_DIR/" \;
+echo "Kept $(find "$SBOM_DIR" -type f | wc -l) package SBOM(s) in $SBOM_DIR"
+
 rm -rf "$WORK_DIRECTORY"
