@@ -15,6 +15,29 @@
 #
 
 ---
+- name: Install FUSE runtime dependencies (fuse3, libfuse2t64)
+  ansible.builtin.apt:
+    name:
+      - fuse3
+      - libfuse2t64
+    state: present
+
+- name: Install mount-s3 (S3 FUSE mounter, all architectures)
+  ansible.builtin.apt:
+    deb: https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.deb
+    state: present
+
+- name: Add Microsoft packages apt repository for blobfuse2
+  ansible.builtin.apt:
+    deb: https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+    state: present
+
+- name: Install blobfuse2 v2 (Azure Blob FUSE mounter)
+  ansible.builtin.apt:
+    name: blobfuse2
+    state: present
+    update_cache: true
+
 - name: Install the Hyperscale Compliance package
   ansible.builtin.apt:
     name: delphix-hyperscale
